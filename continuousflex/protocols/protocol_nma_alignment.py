@@ -46,7 +46,7 @@ import pyworkflow.em.metadata as md
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
-                            setXmippAttributes)
+                            setXmippAttributes, basename, setOfParticlesToMd)
 from .convert import modeToRow
 
 
@@ -185,8 +185,22 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
+            if(index): # case the input is a stack
+                # Conside the index is the id in the input set
+                particle = inputSet[index]
+            else: # input is not a stack
+                # convert the inputSet to metadata:
+                mdtemp = md.MetaData()
+                setOfParticlesToMd(inputSet,mdtemp)
+                # Loop and find the index based on the basename:
+                bn_retrieved = basename(imgPath)
+                for searched_index in mdtemp:
+                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE,searched_index)
+                    bn_searched = basename(imgPath_temp)
+                    if bn_searched == bn_retrieved:
+                        index = searched_index
+                        particle = inputSet[index]
+                        break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, long(particle.getObjId()), objId)
         mdImgs.write(self.imgsFn)
@@ -217,8 +231,22 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
-            # Conside the index is the id in the input set
-            particle = inputSet[index]
+            if(index): # case the input is a stack
+                # Conside the index is the id in the input set
+                particle = inputSet[index]
+            else: # input is not a stack
+                # convert the inputSet to metadata:
+                mdtemp = md.MetaData()
+                setOfParticlesToMd(inputSet,mdtemp)
+                # Loop and find the index based on the basename:
+                bn_retrieved = basename(imgPath)
+                for searched_index in mdtemp:
+                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE,searched_index)
+                    bn_searched = basename(imgPath_temp)
+                    if bn_searched == bn_retrieved:
+                        index = searched_index
+                        particle = inputSet[index]
+                        break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, long(particle.getObjId()), objId)
         mdImgs.write(self.imgsFn)

@@ -46,7 +46,7 @@ import pyworkflow.em.metadata as md
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
-                            setXmippAttributes, basename, setOfParticlesToMd)
+                            setXmippAttributes, basename)
 from .convert import modeToRow
 
 
@@ -192,7 +192,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-		mdtemp = md.MetaData(self.imgsFn_backup)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:
@@ -237,7 +237,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-		mdtemp = md.MetaData(self.imgsFn_backup)
+                mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:

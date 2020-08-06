@@ -118,6 +118,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         atomsFn = self.getInputPdb().getFileName()
         # Define some outputs filenames
         self.imgsFn = self._getExtraPath('images.xmd') 
+	self.imgsFn_backup = self._getExtraPath('images_backup.xmd')
         self.modesFn = self._getExtraPath('modes.xmd')
         self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
         if self.structureEM:
@@ -146,6 +147,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         # Write a metadata with the normal modes information
         # to launch the nma alignment programs
         writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
+	writeSetOfParticles(self.inputParticles.get(), self.imgsFn_backup)
         
 	# This is now done differently (see _insertAllSteps) and this line must be removed now
 	# Copy the atoms file to current working dir
@@ -190,8 +192,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+		mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:
@@ -236,8 +237,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                 particle = inputSet[index]
             else: # input is not a stack
                 # convert the inputSet to metadata:
-                mdtemp = md.MetaData()
-                setOfParticlesToMd(inputSet,mdtemp)
+		mdtemp = md.MetaData(self.imgsFn_backup)
                 # Loop and find the index based on the basename:
                 bn_retrieved = basename(imgPath)
                 for searched_index in mdtemp:

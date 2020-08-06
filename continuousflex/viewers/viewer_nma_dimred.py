@@ -182,6 +182,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
         newProt.sqliteFile.set(fnSqlite)
         
         project.launchProtocol(newProt)
+        project.getRunsGraph()
         
     def _loadAnimationData(self, obj):
         prot = self.protocol

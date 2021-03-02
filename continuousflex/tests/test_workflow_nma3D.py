@@ -36,6 +36,8 @@ from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 from continuousflex.protocols.protocol_nma_dimred_vol import DIMRED_SKLEAN_PCA
 import os
 
+# TODO: rewrite the whole test protocol using the new data synthesizing scripts
+
 class TestHEMNMA3D(TestWorkflow):
     """ Check the images are converted properly to spider format. """
 
@@ -78,7 +80,6 @@ class TestHEMNMA3D(TestWorkflow):
         protAlignment.inputVolumes.set(protImportParts.outputVolumes)
         self.launchProtocol(protAlignment)
 
-        # Launch Dimred after NMA alignment 
         protDimRed = self.newProtocol(FlexProtDimredNMAVol,
                                       dimredMethod=DIMRED_SKLEAN_PCA,  # PCA
                                       reducedDim=2)
@@ -123,4 +124,3 @@ class TestHEMNMA3D(TestWorkflow):
                                       dimredMethod=DIMRED_SKLEAN_PCA,  # PCA
                                       reducedDim=2)
         protDimRed.inputNMA.set(protAlignment)
-        self.launchProtocol(protDimRed)

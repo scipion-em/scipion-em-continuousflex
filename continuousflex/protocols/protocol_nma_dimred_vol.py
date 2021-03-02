@@ -23,12 +23,11 @@
 # *
 # **************************************************************************
 from pyworkflow.object import String
-from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam, IntParam,
-                                        LEVEL_ADVANCED)
+from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
 from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile
-
+from pyworkflow.protocol import params
 
 
 import numpy as np
@@ -80,11 +79,12 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                       help='Select a previous run of the NMA alignment Vol.')
 
         form.addParam('dataChoice', EnumParam, default=USE_PDBS,
-                      choices=['Use the fitted PDBs (recommended)',
+                      choices=['Use the fitted PDBs',
                                'Use normal mode amplitudes'],
                       label='Data to analyze',
-                      help='Choosing to analyze the fitted PDBs is slower but more accurate.'
-                           ' You can choose to use normal mode amplitudes for preliminary results.')
+                      help='Theoretically, both methods should give similar results, but choosing to analyze the fitted'
+                           ' PDBs can help reduce / eliminate the crosstalk between the normal-modes.'
+                           ' We recommend trying both options and comparing the results.')
 
         form.addParam('dimredMethod', EnumParam, default=DIMRED_SKLEAN_PCA,
                       choices=['Principal Component Analysis (PCA)',
@@ -98,7 +98,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                                'Hessian Locally Linear Embedding',
                                'Stochastic Proximity Embedding',
                                'Neighborhood Preserving Embedding',
-                               'Scikit-Learn PCA (for large PDBs)',
+                               'Scikit-Learn PCA',
                                "Don't reduce dimensions"],
                       label='Dimensionality reduction method',
                       help=""" Choose among the following dimensionality reduction methods:
@@ -125,8 +125,9 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
     NPE <k=12>
        Neighborhood Preserving Embedding, k=number of nearest neighbours 
 """)
-        form.addParam('extraParams', StringParam, level=LEVEL_ADVANCED,
-                      label="Extra params",
+        form.addParam('extraParams', params.StringParam, default=None,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Extra params',
                       help='These parameters are there to change the default parameters of a dimensionality reduction'
                            ' method. Check xmipp_matrix_dimred for full details.')
 
@@ -193,7 +194,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                 self.runJob('xmipp_pdb_nma_deform', cmd)
                 i += 1
             pdbs_list = [f for f in glob.glob(pdbs_folder+'/*.pdb')]
-            #print(pdbs_list)
+            pdbs_list.sort()
             pdbs_matrix = []
             for pdbfn in pdbs_list:
                 pdb_lines = self.readPDB(pdbfn)

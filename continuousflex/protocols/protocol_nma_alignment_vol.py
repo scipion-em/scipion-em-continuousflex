@@ -66,7 +66,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         form.addParam('inputVolumes', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
-                      help='Select one or more volumes')
+                      help='Select the set of volumes that will be analyzed using normal modes.')
         form.addParam('copyDeformations', params.PathParam,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Precomputed results (for developmemt)',
@@ -75,19 +75,20 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                            'remaining steps using this file.')
         form.addSection(label='Missing-wedge Compensation')
         form.addParam('WedgeMode', params.EnumParam,
-                      choices=['Do not compensate', 'Compensate (Recommended)'],
+                      choices=['Do not compensate', 'Compensate'],
                       default=WEDGE_MASK_THRE,
                       label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
                       help='Choose to compensate for the missing wedge if the data is subtomograms.'
-                           ' However, if you deal with missing wedge differently, then choose not to compensate.'
-                           ' You can also choose not to compensate if your data is not subtomograms but EM-maps')
+                           ' However, if you correct the missing wedge in advance, then choose not to compensate.'
+                           ' You can also choose not to compensate if your data is not subtomograms but EM-maps.'
+                           ' The missing wedge is assumed to be in the Y-axis direction.')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
@@ -120,7 +121,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum normalized pixel frequency',
-                      help='The normalized frequency should be a number between 0 and 1 '
+                      help='The normalized frequency should be a number between -0.5 and 0.5 '
                            'The more it is, the bigger the search frequency is, the more time it demands, '
                            'keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
@@ -221,6 +222,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
 
@@ -281,6 +283,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
         mdImgs.write(self.imgsFn)

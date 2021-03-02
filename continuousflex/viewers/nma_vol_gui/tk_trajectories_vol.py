@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -28,22 +27,20 @@ from os.path import basename
 import tkinter as tk
 
 import pyworkflow.gui as gui
+from pyworkflow.utils.properties import Icon
 from pyworkflow.gui.widgets import Button, HotButton
 
-from continuousflex.protocols.data import Point
-from . import PointSelector
-from continuousflex.viewers.nma_plotter import FlexNmaPlotter
+from continuousflex.protocols.data import Point, PathData
+from . import PointPathVol
+from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
+FIGURE_LIMIT_NONE = 0
+FIGURE_LIMITS = 1
 
-class ClusteringWindow(gui.Window):
+class TrajectoriesWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
     contained in a Data object.
-    It will allow to launch 1D, 2D and 3D plots by selecting any
-    combination of the x1, x2...xn from the Point dimension.
-    Points can be selected by either Click and Drag in the Scatter plot or..
-    by creating an Expression.
-    Finally, there is a button 'Create Cluster' that will call a callback 
-    fuction to take care of it.
+    It will allow to draw and adjust trajectories along 2D axes.
     """
 
     def __init__(self, **kwargs):
@@ -51,7 +48,22 @@ class ClusteringWindow(gui.Window):
 
         self.dim = kwargs.get('dim')
         self.data = kwargs.get('data')
+        self.pathData = PathData(dim=self.dim)
         self.callback = kwargs.get('callback', None)
+        self.loadCallback = kwargs.get('loadCallback', None)
+        self.numberOfPoints = kwargs.get('numberOfPoints', 10)
+
+        # Adding figure limits option
+        self.limits_modes = kwargs.get('limits_mode')
+        self.LimitLow = kwargs.get('LimitL')
+        self.LimitHigh = kwargs.get('LimitH')
+        self.xlim_low = kwargs.get('xlim_low')
+        self.xlim_high = kwargs.get('xlim_high')
+        self.ylim_low = kwargs.get('ylim_low')
+        self.ylim_high = kwargs.get('ylim_high')
+        self.zlim_low = kwargs.get('zlim_low')
+        self.zlim_high = kwargs.get('zlim_high')
+
         self.plotter = None
 
         content = tk.Frame(self.root)
@@ -62,8 +74,7 @@ class ClusteringWindow(gui.Window):
 
     def _createContent(self, content):
         self._createFigureBox(content)
-        self._createClusteringBox(content)
-        self._updateSelectionLabel()
+        self._createTrajectoriesBox(content)
 
     def _addLabel(self, parent, text, r, c):
         label = tk.Label(parent, text=text, font=self.fontBold)
@@ -86,12 +97,12 @@ class ClusteringWindow(gui.Window):
         self.listbox = listbox
 
         # Selection controls
-        self._addLabel(frame, 'Selection', 1, 0)
+        self._addLabel(frame, 'Rejection', 1, 0)
         # Selection label
         self.selectionVar = tk.StringVar()
         self.clusterLabel = tk.Label(frame, textvariable=self.selectionVar)
         self.clusterLabel.grid(row=1, column=1, sticky='nw', padx=5, pady=(10, 5))
-
+        self._updateSelectionLabel()
         # --- Expression
         expressionFrame = tk.Frame(frame)
         expressionFrame.grid(row=2, column=1, sticky='news')
@@ -115,40 +126,57 @@ class ClusteringWindow(gui.Window):
 
         frame.grid(row=0, column=0, sticky='new', padx=5, pady=(10, 5))
 
-    def _createClusteringBox(self, content):
-        frame = tk.LabelFrame(content, text='Cluster')
+    def _createTrajectoriesBox(self, content):
+        frame = tk.LabelFrame(content, text='Trajectories')
         frame.columnconfigure(0, minsize=50)
         frame.columnconfigure(1, weight=1)  # , minsize=30)
 
-        # Cluster line
-        self._addLabel(frame, 'Cluster name', 0, 0)
-        self.clusterVar = tk.StringVar()
-        clusterEntry = tk.Entry(frame, textvariable=self.clusterVar,
+        # Animation name
+        self._addLabel(frame, 'Name', 0, 0)
+        self.animationVar = tk.StringVar()
+        clusterEntry = tk.Entry(frame, textvariable=self.animationVar,
                                 width=30, bg='white')
         clusterEntry.grid(row=0, column=1, sticky='nw', pady=5)
 
-        buttonsFrame = tk.Frame(frame, bg='green')
+        buttonsFrame = tk.Frame(frame)
         buttonsFrame.grid(row=1, column=1,
                           sticky='se', padx=5, pady=5)
         buttonsFrame.columnconfigure(0, weight=1)
 
-        self.createBtn = HotButton(buttonsFrame, text='Create Cluster',
-                                   tooltip="Select some points to create the cluster",
-                                   imagePath='fa-plus-circle.png', command=self._onCreateClick)
-        self.createBtn.grid(row=0, column=1)
+        self.generateBtn = HotButton(buttonsFrame, text='Generate Animation', state=tk.DISABLED,
+                                     tooltip='Select trajectory points to generate the animations',
+                                     imagePath='fa-plus-circle.png', command=self._onCreateClick)
+        self.generateBtn.grid(row=0, column=1, padx=5)
+
+        self.loadBtn = Button(buttonsFrame, text='Load', imagePath='fa-folder-open.png',
+                              tooltip='Load a generated animation.', command=self._onLoadClick)
+        self.loadBtn.grid(row=0, column=2, padx=5)
+
+        self.closeBtn = Button(buttonsFrame, text='Close', imagePath=Icon.ACTION_CLOSE,
+                               tooltip='Close window', command=self.close)
+        self.closeBtn.grid(row=0, column=3, padx=(5, 10))
 
         frame.grid(row=1, column=0, sticky='new', padx=5, pady=(5, 10))
 
     def _onResetClick(self, e=None):
         """ Clean the expression and the current selection. """
         self.expressionVar.set('')
-        for point in self.data:
+        self.pathData.clear()
+        for point in self.data.iterAll():
             point.setState(Point.NORMAL)
         self._onUpdateClick()
+        self.generateBtn.config(state=tk.DISABLED)
 
     def _onCreateClick(self, e=None):
         if self.callback:
             self.callback()
+
+    def _onLoadClick(self, e=None):
+        if self.loadCallback:
+            self.loadCallback()
+
+    def setPathData(self, data):
+        self.pathData = data
 
     def _evalExpression(self):
         """ Evaluate the input expression and add 
@@ -158,7 +186,12 @@ class ClusteringWindow(gui.Window):
         if value:
             for point in self.data:
                 if point.eval(value):
-                    point.setState(Point.SELECTED)
+                    point.setState(Point.DISCARDED)
+
+    def setDataIndex(self, indexName, value):
+        """ Set which point data index will be used as X, Y or Z. """
+        setattr(self.data, indexName, value)
+        setattr(self.pathData, indexName, value)
 
     def _onUpdateClick(self, e=None):
         components = self.listbox.curselection()
@@ -176,9 +209,21 @@ class ClusteringWindow(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = FlexNmaPlotter(data=self.data)
-
+                # self.plotter = FlexNmaVolPlotter(data=self.data)
+                # Actually plot
+                if self.limits_modes == FIGURE_LIMIT_NONE:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                else:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                LimitL=self.LimitLow, LimitH=self.LimitHigh,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
                 doShow = True
+                # self.plotter.useLastPlot = True
             else:
                 self.plotter.clear()
                 doShow = False
@@ -186,22 +231,26 @@ class ClusteringWindow(gui.Window):
             # Actually plot
             baseList = [basename(n) for n in modeNameList]
 
-            self.data.XIND = modeList[0]
+            self.setDataIndex('XIND', modeList[0])
+            self.ps = None
 
             if dim == 1:
                 self.plotter.plotArray1D("Histogram for %s" % baseList[0],
-                                         "Deformation value", "Number of images")
+                                         "Deformation value", "Number of volumes")
             else:
-                self.data.YIND = modeList[1]
+                self.setDataIndex('YIND', modeList[1])
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
+                    # ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
+                    #                                 *baseList)
+                    ax = self.plotter.plotArray2D("Click and drag to add points to the Cluster",
                                                     *baseList)
-                    self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel)
+                    self.ps = PointPathVol(ax, self.data, self.pathData,
+                                           callback=self._checkNumberOfPoints)
                 elif dim == 3:
-                    del self.ps  # Remove PointSelector
-                    self.data.ZIND = modeList[2]
+                    # del self.ps # Remove PointSelector
+                    self.setDataIndex('ZIND', modeList[2])
                     self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 
             if doShow:
@@ -210,16 +259,23 @@ class ClusteringWindow(gui.Window):
                 self.plotter.draw()
 
     def _updateSelectionLabel(self):
-        selected = self.data.getSelectedSize()
-        self.selectionVar.set('%d / %d points' % (selected, self.data.getSize()))
+        self.selectionVar.set('%d / %d points' % (self.data.getDiscardedSize(),
+                                                  self.data.getSize()))
 
-        if selected:
-            self.createBtn.config(state=tk.NORMAL)
-        else:
-            self.createBtn.config(state=tk.DISABLED)
+    def _checkNumberOfPoints(self):
+        """ Check that if the number of points was selected
+        and add new ones if needed.
+        """
+        while (self.pathData.getSize() < self.numberOfPoints):
+            self.pathData.splitLongestSegment()
+        self._onUpdateClick()
+        self.generateBtn.config(state=tk.NORMAL)
 
-    def getClusterName(self):
-        return self.clusterVar.get().strip()
+    def getAnimationName(self):
+        return self.animationVar.get().strip()
+
+    def setAnimationName(self, value):
+        self.animationVar.set(value)
 
     def _onClosing(self):
         if self.plotter:

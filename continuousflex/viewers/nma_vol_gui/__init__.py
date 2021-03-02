@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors: 
-# * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# * Slavica Jonic (slavica.jonic@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -23,22 +22,8 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from .protocol_nma import FlexProtNMA
-from .protocol_nma_alignment import FlexProtAlignmentNMA
-from .protocol_nma_base import NMA_CUTOFF_ABS, NMA_CUTOFF_REL
-#from .protocol_nma_choose import XmippProtNMAChoose
-from .protocol_nma_dimred import FlexProtDimredNMA
-from .protocol_batch_cluster import FlexBatchProtNMACluster
-from .protocol_structure_mapping import FlexProtStructureMapping
 
-from .protocol_batch_cluster_vol import FlexBatchProtNMAClusterVol
-from .protocol_nma_alignment_vol import FlexProtAlignmentNMAVol
-from .protocol_nma_dimred_vol import FlexProtDimredNMAVol
-from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
-from .protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
-from .protocol_apply_volumeset_alignment import FlexProtApplyVolSetAlignment
-
-from .data import *
-from .pdb import *
-
-
+from .PointSelectorVol import PointSelectorVol
+from .PointPathVol import PointPathVol
+from .tk_clustering_vol import ClusteringWindowVol
+from .tk_trajectories_vol import TrajectoriesWindowVol

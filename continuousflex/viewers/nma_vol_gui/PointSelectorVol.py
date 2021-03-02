@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -24,70 +23,74 @@
 # *
 # **************************************************************************
 
-from continuousflex.viewers.nma_plotter import plotArray2D
+from continuousflex.viewers.plotter_vol import plotArray2D
+from continuousflex.viewers.plotter_vol import plotArray2D_xy
 
 
-class PointSelector():
+class PointSelectorVol():
     """ Graphical manager based on Matplotlib to handle mouse
     events of click, drag and release and mark some point
     from input Data as 'selected'.
     """
+
     def __init__(self, ax, data, callback=None):
         self.ax = ax
         self.data = data
         self.createPlots(ax)
         self.press = None
         self.callback = callback
-        # connect to all the events we need 
+        # connect to all the events we need
         self.cidpress = self.rectangle_selection.figure.canvas.mpl_connect(
             'button_press_event', self.onPress)
         self.cidrelease = self.rectangle_selection.figure.canvas.mpl_connect(
             'button_release_event', self.onRelease)
         self.cidmotion = self.rectangle_selection.figure.canvas.mpl_connect(
             'motion_notify_event', self.onMotion)
-    
+
     def createPlots(self, ax):
-        plotArray2D(ax, self.data)
+        # plotArray2D(ax, self.data)
+        # To avoid plotting the sidebar twice
+        plotArray2D_xy(ax, self.data)
         self.createSelectionPlot(ax)
-    
+
     def getSelectedData(self):
         xs, ys = [], []
         for point in self.data:
-            if point.getState() == 1: # point selected
+            if point.getState() == 1:  # point selected
                 xs.append(point.getX())
                 ys.append(point.getY())
         return xs, ys
-        
+
     def createSelectionPlot(self, ax):
         xs, ys = self.getSelectedData()
         self.plot_selected, = ax.plot(xs, ys, 'o', ms=8, alpha=0.4,
-                                  color='yellow')
-         
-        self.rectangle_selection, = ax.plot([0], [0], ':')  # empty line      
-        
+                                      color='yellow')
+
+        self.rectangle_selection, = ax.plot([0], [0], ':')  # empty line
+
     def onPress(self, event):
-        if event.inaxes != self.rectangle_selection.axes: 
+        if event.inaxes != self.rectangle_selection.axes:
             return
         # ignore click event if toolbar is active
         if self.ax.get_navigate_mode():
             return
-        
+
         self.press = True
         self.originX = event.xdata
         self.originY = event.ydata
-        
+
     def onMotion(self, event):
         if self.press is None: return
         self.update(event, addSelected=False)
-        
+
     def onRelease(self, event):
         self.press = None
         self.update(event, addSelected=True)
-        
+
     def inside(self, x, y, xmin, xmax, ymin, ymax):
         return (xmin <= x <= xmax and
                 ymin <= y <= ymax)
-        
+
     def update(self, event, addSelected=False):
         """ Update the plots with selected points.
         Take the selection rectangle and include points from 'event'.
@@ -99,18 +102,18 @@ class PointSelector():
         ox, oy = self.originX, self.originY
         ex, ey = event.xdata, event.ydata
         xs1, ys1 = self.getSelectedData()
-        
+
         x1 = min(ox, ex)
         x2 = max(ox, ex)
         y1 = min(oy, ey)
         y2 = max(oy, ey)
-        
+
         if addSelected:
-            xs, ys = [0], [0] # rectangle selection
+            xs, ys = [0], [0]  # rectangle selection
         else:
             xs = [x1, x2, x2, x1, x1]
             ys = [y1, y1, y2, y2, y1]
-            
+
         for point in self.data:
             x, y = point.getX(), point.getY()
             if self.inside(x, y, x1, x2, y1, y2):
@@ -118,10 +121,10 @@ class PointSelector():
                 ys1.append(y)
                 if addSelected:
                     point.setSelected()
-        
-        if self.callback: # Notify changes on selection
+
+        if self.callback:  # Notify changes on selection
             self.callback()
-        self.plot_selected.set_data(xs1, ys1)        
+        self.plot_selected.set_data(xs1, ys1)
         self.rectangle_selection.set_data(xs, ys)
-        
+
         self.ax.figure.canvas.draw()

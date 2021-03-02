@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -25,14 +24,16 @@
 # **************************************************************************
 
 from math import sqrt
-from continuousflex.viewers.nma_plotter import plotArray2D
+# from continuousflex.viewers.plotter_vol import plotArray2D
+from continuousflex.viewers.plotter_vol import plotArray2D_xy
+
 
 STATE_NO_POINTS = 0  # no points have been selected, double-click will add first one
 STATE_DRAW_POINTS = 1  # still adding points, double-click will set the last one
 STATE_ADJUST_POINTS = 2  # no more points will be added, just adjust the current ones
 
 
-class PointPath():
+class PointPathVol():
     """ Graphical manager based on Matplotlib to handle mouse
     events to create a path of points. 
     It also allow to modify the point positions on the path.
@@ -42,7 +43,10 @@ class PointPath():
         self.ax = ax
         self.data = data
 
-        plotArray2D(ax, self.data)
+        # plotArray2D(ax, self.data)
+        # To avoid plotting the sidebar twice
+        plotArray2D_xy(ax, self.data)
+
         self.callback = callback
 
         self.dragIndex = None

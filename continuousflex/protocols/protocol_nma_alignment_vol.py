@@ -1,12 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:  Carlos Oscar Sanchez Sorzano (coss@cnb.csic.es), May 2013
-# *           Qiyu Jin
-# *           Slavica Jonic                (slavica.jonic@upmc.fr)
-# * Ported to Scipion:
-# *           J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es), Jan 2014
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -28,34 +23,30 @@
 # *
 # **************************************************************************
 
-
 from os.path import basename
 
+from pyworkflow.utils import getListFromRangeString
+from pwem.protocols import ProtAnalysis3D
+from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
+                            setXmippAttributes, setOfParticlesToMd, getImageLocation)
+
+import pwem as em
+import pwem.emlib.metadata as md
+from xmipp3 import XmippMdRow
+from pyworkflow.utils.path import copyFile, cleanPath
+import pyworkflow.protocol.params as params
+from pyworkflow.protocol.params import NumericRangeParam
+from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 
-from pyworkflow.utils import isPower2, getListFromRangeString
-from pyworkflow.utils.path import copyFile, cleanPath
-import pyworkflow.protocol.params as params
-from pwem.protocols import ProtAnalysis3D
-
-from pyworkflow.protocol.params import NumericRangeParam
-import pwem as em
-import pwem.emlib.metadata as md
-
-from xmipp3.base import XmippMdRow
-from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
-                            getImageLocation, createItemMatrix,
-                            setXmippAttributes)
-from .convert import modeToRow
-
-NMA_ALIGNMENT_WAV = 0
-NMA_ALIGNMENT_PROJ = 1
+WEDGE_MASK_NONE = 0
+WEDGE_MASK_THRE = 1
 
 
-class FlexProtAlignmentNMA(ProtAnalysis3D):
+class FlexProtAlignmentNMAVol(ProtAnalysis3D):
     """ Protocol for flexible angular alignment. """
-    _label = 'nma alignment'
+    _label = 'nma alignment vol'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
@@ -65,50 +56,82 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                       help='Set of modes computed by normal mode analysis.')
         form.addParam('modeList', NumericRangeParam, expertLevel=params.LEVEL_ADVANCED,
                       label="Modes selection",
-                      help='Select the normal modes that will be used for image analysis. \n'
+                      help='Select the normal modes that will be used for volume analysis. \n'
                            'If you leave this field empty, all computed modes will be selected for image analysis.\n'
                            'You have several ways to specify the modes.\n'
                            '   Examples:\n'
                            ' "7,8-10" -> [7,8,9,10]\n'
                            ' "8, 10, 12" -> [8,10,12]\n'
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
-        form.addParam('inputParticles', params.PointerParam, label="Input particles",
-                      pointerClass='SetOfParticles',
-                      help='Select the set of particles that will be analyzed using normal modes.')
-
+        form.addParam('inputVolumes', params.PointerParam,
+                      pointerClass='SetOfVolumes,Volume',
+                      label="Input volume(s)", important=True,
+                      help='Select the set of volumes that will be analyzed using normal modes.')
         form.addParam('copyDeformations', params.PathParam,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Precomputed results (for development)',
-                      help='Only for tests during development. Enter a metadata file with precomputed elastic '
-                           'and rigid-body alignment parameters and perform '
-                           'all remaining steps using this file.')
+                      label='Precomputed results (for developmemt)',
+                      help='Enter a metadata file with precomputed elastic  \n'
+                           'and rigid-body alignment parameters to perform \n'
+                           'remaining steps using this file.')
+        form.addSection(label='Missing-wedge Compensation')
+        form.addParam('WedgeMode', params.EnumParam,
+                      choices=['Do not compensate', 'Compensate'],
+                      default=WEDGE_MASK_THRE,
+                      label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
+                      help='Choose to compensate for the missing wedge if the data is subtomograms.'
+                           ' However, if you correct the missing wedge in advance, then choose not to compensate.'
+                           ' You can also choose not to compensate if your data is not subtomograms but EM-maps.'
+                           ' The missing wedge is assumed to be in the Y-axis direction.')
+        form.addParam('tiltLow', params.IntParam, default=-60,
+                      # expertLevel=params.LEVEL_ADVANCED,
+                      condition='WedgeMode==%d' % WEDGE_MASK_THRE,
+                      label='Lower tilt value',
+                      help='The lower tilt angle used in obtaining the tilt series')
+        form.addParam('tiltHigh', params.IntParam, default=60,
+                      # expertLevel=params.LEVEL_ADVANCED,
+                      condition='WedgeMode==%d' % WEDGE_MASK_THRE,
+                      label='Upper tilt value',
+                      help='The upper tilt angle used in obtaining the tilt series')
 
-        form.addSection(label='Combined elastic and rigid-body alignment')
-        form.addParam('trustRegionScale', params.IntParam, default=1,
+        form.addSection(label='Search parameters')
+        form.addParam('trustRegionScale', params.FloatParam, default=1.0,
                       expertLevel=params.LEVEL_ADVANCED,
-                      label='Elastic-alignment trust region scale',
+                      label='CONDOR optimiser parameter trustRegionScale ',
                       help='For elastic alignment, this parameter scales the initial '
                            'value of the trust region radius of CONDOR optimization. '
                            'The default value of 1 works in majority of cases. \n'
                            'This value should not be changed except by expert users. '
                            'Larger values (e.g., between 1 and 2) can be tried '
                            'for larger expected amplitudes of conformational change.')
-        form.addParam('alignmentMethod', params.EnumParam, default=NMA_ALIGNMENT_WAV,
-                      choices=['wavelets & splines', 'projection matching'],
-                      label='Rigid-body alignment method',
-                      help='For rigid-body alignment, Projection Matching method (faster) or '
-                           'Wavelets and Splines method (more accurate) can be used. In the case of Wavelets and Splines, '
-                           'the size of images should be a power of 2.')
-        form.addParam('discreteAngularSampling', params.FloatParam, default=10,
-                      label="Discrete angular sampling (deg)",
-                      help='This is the angular step (in degrees) with which a library of reference projections '
-                           'is computed for rigid-body alignment in Projection Matching and Wavelets methods. \n'
-                           'This alignment is refined with Splines method when Wavelets and Splines alignment is chosen.')
+        form.addParam('rhoStartBase', params.FloatParam, default=250.0,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter rhoStartBase',
+                      help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
+                           ' yet the slower')
+        form.addParam('rhoEndBase', params.FloatParam, default=50.0,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter rhoEndBase ',
+                      help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
+                           'however it is better to keep it < 1000 if set very high we risk distortions')
+        form.addParam('niter', params.IntParam, default=10000,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter niter',
+                      help='niter should be big enough to guarantee that the search converges to the '
+                           'right set of nma deformation amplitudes')
+        form.addParam('frm_freq', params.FloatParam, default=0.25,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='Maximum normalized pixel frequency',
+                      help='The normalized frequency should be a number between -0.5 and 0.5 '
+                           'The more it is, the bigger the search frequency is, the more time it demands, '
+                           'keeping it as default is recommended.')
+        form.addParam('frm_maxshift', params.IntParam, default=10,
+                      expertlevel=params.LEVEL_ADVANCED,
+                      label='Maximum shift for rigid body search',
+                      help='The maximum shift is a number between 1 and half the size of your volume. Keep as default'
+                           ' if your target is near the center in your subtomograms')
+        form.addParallelSection(threads=0, mpi=24)
 
-        form.addParallelSection(threads=0, mpi=8)
-
-        # --------------------------- INSERT steps functions --------------------------------------------
-
+    # --------------------------- INSERT steps functions --------------------------------------------
     def getInputPdb(self):
         """ Return the Pdb object associated with the normal modes. """
         return self.inputModes.get().getPdb()
@@ -116,8 +139,8 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
     def _insertAllSteps(self):
         atomsFn = self.getInputPdb().getFileName()
         # Define some outputs filenames
-        self.imgsFn = self._getExtraPath('images.xmd')
-        self.imgsFn_backup = self._getExtraPath('images_backup.xmd')
+        self.imgsFn = self._getExtraPath('volumes.xmd')
+        self.imgsFn_backup = self._getExtraPath('volumes_backup.xmd')
         self.modesFn = self._getExtraPath('modes.xmd')
         self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
         if self.structureEM:
@@ -130,11 +153,11 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
-        if self.copyDeformations.empty():  # ONLY FOR DEBUGGING
+        if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
         else:
             # TODO: for debugging and testing it will be useful to copy the deformations
-            # metadata file, not just the deformation.txt file         
+            # metadata file, not just the deformation.txt file
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -145,9 +168,10 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         self.writeModesMetaData()
         # Write a metadata with the normal modes information
         # to launch the nma alignment programs
-        writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
-        writeSetOfParticles(self.inputParticles.get(),self.imgsFn_backup)
-
+        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn_backup)
+        # Copy the atoms file to current working dir
+        # copyFile(atomsFn, self.atomsFn)
 
     def writeModesMetaData(self):
         """ Iterate over the input SetOfNormalModes and write
@@ -164,6 +188,8 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
         inputModes = self.inputModes.get()
         for mode in inputModes:
+            # If there is a mode selection, only
+            # take into account those selected
             if not modeSelection or mode.getObjId() in modeSelection:
                 row = XmippMdRow()
                 modeToRow(mode, row)
@@ -172,9 +198,9 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
     def copyDeformationsStep(self, deformationMd):
         copyFile(deformationMd, self.imgsFn)
-        # We update the image paths based on image names (if computer on another computer or imported from another
-        # project), and we need to set the item_id for each image
-        inputSet = self.inputParticles.get()
+        # We update the volume paths based on volume names (if computed on another computer or imported from another
+        # project), and we need to set the item_id for each volume
+        inputSet = self.inputVolumes.get()
         mdImgs = md.MetaData(self.imgsFn)
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
@@ -196,31 +222,47 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
+
+
+
     def performNmaStep(self, atomsFn, modesFn):
-        sampling = self.inputParticles.get().getSamplingRate()
-        discreteAngularSampling = self.discreteAngularSampling.get()
+        sampling = self.inputVolumes.get().getSamplingRate()
         trustRegionScale = self.trustRegionScale.get()
         odir = self._getTmpPath()
         imgFn = self.imgsFn
+        frm_freq = self.frm_freq.get()
+        frm_maxshift = self.frm_maxshift.get()
+        rhoStartBase = self.rhoStartBase.get()
+        rhoEndBase = self.rhoEndBase.get()
+        niter = self.niter.get()
 
         args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
-        args += "--discrAngStep %(discreteAngularSampling)f --odir %(odir)s --centerPDB "
+        args += "--odir %(odir)s --centerPDB "
         args += "--trustradius_scale %(trustRegionScale)d --resume "
 
         if self.getInputPdb().getPseudoAtoms():
             args += "--fixed_Gaussian "
 
-        if self.alignmentMethod == NMA_ALIGNMENT_PROJ:
-            args += "--projMatch "
+        args += "--alignVolumes %(frm_freq)f %(frm_maxshift)d "
 
-        self.runJob("xmipp_nma_alignment", args % locals())
+        args += "--condor_params %(rhoStartBase)f %(rhoEndBase)f %(niter)d "
+
+        if self.WedgeMode == WEDGE_MASK_THRE:
+            tilt0 = self.tiltLow.get()
+            tiltF = self.tiltHigh.get()
+            args += "--tilt_values %(tilt0)d %(tiltF)d "
+
+        print(args % locals())
+        self.runJob("xmipp_nma_alignment_vol", args % locals())
 
         cleanPath(self._getPath('nmaTodo.xmd'))
 
-        inputSet = self.inputParticles.get()
+        inputSet = self.inputVolumes.get()
         mdImgs = md.MetaData(self.imgsFn)
+
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             index, fn = xmippToLocation(imgPath)
@@ -241,11 +283,16 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
                         break
             mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
             mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
+        mdImgs.write(self.imgsFn)
+        cleanPath(self._getExtraPath('copy.xmd'))
+
     def createOutputStep(self):
-        inputSet = self.inputParticles.get()
-        partSet = self._createSetOfParticles()
+        inputSet = self.inputVolumes.get()
+        # partSet = self._createSetOfParticles()
+        partSet = self._createSetOfVolumes()
         pdbPointer = self.inputModes.get()._pdbPointer
 
         partSet.copyInfo(inputSet)
@@ -256,7 +303,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
         self._defineOutputs(outputParticles=partSet)
         self._defineSourceRelation(pdbPointer, partSet)
-        self._defineTransformRelation(self.inputParticles, partSet)
+        self._defineTransformRelation(self.inputVolumes, partSet)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -265,9 +312,6 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
     def _validate(self):
         errors = []
-        xdim = self.inputParticles.get().getDim()[0]
-        if not isPower2(xdim):
-            errors.append("Image dimension (%s) is not a power of two, consider resize them" % xdim)
         return errors
 
     def _citations(self):
@@ -278,7 +322,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
     # --------------------------- UTILS functions --------------------------------------------
     def _printWarnings(self, *lines):
-        """ Print some warning lines to 'warnings.xmd', 
+        """ Print some warning lines to 'warnings.xmd',
         the function should be called inside the working dir."""
         fWarn = open("warnings.xmd", 'w')
         for l in lines:
@@ -291,5 +335,6 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
 
     def _updateParticle(self, item, row):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
-                           md.MDL_SHIFT_Y, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST)
+                           md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST, md.MDL_MAXCC,
+                           md.MDL_ANGLE_Y)
         createItemMatrix(item, row, align=em.ALIGN_PROJ)

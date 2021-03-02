@@ -1,8 +1,7 @@
 # **************************************************************************
 # *
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -31,11 +30,13 @@ import pyworkflow.gui as gui
 from pyworkflow.gui.widgets import Button, HotButton
 
 from continuousflex.protocols.data import Point
-from . import PointSelector
-from continuousflex.viewers.nma_plotter import FlexNmaPlotter
+from . import PointSelectorVol
+from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
+FIGURE_LIMIT_NONE = 0
+FIGURE_LIMITS = 1
 
-class ClusteringWindow(gui.Window):
+class ClusteringWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
     contained in a Data object.
     It will allow to launch 1D, 2D and 3D plots by selecting any
@@ -53,6 +54,18 @@ class ClusteringWindow(gui.Window):
         self.data = kwargs.get('data')
         self.callback = kwargs.get('callback', None)
         self.plotter = None
+
+        # Adding figure limits option
+        self.limits_modes = kwargs.get('limits_mode')
+        self.LimitLow = kwargs.get('LimitL')
+        self.LimitHigh = kwargs.get('LimitH')
+        self.xlim_low = kwargs.get('xlim_low')
+        self.xlim_high = kwargs.get('xlim_high')
+        self.ylim_low = kwargs.get('ylim_low')
+        self.ylim_high = kwargs.get('ylim_high')
+        self.zlim_low = kwargs.get('zlim_low')
+        self.zlim_high = kwargs.get('zlim_high')
+
 
         content = tk.Frame(self.root)
         self._createContent(content)
@@ -165,7 +178,7 @@ class ClusteringWindow(gui.Window):
         dim = len(components)
 
         if not dim:
-            self.showWarning("Please select some Axis before update plots.")
+            self.showWarning("Please select some Axis before updating plots.")
         else:
             modeList = components
             modeNameList = ['x%d' % (m + 1) for m in components]
@@ -176,8 +189,19 @@ class ClusteringWindow(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                self.plotter = FlexNmaPlotter(data=self.data)
-
+                # self.plotter = FlexNmaVolPlotter(data=self.data)
+                # Actually plot
+                if self.limits_modes == FIGURE_LIMIT_NONE:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
+                else:
+                    self.plotter = FlexNmaVolPlotter(data=self.data,
+                                                LimitL=self.LimitLow, LimitH=self.LimitHigh,
+                                                xlim_low=self.xlim_low, xlim_high=self.xlim_high,
+                                                ylim_low=self.ylim_low, ylim_high=self.ylim_high,
+                                                zlim_low=self.zlim_low, zlim_high=self.zlim_high)
                 doShow = True
             else:
                 self.plotter.clear()
@@ -190,17 +214,24 @@ class ClusteringWindow(gui.Window):
 
             if dim == 1:
                 self.plotter.plotArray1D("Histogram for %s" % baseList[0],
-                                         "Deformation value", "Number of images")
+                                         "Deformation value", "Number of volumes")
             else:
                 self.data.YIND = modeList[1]
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    ax = self.plotter.createSubPlot("Click and drag to add points to the Cluster",
-                                                    *baseList)
-                    self.ps = PointSelector(ax, self.data, callback=self._updateSelectionLabel)
+                    # ax = self.plotter.createSubPlot("Click and drag to add some points to the Cluster",
+                    #                                 *baseList)
+
+                    ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
+                                                   *baseList)
+                    self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel)
+                    # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
-                    del self.ps  # Remove PointSelector
+                    try:
+                        del self.ps  # Remove PointSelector
+                    except:
+                        pass
                     self.data.ZIND = modeList[2]
                     self.plotter.plotArray3D("%s %s %s" % tuple(baseList), *baseList)
 

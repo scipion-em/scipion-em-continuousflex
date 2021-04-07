@@ -32,7 +32,15 @@ from .protocol_batch_cluster import FlexBatchProtNMACluster
 from .protocol_structure_mapping import FlexProtStructureMapping
 from .protocol_bayesian_flexible_fitting import FlexProtBayesianFlexibleFitting
 from .protocol_generate_psf import FlexProtGeneratePSF
+from .protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
+from .protocol_batch_cluster_vol import FlexBatchProtNMAClusterVol
+from .protocol_nma_alignment_vol import FlexProtAlignmentNMAVol
+from .protocol_nma_dimred_vol import FlexProtDimredNMAVol
+from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
+from .protocol_missing_wedge_filling import FlexProtMissingWedgeFilling
+from .protocol_apply_volumeset_alignment import FlexProtApplyVolSetAlignment
+from .protocol_denoise_volumes import FlexProtVolumeDenoise
 from .data import *
 from .pdb import *
-
-
+from .protocol_pdb_dimred import FlexProtDimredPdb
+from .protocol_subtomograms_classify import FlexProtSubtomoClassify

@@ -37,7 +37,7 @@ Note: Xmipp and Chimerax plugins should be installed (from Scipion3 plugin manag
 Supported versions
 ------------------
 
-0.7
+3.0.1
 
 Protocols
 ---------

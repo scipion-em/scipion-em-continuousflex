@@ -90,5 +90,18 @@ author = "C.O.S. Sorzano, A.L. Álvarez-Cabrera, M. Kazemi, J.M. Carazo, S. Joni
 keywords = ""
 }
 
+
+@article{harastani2020hybrid,
+  title={Hybrid Electron Microscopy Normal Mode Analysis with Scipion},
+  author={Harastani, Mohamad and Sorzano, Carlos Oscar S and Joni{\'c}, Slavica},
+  journal={Protein Science},
+  volume={29},
+  number={1},
+  pages={223--236},
+  year={2020},
+  publisher={Wiley Online Library},
+  doi= {https://doi.org/10.1002/pro.3772}
+}
+
 """
 

@@ -27,7 +27,6 @@
 from continuousflex.viewers.nma_plotter import plotArray2D
 
 
-
 class PointSelector():
     """ Graphical manager based on Matplotlib to handle mouse
     events of click, drag and release and mark some point
@@ -86,8 +85,8 @@ class PointSelector():
         self.update(event, addSelected=True)
         
     def inside(self, x, y, xmin, xmax, ymin, ymax):
-        return (x >= xmin and x <= xmax and
-                y >= ymin and y <= ymax)
+        return (xmin <= x <= xmax and
+                ymin <= y <= ymax)
         
     def update(self, event, addSelected=False):
         """ Update the plots with selected points.
@@ -126,5 +125,3 @@ class PointSelector():
         self.rectangle_selection.set_data(xs, ys)
         
         self.ax.figure.canvas.draw()
-        
-        

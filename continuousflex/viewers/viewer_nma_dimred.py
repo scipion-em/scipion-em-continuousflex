@@ -23,8 +23,9 @@
 # *
 # **************************************************************************
 from continuousflex.protocols.data import PathData
+
 """
-This module implement the wrappers aroung Xmipp CL2D protocol
+This module implement the wrappers around Xmipp CL2D protocol
 visualization program.
 """
 
@@ -50,14 +51,14 @@ from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
 
-        
+
 class FlexDimredNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
     _label = 'viewer nma dimred'
     _targets = [FlexProtDimredNMA]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
-    
+
     def __init__(self, **kwargs):
         ProtocolViewer.__init__(self, **kwargs)
         self._data = None
@@ -71,87 +72,91 @@ class FlexDimredNMAViewer(ProtocolViewer):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='1',
                       label='Display normal-mode amplitudes in the low-dimensional space',
-                      help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, using axis 1; \n'
-                           'type 2 to see the histogram of normal-mode amplitudes in the low-dimensional space, using axis 2; etc. \n'
+                      help='Type 1 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
+                           'using axis 1; \n '
+                           'Type 2 to see the histogram of normal-mode amplitudes in the low-dimensional space, '
+                           'using axis 2; etc. \n '
                            'Type 1 2 to see normal-mode amplitudes in the low-dimensional space, using axes 1 and 2; \n'
-                           'type 1 2 3 to see normal-mode amplitudes in the low-dimensional space, using axes 1, 2, and 3; etc.'
-                           )
-        
+                           'Type 1 2 3 to see normal-mode amplitudes in the low-dimensional space, using axes 1, 2, '
+                           'and 3; etc. '
+                      )
+
         form.addParam('displayClustering', LabelParam,
                       label='Open clustering tool?',
                       help='Open a GUI to visualize the images as points '
-                           'and select some of them to create clusters, and compute the 3D reconstructions from the clusters.')
-         
+                           'and select some of them to create clusters, and compute the 3D reconstructions from the '
+                           'clusters.')
+
         form.addParam('displayTrajectories', LabelParam,
                       label='Open trajectories tool?',
                       help='Open a GUI to visualize the images as points, '
-                           'draw and ajust trajectories, and animate them.')       
-        
+                           'draw and adjust trajectories, and animate them.')
+
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
                 'displayClustering': self._displayClustering,
                 'displayTrajectories': self._displayTrajectories,
-                } 
-                        
+                }
+
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
         return self._doViewRawDeformation(components)
-        
+
     def _doViewRawDeformation(self, components):
-#        components = map(int, self.displayRawDeformation.get().split())
         components = list(map(int, components.split()))
         dim = len(components)
         views = []
-        
+
         if dim > 0:
             modeList = [m - 1 for m in components]
             modeNameList = ['Axis %d' % m for m in components]
             missingList = []
-                    
+
             if missingList:
-                return [self.errorMessage("Invalid mode(s) *%s*\n." % (', '.join(missingList)), 
-                              title="Invalid input")]
-            
+                return [self.errorMessage("Invalid mode(s) *%s*\n." % (', '.join(missingList)),
+                                          title="Invalid input")]
+
             # Actually plot
             plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
-            
+
             self.getData().XIND = modeList[0]
             if dim == 1:
-                plotter.plotArray1D("Histogram of normal-mode amplitudes in low-dimensional space: %s" % baseList[0], 
+                plotter.plotArray1D("Histogram of normal-mode amplitudes in low-dimensional space: %s" % baseList[0],
                                     "Amplitude", "Number of images")
             else:
                 self.getData().YIND = modeList[1]
                 if dim == 2:
-                    plotter.plotArray2D("Normal-mode amplitudes in low-dimensional space: %s vs %s" % tuple(baseList), *baseList)
+                    plotter.plotArray2D("Normal-mode amplitudes in low-dimensional space: %s vs %s" % tuple(baseList),
+                                        *baseList)
                 elif dim == 3:
                     self.getData().ZIND = modeList[2]
-                    plotter.plotArray3D("Normal-mode amplitudes in low-dimensional space: %s %s %s" % tuple(baseList), *baseList)
+                    plotter.plotArray3D("Normal-mode amplitudes in low-dimensional space: %s %s %s" % tuple(baseList),
+                                        *baseList)
             views.append(plotter)
-            
+
         return views
-    
+
     def _displayClustering(self, paramName):
-        self.clusterWindow = self.tkWindow(ClusteringWindow, 
+        self.clusterWindow = self.tkWindow(ClusteringWindow,
                                            title='Clustering Tool',
                                            dim=self.protocol.reducedDim.get(),
                                            data=self.getData(),
                                            callback=self._createCluster
                                            )
         return [self.clusterWindow]
-    
-    
+
     def _displayTrajectories(self, paramName):
-        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindow, 
-                              title='Trajectories Tool',
-                              dim=self.protocol.reducedDim.get(),
-                              data=self.getData(),
-                              callback=self._generateAnimation,
-                              loadCallback=self._loadAnimation,
-                              numberOfPoints=10
-                              )
+        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindow,
+                                                title='Trajectories Tool',
+                                                dim=self.protocol.reducedDim.get(),
+                                                data=self.getData(),
+                                                callback=self._generateAnimation,
+                                                loadCallback=self._loadAnimation,
+                                                numberOfPoints=10
+                                                )
         return [self.trajectoriesWindow]
-        
+
     def _createCluster(self):
         """ Create the cluster with the selected particles
         from the cluster. This method will be called when
@@ -173,68 +178,67 @@ class FlexDimredNMAViewer(ProtocolViewer):
         partSet.close()
 
         from continuousflex.protocols.protocol_batch_cluster import FlexBatchProtNMACluster
-        #from xmipp3.protocols.nma.protocol_batch_cluster import BatchProtNMACluster
+        # from xmipp3.protocols.nma.protocol_batch_cluster import BatchProtNMACluster
         newProt = project.newProtocol(FlexBatchProtNMACluster)
         clusterName = self.clusterWindow.getClusterName()
         if clusterName:
             newProt.setObjLabel(clusterName)
         newProt.inputNmaDimred.set(prot)
         newProt.sqliteFile.set(fnSqlite)
-        
+
         project.launchProtocol(newProt)
         project.getRunsGraph()
-        
+
     def _loadAnimationData(self, obj):
         prot = self.protocol
-        animationName = obj.getFileName() # assumes that obj.getFileName is the folder of animation
+        animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
         animationPath = prot._getExtraPath(animationName)
-        
-        animationFiles = [animationName+'.vmd', animationName+'.pdb', 'trajectory.txt']
+
+        animationFiles = [animationName + '.vmd', animationName + '.pdb', 'trajectory.txt']
         for s in animationFiles:
-            f = join(animationPath,s)
+            f = join(animationPath, s)
             if not exists(f):
                 self.errorMessage('Animation file "%s" not found. ' % f)
                 return
-        
+
         # Load animation trajectory points
-        trajectoryPoints = np.loadtxt(join(animationPath,'trajectory.txt'))
+        trajectoryPoints = np.loadtxt(join(animationPath, 'trajectory.txt'))
         data = PathData(dim=trajectoryPoints.shape[1])
-        
+
         for i, row in enumerate(trajectoryPoints):
-            data.addPoint(Point(pointId=i+1, data=list(row), weight=1))
-            
+            data.addPoint(Point(pointId=i + 1, data=list(row), weight=1))
+
         self.trajectoriesWindow.setPathData(data)
         self.trajectoriesWindow.setAnimationName(animationName)
         self.trajectoriesWindow._onUpdateClick()
-        
+
         def _showVmd():
-            vmdFn = join(animationPath,animationName+'.vmd')
-            VmdView(' -e %s' % vmdFn).show()        
-            
+            vmdFn = join(animationPath, animationName + '.vmd')
+            VmdView(' -e %s' % vmdFn).show()
+
         self.getTkRoot().after(500, _showVmd)
-        
-        
+
     def _loadAnimation(self):
         prot = self.protocol
-        browser = FileBrowserWindow("Select the animation folder (animation_NAME)", 
-                                    self.getWindow(), prot._getExtraPath(), 
+        browser = FileBrowserWindow("Select the animation folder (animation_NAME)",
+                                    self.getWindow(), prot._getExtraPath(),
                                     onSelect=self._loadAnimationData)
         browser.show()
-        
+
     def _generateAnimation(self):
         prot = self.protocol
         projectorFile = prot.getProjectorFile()
-        
+
         animation = self.trajectoriesWindow.getAnimationName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
-        
+
         cleanPath(animationPath)
         makePath(animationPath)
         animationRoot = join(animationPath, 'animation_%s' % animation)
-        
-        trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])        
-        np.savetxt(join(animationPath,'trajectory.txt'), trajectoryPoints)
-        
+
+        trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
+        np.savetxt(join(animationPath, 'trajectory.txt'), trajectoryPoints)
+
         if projectorFile:
             M = np.loadtxt(projectorFile)
             deformations = np.dot(trajectoryPoints, np.linalg.pinv(M))
@@ -242,36 +246,36 @@ class FlexDimredNMAViewer(ProtocolViewer):
             Y = np.loadtxt(prot.getOutputMatrixFile())
             X = np.loadtxt(prot.getDeformationFile())
             # Find closest points in deformations
-            deformations = [X[np.argmin(np.sum((Y - p)**2, axis=1))] for p in trajectoryPoints]
-            
+            deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
+
         pdb = prot.getInputPdb()
         pdbFile = pdb.getFileName()
-        
+
         structureEM = prot.getInputPdb().getPseudoAtoms()
         if not structureEM:
-             localFn = replaceBaseExt(basename(pdbFile),'pdb')
-             cifToPdb(pdbFile, localFn)
-             pdbFile = basename(localFn)
+            localFn = replaceBaseExt(basename(pdbFile), 'pdb')
+            cifToPdb(pdbFile, localFn)
+            pdbFile = basename(localFn)
 
         modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
-        
+
         for i, d in enumerate(deformations):
-            atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i+1)
+            atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
             cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
             runJob(None, 'xmipp_pdb_nma_deform', cmd, env=prot._getEnviron())
-            
+
         # Join all deformations in a single pdb
         # iterating going up and down through all points
         # 1 2 3 ... n-2 n-1 n n-1 n-2 ... 3, 2
         n = len(deformations)
-        r1 = list(range(1, n+1))
-        r2 = list(range(2, n)) # Skip 1 at the end
+        r1 = list(range(1, n + 1))
+        r2 = list(range(2, n))  # Skip 1 at the end
         r2.reverse()
         loop = r1 + r2
-        
+
         trajFn = animationRoot + '.pdb'
         trajFile = open(trajFn, 'w')
-        
+
         for i in loop:
             atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % i
             atomsFile = open(atomsFn)
@@ -282,8 +286,8 @@ class FlexDimredNMAViewer(ProtocolViewer):
 
         trajFile.close()
         # Delete temporary atom files
-        cleanPattern(animationRoot + 'atomsDeformed_??.pdb')    
-        
+        cleanPattern(animationRoot + 'atomsDeformed_??.pdb')
+
         # Generate the vmd script
         vmdFn = animationRoot + '.vmd'
         vmdFile = open(vmdFn, 'w')
@@ -296,23 +300,21 @@ class FlexDimredNMAViewer(ProtocolViewer):
         animate speed 0.5
         animate forward
         """ % trajFn)
-        vmdFile.close() 
-        
+        vmdFile.close()
+
         VmdView(' -e ' + vmdFn).show()
-            
-        
+
     def loadData(self):
         """ Iterate over the images and the output matrix txt file
         and create a Data object with theirs Points.
         """
         matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
         particles = self.protocol.getInputParticles()
-        
+
         data = Data()
         for i, particle in enumerate(particles):
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=matrix[i, :],
                                 weight=particle._xmipp_cost.get()))
-            
+
         return data
-    

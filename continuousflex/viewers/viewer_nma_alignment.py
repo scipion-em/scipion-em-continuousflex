@@ -36,7 +36,8 @@ from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtAlignmentNMA
-        
+
+
 class FlexAlignmentNMAViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
     """
@@ -52,7 +53,7 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
         if self._data is None:
             self._data = self.loadData()
         return self._data
-           
+
     def _defineParams(self, form):
         form.addSection(label='Visualization')
         form.addParam('displayRawDeformation', StringParam, default='7',
@@ -61,32 +62,31 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
                            'type 8 to see the histogram of amplitudes along mode 8, etc.\n'
                            'Type 7 8 to see the 2D plot of amplitudes along modes 7 and 8.\n'
                            'Type 7 8 9 to see the 3D plot of amplitudes along modes 7, 8 and 9; etc.'
-                           )
-    
+                      )
+
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
-                } 
-                        
-#     def _viewWithMatlab(self, paramName):
-#         xmippLib = join(os.environ['XMIPP_HOME'], 'libraries', 'bindings', 'matlab')
-#         command = "path(path, '%s');xmipp_nma_selection_tool('%s')" % (xmippLib, self._getPath())
-#         return [CommandView('matlab -r "%s"' % command)]
-        
+                }
+
+    #     def _viewWithMatlab(self, paramName):
+    #         xmippLib = join(os.environ['XMIPP_HOME'], 'libraries', 'bindings', 'matlab')
+    #         command = "path(path, '%s');xmipp_nma_selection_tool('%s')" % (xmippLib, self._getPath())
+    #         return [CommandView('matlab -r "%s"' % command)]
+
     def _viewRawDeformation(self, paramName):
         components = self.displayRawDeformation.get()
         return self._doViewRawDeformation(components)
-        
+
     def _doViewRawDeformation(self, components):
-#        components = map(int, self.displayRawDeformation.get().split())
         components = list(map(int, components.split()))
         dim = len(components)
         views = []
-        
+
         if dim > 0:
             modeList = []
             modeNameList = []
             missingList = []
-            
+
             for modeNumber in components:
                 found = False
                 md = MetaData(self.protocol._getExtraPath('modes.xmd'))
@@ -99,18 +99,18 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
                         break
                 if not found:
                     missingList.append(str(modeNumber))
-                    
+
             if missingList:
-                return [self.errorMessage("Invalid mode(s) *%s*\n." % (', '.join(missingList)), 
-                              title="Invalid input")]
-            
+                return [self.errorMessage("Invalid mode(s) *%s*\n." % (', '.join(missingList)),
+                                          title="Invalid input")]
+
             # Actually plot
             plotter = FlexNmaPlotter(data=self.getData())
             baseList = [basename(n) for n in modeNameList]
-            
+
             self.getData().XIND = modeList[0]
             if dim == 1:
-                plotter.plotArray1D("Histogram of normal-mode amplitudes: %s" % baseList[0], 
+                plotter.plotArray1D("Histogram of normal-mode amplitudes: %s" % baseList[0],
                                     "Amplitude", "Number of images")
             else:
                 self.getData().YIND = modeList[1]
@@ -120,22 +120,20 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
                     self.getData().ZIND = modeList[2]
                     plotter.plotArray3D("Normal-mode amplitudes: %s %s %s" % tuple(baseList), *baseList)
             views.append(plotter)
-            
+
         return views
-    
+
     def loadData(self):
         """ Iterate over the images and their deformations 
         to create a Data object with theirs Points.
         """
         particles = self.protocol.outputParticles
-        
+
         data = Data()
         for i, particle in enumerate(particles):
             pointData = list(map(float, particle._xmipp_nmaDisplacements))
             data.addPoint(Point(pointId=particle.getObjId(),
                                 data=pointData,
                                 weight=particle._xmipp_cost.get()))
-            
-        return data
 
-    
+        return data

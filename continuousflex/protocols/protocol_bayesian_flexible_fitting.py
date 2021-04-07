@@ -29,14 +29,20 @@ from pwem.objects.data import AtomStruct
 # from pyworkflow.utils import replaceExt
 # import pwem.emlib.metadata as md
 
-import continuousflex.protocols.src.molecule
-import continuousflex.protocols.src.density
-import continuousflex.protocols.src.functions
-from continuousflex.protocols.src.viewers import chimera_fit_viewer
 
 
+import sys
+sys.path.append('/home/guest/PycharmProjects/bayesian-md-nma')
+import src.molecule
+import src.density
+import src.functions
+from src.viewers import chimera_fit_viewer, chimera_molecule_viewer
+from src.flexible_fitting import FlexibleFitting, multiple_fitting
 import numpy as np
-import os
+
+ATOMICMODEL_CARBONALPHA=0
+ATOMICMODEL_BACKBONE=1
+ATOMICMODEL_ALLATOMS=2
 
 class FlexProtBayesianFlexibleFitting(ProtAnalysis3D):
     """ Protocol for Bayesian Flexible Fitting. """
@@ -72,21 +78,19 @@ class FlexProtBayesianFlexibleFitting(ProtAnalysis3D):
                       help="TODO", expertLevel=params.LEVEL_ADVANCED)
 
         ########################### Force field ############################################
-        form.addSection(label='Force Field')
-        form.addParam('biaisingFactor', params.FloatParam, default=1.0, label='Biasing potential factor',
+        form.addSection(label='Atomic Model')
+        form.addParam('atomicModel', params.EnumParam, label="Atomic model", default=ATOMICMODEL_ALLATOMS,
+                      choices=['Carbon Alpha', 'Backbone', 'All atoms'],
                       help="TODO")
-        form.addParam('energyFactor', params.FloatParam, default=1.0, label='Potential energy factor',
-                      help="TODO")
-        form.addParam('coarseGrained', params.BooleanParam, label="Coarse-grained model",
-                      default=True,
-                      help="TODO")
-        form.addParam('inputPSF', params.FileParam, label="Protein Structure File (PSF)", condition='coarseGrained==False',
+        form.addParam('inputPSF', params.FileParam, label="Protein Structure File (PSF)", condition='atomicModel>0',
                       help='Generated with generatePSF protocol (.psf)')
-        form.addParam('inputPRM', params.FileParam, label="Parameter File (PRM)", condition='coarseGrained==False',
+        form.addParam('inputPRM', params.FileParam, label="Parameter File (PRM)", condition='atomicModel>0',
                       help='CHARMM force field parameter file (.prm)')
 
-        ########################### Volume parameters ############################################
-        form.addSection(label='Volume parameters')
+        ########################### Density ############################################
+        form.addSection(label='Density')
+        form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
+                      help="TODO")
         form.addParam('gauss_sigma', params.FloatParam, default=2.0, label='3D Gaussians standard deviation',
                       help="TODO")
         form.addParam('gauss_threshold', params.IntParam, default=5, label='3D Gaussians cutoff',
@@ -95,11 +99,15 @@ class FlexProtBayesianFlexibleFitting(ProtAnalysis3D):
 
         ########################### Bayesian model ############################################
         form.addSection(label='Bayesian Model')
+        form.addParam('biaisingFactor', params.FloatParam, default=100.0, label='Biasing potential factor',
+                      help="TODO")
+        form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
+                      help="TODO")
         form.addParam('fitLocal', params.BooleanParam, label="Fit local dynamics",
                       default=True,
                       help="TODO")
-        form.addParam('dtLocal', params.FloatParam, default=0.005,
-                      label='Local dynamics time step',
+        form.addParam('dtLocal', params.FloatParam, default=1,
+                      label='Local dynamics time step (fs)',
                       condition='fitLocal==True', expertLevel=params.LEVEL_ADVANCED,
                       help="TODO")
         form.addParam('fitGlobal', params.BooleanParam, label="Fit global dynamics",
@@ -142,77 +150,79 @@ class FlexProtBayesianFlexibleFitting(ProtAnalysis3D):
         self.createInitialStructure()
         self.createTargetDensity()
         self.createFittingParameters()
+        chimera_fit_viewer(mol=self.initStructure, target=self.targetDensities[0])
         self.runHMC()
         self.createOutputStep()
 
     def createInitialStructure(self):
         # Read PDB
         fnPDB = self.inputPDB.get().getFileName()
-        self.initStructure = continuousflex.protocols.src.molecule.Molecule.from_file(file=fnPDB)
+        self.initStructure = src.molecule.Molecule(pdb_file=fnPDB)
 
         # Add selected modes
         fnModes = [i.getModeFile() for i in self.inputModes.get()]
         modeSelection = np.array(getListFromRangeString(self.modeList.get()))
-        self.initStructure.add_modes(files=fnModes, selection=modeSelection)
+        self.initStructure.set_normalModeVec(files=fnModes, selection=modeSelection)
 
         # Set Molecule Force field
-        if self.coarseGrained.get():
+        if self.atomicModel.get() == ATOMICMODEL_CARBONALPHA:
             # If coarse grained, use default Carbon alpha force field values
-            self.initStructure.select_atoms(pattern='CA')
+            self.initStructure.allatoms2carbonalpha()
             self.initStructure.set_forcefield()
         else:
             # Else read PSF and PRM files
             fnPSF = self.inputPSF.get()
             fnPRM = self.inputPRM.get()
             self.initStructure.set_forcefield(psf_file=fnPSF, prm_file=fnPRM)
+            if self.atomicModel.get() == ATOMICMODEL_BACKBONE:
+                self.initStructure.allatoms2backbone()
 
     def createTargetDensity(self):
         # Read Volumes
         fnVolumes = [i.getFileName() for i in self.inputVolumes.get()]
         self.targetDensities = []
         for i in fnVolumes:
-            targetDensity = continuousflex.protocols.src.density.Volume.from_file(file=i, sigma=self.gauss_sigma.get(),
-                                                                           threshold=self.gauss_threshold.get())
+            targetDensity = src.density.Volume.from_file(file=i, sigma=self.gauss_sigma.get(),
+                              threshold=self.gauss_threshold.get(), voxel_size=self.voxel_size.get())
 
             # Rescale the volumes to the initial structure
-            targetDensity.rescale(self.initStructure)
+            initDensity = src.density.Volume.from_coords(coord=self.initStructure.coords, size=targetDensity.size,
+                                                         sigma = targetDensity.sigma, threshold=targetDensity.threshold,
+                                                         voxel_size=targetDensity.voxel_size)
+            targetDensity.rescale(initDensity)
             self.targetDensities.append(targetDensity)
 
     def createFittingParameters(self):
         self.fittingParams = {
-            "lb": self.biaisingFactor.get(),
-            "lp": self.energyFactor.get(),
-            "max_iter": self.n_step.get(),
+            "initial_biasing_factor": self.biaisingFactor.get(),
+            "n_step": self.n_step.get(),
+            "n_iter" : self.n_iter.get(),
+            "n_warmup" : self.n_warmup.get(),
             "criterion": False,
+            "temperature" :  self.temperature.get()
         }
         self.fittingVars =[]
         if self.fitLocal.get():
-            self.fittingVars.append("x")
-            self.fittingParams["x_dt"] = self.dtLocal.get()
-            self.fittingParams["x_init"] = np.zeros(self.initStructure.coords.shape)
-            self.fittingParams["x_mass"] = 1
+            self.fittingVars.append("local")
+            self.fittingParams["local_dt"] = self.dtLocal.get() * 1e-15
         if self.fitGlobal.get():
-            self.fittingVars.append("q")
-            self.fittingParams["q_dt"] = self.dtGlobal.get()
-            self.fittingParams["q_init"] = np.zeros(self.initStructure.modes.shape[1])
-            self.fittingParams["q_mass"] = 1
+            self.fittingVars.append("global")
+            self.fittingParams["global_dt"] = self.dtGlobal.get()
         if self.fitRotation.get():
-            self.fittingVars.append("angles")
-            self.fittingParams["angles_dt"] = self.dtRotation.get()
-            self.fittingParams["angles_init"] = np.zeros(3)
-            self.fittingParams["angles_mass"] = 1
+            self.fittingVars.append("rotation")
+            self.fittingParams["rotation_dt"] = self.dtRotation.get()
         if self.fitShift.get():
             self.fittingVars.append("shift")
             self.fittingParams["shift_dt"] = self.dtShift.get()
-            self.fittingParams["shift_init"] = np.zeros(3)
-            self.fittingParams["shift_mass"] = 1
 
     def runHMC(self):
         # Run parallel HMC fitting
-        self.fittingHMC = continuousflex.protocols.src.functions.multiple_fitting(init=self.initStructure,
-                    targets=self.targetDensities, vars=self.fittingVars, n_chain=self.n_chain.get(),
-                    n_iter=self.n_iter.get(), n_warmup=self.n_warmup.get(), params=self.fittingParams,
-                    n_proc=self.n_proc.get(), verbose=self.verboseLevel.get())
+        models=[]
+        for t in self.targetDensities:
+            models.append(FlexibleFitting(init=self.initStructure, target=t, vars=self.fittingVars,n_chain=self.n_chain.get(),
+                        params=self.fittingParams, verbose=self.verboseLevel.get()))
+
+        self.fittingHMC = multiple_fitting(models = models,n_chain=self.n_chain.get(), n_proc=self.n_proc.get())
 
     def createOutputStep(self):
         for i in range(len(self.fittingHMC)) :

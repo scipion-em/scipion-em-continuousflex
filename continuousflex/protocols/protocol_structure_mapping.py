@@ -189,9 +189,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         
         makePath(self._getExtraPath("modes%d"%nVoli))
         
-        for i in range(self.numberOfModes.get() + 1):
-            if i==0:
-                i += 1 
+        for i in range(1, self.numberOfModes.get() + 1):
             copyFile (self._getPath("modes/vec.%d"%i),
                       self._getExtraPath("modes%d/vec.%d"%(nVoli, i)))
             

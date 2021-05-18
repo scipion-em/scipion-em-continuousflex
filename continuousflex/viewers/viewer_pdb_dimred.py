@@ -128,11 +128,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             z_high = self.zlim_high.get()
 
         # print(self.protocol.getOutputMatrixFile())
-        X = np.loadtxt(fname=self.protocol.getOutputMatrixFile())
+        X = load(self.protocol._getExtraPath('pca_pickled.txt'))
         if dim == 1:
             plt.hist(X[:,components[0]-1])
         if dim == 2:
-            plt.scatter(X[:,components[0]-1],X[:,components[1]-1])
+            plt.scatter(X.components_[components[0]-1,:],X.components_[components[1]-1,:])
             if self.xlimits_mode.get() == X_LIMITS:
                 plt.xlim([x_low,x_high])
             if self.ylimits_mode.get() == Y_LIMITS:

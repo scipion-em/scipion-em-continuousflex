@@ -44,3 +44,5 @@ from .data import *
 from .pdb import *
 from .protocol_pdb_dimred import FlexProtDimredPdb
 from .protocol_subtomograms_classify import FlexProtSubtomoClassify
+from .protocol_genesis_min import FlexProtGenesisMin
+from .protocol_genesis_fit import FlexProtGenesisFit

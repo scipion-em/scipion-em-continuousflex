@@ -24,8 +24,9 @@
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
-from pwem.objects.data import AtomStruct
+from pwem.objects.data import AtomStruct, EMFile
 import os
+
 
 class FlexProtGeneratePSF(ProtAnalysis3D):
     """ Protocol to generate PSF file. """
@@ -39,7 +40,8 @@ class FlexProtGeneratePSF(ProtAnalysis3D):
                       pointerClass='AtomStruct', label="Input PDB", important=True,
                       help='Select the PDB from which the PSF file will be generate')
         form.addParam('inputTopology', params.FileParam, label="Input Topology file", important=True,
-                      help='CHARMM Topology .rtf file')
+                      help='CHARMM Topology file (.rtf). Can be founded at '+
+                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
 
 
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -71,6 +73,7 @@ class FlexProtGeneratePSF(ProtAnalysis3D):
             psfgen.write("package require psfgen\n")
             psfgen.write("topology " + fnTopology + "\n")
             psfgen.write("pdbalias residue HIS HSE\n")
+            psfgen.write("pdbalias residue MSE MET\n")
             psfgen.write("pdbalias atom ILE CD1 CD\n")
 
             psfgen.write("foreach chain $chains {\n")
@@ -88,7 +91,9 @@ class FlexProtGeneratePSF(ProtAnalysis3D):
 
     def createOutputStep(self):
         pdb = AtomStruct(self._getExtraPath('output.pdb'), pseudoatoms=False)
-        self._defineOutputs(outputPdb=pdb)
+        self._defineOutputs(outputPDB=pdb)
+        psf = EMFile(self._getExtraPath('output.psf'))
+        self._defineOutputs(outputPSF=psf)
 
     # --------------------------- STEPS functions --------------------------------------------
     # --------------------------- INFO functions --------------------------------------------

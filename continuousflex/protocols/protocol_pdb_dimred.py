@@ -63,7 +63,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('pdbSource', EnumParam, default=0,
                       label='Source of PDBs',
-                      choices=['After subtomogram synthesis', 'File pattern'],
+                      choices=['After subtomogram synthesis', 'File pattern', 'SetOfPDBs'],
                       help='Use the file pattern as file location with /*.pdb')
         form.addParam('pdbs', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
                       condition='pdbSource == 0',
@@ -73,6 +73,8 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='pdbSource == 1',
                       label="List of PDBs",
                       help='Use the file pattern as file location with /*.pdb')
+        form.addParam("set_of_pdbs", params.PointerParam, pointerClass="SetOfAtomStructs", condition = "pdbSource == 2",
+                      label ="Set of PDBs", help='Select a set of PDBs.')
         form.addParam('dimredMethod', EnumParam, default=DIMRED_SKLEAN_PCA,
                       choices=['Principal Component Analysis (PCA)',
                                'Local Tangent Space Alignment',
@@ -125,18 +127,17 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
-        pdb_mat = self.getInputPdbs()
+        pdbs_list = self.getInputPdbs()
         reducedDim = self.reducedDim.get()
         method = self.dimredMethod.get()
         extraParams = self.extraParams.get('')
         deformationsFile = self.getDeformationFile()
         self._insertFunctionStep('performPDBdimred',
-                                 pdb_mat,reducedDim,method,extraParams,deformationsFile)
+                                 pdbs_list,reducedDim,method,extraParams,deformationsFile)
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
-    def performPDBdimred(self,pdb_mat,reducedDim,method,extraParams,deformationsFile):
-        pdbs_list = [f for f in glob.glob(pdb_mat)]
+    def performPDBdimred(self,pdbs_list,reducedDim,method,extraParams,deformationsFile):
         pdbs_list.sort()
         pdbs_matrix = []
         for pdbfn in pdbs_list:
@@ -156,14 +157,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
         if methodName == 'sklearn_PCA':
             # X = np.loadtxt(fname=deformationsFile)
-            X = pdbs_matrix
+            X = np.array(pdbs_matrix)
             pca = decomposition.PCA(n_components=reducedDim)
-            pca.fit(X)
-            Y = pca.transform(X)
-            np.savetxt(outputMatrix,Y)
-            M = np.matmul(np.linalg.pinv(X),Y)
-            mappingFile = self._getExtraPath('projector.txt')
-            np.savetxt(mappingFile,M)
+            pca.fit(X.T)
+            # Y = pca.transform(X)
+            # np.savetxt(outputMatrix,Y)
+            # M = np.matmul(np.linalg.pinv(X),Y)
+            # mappingFile = self._getExtraPath('projector.txt')
+            # np.savetxt(mappingFile,M)
             # save the pca:
             pca_pickled = self._getExtraPath('pca_pickled.txt')
             dump(pca,pca_pickled)
@@ -175,8 +176,6 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                 args += " --saveMapping %(mappingFile)s"
             self.runJob("xmipp_matrix_dimred", args % locals())
 
-
-        print(pdb_mat)
         pass
 
     def createOutputStep(self):
@@ -208,9 +207,15 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
     def getInputPdbs(self):
         if self.pdbSource.get()==0:
-            return self.pdbs.get()._getExtraPath('*.pdb')
-        else:
-            return self.pdbs_file.get()
+            pdbs = self.pdbs.get()._getExtraPath('*.pdb')
+            pdbs_list = [f for f in glob.glob(pdbs)]
+            return pdbs_list
+        elif self.pdbSource.get()==1:
+            pdbs = self.pdbs_file.get()
+            pdbs_list = [f for f in glob.glob(pdbs)]
+            return pdbs_list
+        elif self.pdbSource.get()==2:
+            return [i.getFileName() for i in self.set_of_pdbs.get()]
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')

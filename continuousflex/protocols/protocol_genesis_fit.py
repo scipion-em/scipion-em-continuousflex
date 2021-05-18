@@ -116,14 +116,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "[ENERGY] \n"
         s += "forcefield = CHARMM  # CHARMM force field \n"
         s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
-        s += "switchdist = 6.0  # switch distance \n"
+        s += "switchdist = 4.0  # switch distance \n"
         s += "cutoffdist = 6.0  # cutoff distance \n"
         s += "pairlistdist = 8.0  # pair-list distance \n"
         s += "implicit_solvent = NONE  # use GBSA implicit solvent model \n"
         # s += "gbsa_salt_cons = 0.15  # salt concentration \n"
         # s += "gbsa_surf_tens = 0.005  # surface tension coefficient in SA term \n"
         # s += "gbsa_eps_solvent = 78.5  # dielectric constant of solvent \n"
-        s += "vdw_force_switch = NO \n"
+        s += "vdw_force_switch = YES \n"
 
         s += "[DYNAMICS] \n"
         s += "integrator = VVER  # [LEAP,VVER] \n"
@@ -139,8 +139,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "rigid_bond = NO  # use SHAKE \n"
 
         s += "[ENSEMBLE] \n"
-        s += "ensemble = NVE  # constant temperature \n"
-        s += "tpcontrol = NO  # Langevin thermostat \n"
+        s += "ensemble = NVT  # constant temperature \n"
+        s += "tpcontrol = BERENDSEN  # Langevin thermostat \n"
         s += "temperature = 300  # T = 300 K \n"
         # s += "gamma_t = 5  # friction coefficient (ps-1) \n"
 
@@ -148,7 +148,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "type = NOBC  # No periodic boundary condition \n"
 
         s += "[SELECTION] \n"
-        s += "group1 = all\n"
+        s += "group1 = all and not hydrogen\n"
 
         s += "[RESTRAINTS] \n"
         s += "nfunctions = 1 \n"
@@ -160,7 +160,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "emfit = YES  # perform EM flexible fitting \n"
         s += "emfit_target = "+self.inputVolumeFn+"\n"
         s += "emfit_sigma = 2.0  # half of the map resolution (5 A) \n"
-        s += "emfit_tolerance = 0.001  # Tolerance for error (0.1%) \n"
+        s += "emfit_tolerance = 0.01  # Tolerance for error (0.1%) \n"
         s += "emfit_period = 1  # emfit force update period \n"
         s += "emfit_nma = "+self._getExtraPath("emfit_nma")+"\n"
 

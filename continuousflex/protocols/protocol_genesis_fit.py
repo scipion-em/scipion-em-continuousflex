@@ -222,7 +222,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         print(self.crdout_period.get())
         cc, rmsd = get_cc_rmsd(N=(self.n_steps.get()//self.crdout_period.get()), prefix=outputPrefix,
                                target=Molecule(self.target_pdb.get().getFileName()),
-                size=100, voxel_size=2.0, cutoff=10.0, sigma=2.0, step=1, test_idx=False)
+                size=100, voxel_size=2.0, cutoff=10.0, sigma=2.0, step=1, test_idx=True)
         fig, ax = plt.subplots(1,2)
         ax[0].set_xlabel("MD step")
         ax[0].set_ylabel("CC")

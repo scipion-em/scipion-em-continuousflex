@@ -36,6 +36,10 @@ import time
 
 import os
 
+TPCONTROL_LANGEVIN=0
+TPCONTROL_BERENDSEN=1
+TPCONTROL_NO=2
+
 class FlexProtGenesisFit(ProtAnalysis3D):
     """ Protocol for flexible fitting a PDB into a cryo EM map using Genesis. """
     _label = 'genesis fit'
@@ -85,6 +89,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=0,
                       choices=['Yes', 'No'],
                       help="TODo")
+        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=0,
+                      choices=['LANGEVIN', 'BERENDSEN', 'NO'],
+                      help="TODo")
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -99,6 +106,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     def fittingStep(self):
         min = self.inputGenesisMin.get()
         outputPrefix = self._getExtraPath("run"+str(self.niter)+"_")
+        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+            tpcontrol = "LANGEVIN"
+        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+            tpcontrol = "BERENDSEN"
+        else:
+            tpcontrol = "NO"
 
         s = "[INPUT] \n"
         s += "topfile = "+min.inputRTF.get()+"\n"
@@ -139,7 +152,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         s += "[ENSEMBLE] \n"
         s += "ensemble = NVT  # constant temperature \n"
-        s += "tpcontrol = BERENDSEN  # Langevin thermostat \n"
+        s += "tpcontrol = "+tpcontrol+"  # Langevin thermostat \n"
         s += "temperature = 300  # T = 300 K \n"
         # s += "gamma_t = 5  # friction coefficient (ps-1) \n"
 

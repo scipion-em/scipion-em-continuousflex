@@ -139,7 +139,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "vdw_force_switch = YES \n"
 
         s += "[DYNAMICS] \n"
-        s += "integrator = LEAP  # [LEAP,VVER] \n"
+        s += "integrator = VVER  # [LEAP,VVER] \n"
         s += "nsteps = "+str(self.n_steps.get())+" \n"
         s += "timestep = "+str(self.time_step.get())+"  #\n"
         s += "eneout_period = "+str(self.eneout_period.get())+" \n"

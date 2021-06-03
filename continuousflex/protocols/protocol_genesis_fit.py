@@ -34,6 +34,7 @@ from src.molecule import Molecule
 from src.functions import get_cc_rmsd
 import matplotlib.pyplot as plt
 import time
+import mrcfile
 
 import os
 
@@ -48,14 +49,25 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
+        form.addParam('genesisDir', params.FileParam, label="Genesis install path",
+                      help='Path to genesis installation')
+        form.addParam('forcefield', params.EnumParam, label="Forcefield", default=0,
+                      choices=['CHARMM', 'AAGO'],
+                      help="TODo")
         form.addParam('inputGenesisMin', params.PointerParam,
-                      pointerClass='FlexProtGenesisMin', label="Input Genesis Minimization", important=True,
-                      help='Select the input minimization')
+                      pointerClass='FlexProtGenesisMin', label="Input Genesis Minimization",
+                      help='Select the input minimization', condition="forcefield==0")
+        form.addParam('inputGRO', params.PointerParam, label="Coordinate file .gro",
+                      pointerClass='EMFile', help='TODO', condition="forcefield==1")
+        form.addParam('inputTOP', params.PointerParam, label="Topology file .top",
+                      pointerClass='EMFile', help='TODO', condition="forcefield==1")
         form.addParam('convertVolume', params.BooleanParam, label="Convert Volume (SITUS)",
                       default=False,
                       help="If selected, the input MRC volume will be automatically converted to SITUS format")
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume", condition="convertVolume==True",
                       label="Input volume", help='Select the target EM density volume')
+        form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
+                      help="TODO")
         form.addParam('situs_dir', params.FileParam, condition="convertVolume==True",
                       label="Situs install path", help='Select the root directory of Situs installation')
         form.addParam('inputVolumeFile', params.FileParam, condition="convertVolume==False",
@@ -115,11 +127,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             tpcontrol = "NO"
 
         s = "[INPUT] \n"
-        s += "topfile = "+min.inputRTF.get()+"\n"
-        s += "parfile = "+min.inputPRM.get()+"\n"
-        s += "pdbfile = "+min.inputPDB.get().getFileName()+"\n"
-        s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
-        s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
+        if self.forcefield == 0:
+            s += "topfile = "+min.inputRTF.get()+"\n"
+            s += "parfile = "+min.inputPRM.get()+"\n"
+            s += "pdbfile = "+min.inputPDB.get().getFileName()+"\n"
+            s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
+            s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
+        elif self.forcefield == 1:
+            s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"
+            s += "grocrdfile = " + self.inputGRO.get().getFileName() + "\n"
 
         s += "[OUTPUT] \n"
         s += "dcdfile = "+outputPrefix + ".dcd\n"
@@ -127,15 +143,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "pdbfile = "+outputPrefix + ".pdb\n"
 
         s += "[ENERGY] \n"
-        s += "forcefield = CHARMM  # CHARMM force field \n"
+        if self.forcefield == 0:
+            s += "forcefield = CHARMM  # CHARMM force field\n"
+        elif self.forcefield == 1:
+            s += "forcefield = AAGO  # AAGO\n"
         s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
         s += "switchdist = 4.0  # switch distance \n"
         s += "cutoffdist = 6.0  # cutoff distance \n"
         s += "pairlistdist = 8.0  # pair-list distance \n"
         s += "implicit_solvent = NONE  # use GBSA implicit solvent model \n"
-        # s += "gbsa_salt_cons = 0.15  # salt concentration \n"
-        # s += "gbsa_surf_tens = 0.005  # surface tension coefficient in SA term \n"
-        # s += "gbsa_eps_solvent = 78.5  # dielectric constant of solvent \n"
         s += "vdw_force_switch = YES \n"
 
         s += "[DYNAMICS] \n"
@@ -191,7 +207,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write("export OMP_NUM_THREADS="+str(self.n_proc.get())+"\n")
             f.write("echo \"OMP NUM THREADS : \"\n")
             f.write("echo $OMP_NUM_THREADS\n")
-            f.write(min.genesisDir.get()+"/bin/atdyn ")
+            f.write(self.genesisDir.get()+"/bin/atdyn ")
             f.write(self._getExtraPath("fitting")+"\n")
             f.write("exit")
         t=time.time()
@@ -200,24 +216,57 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         self.times.append(time.time()-t)
 
     def createInputStep(self):
-        if self.convertVolume.get():
-            prog = self.situs_dir.get() + "/bin/map2map"
-            args = self.inputVolume.get().getFileName() +" "+self._getExtraPath("output.sit") +" <<< \'1\'"
-            with open(self._getExtraPath("runconvert.sh"), "w") as f:
-                f.write("#!/bin/bash \n")
-                f.write(prog+ " "+ args+"\n")
-                f.write("exit")
-            self.runJob("/bin/bash", self._getExtraPath("runconvert.sh"))
-            self.inputVolumeFn = self._getExtraPath("output.sit")
+
+        fnVolume =self.inputVolume.get().getFileName()
+
+        pre, ext = os.path.splitext(os.path.basename(fnVolume))
+        if ext != ".mrc":
+            fnMRC = self._getExtraPath(pre + ".mrc")
+            args = "-i " + fnVolume
+            args += " --oext mrc"
+            args += " -o " + fnMRC
+            self.runJob("xmipp_image_convert", args)
+
+            with mrcfile.open(fnMRC) as mrc:
+                mrc_data = mrc.data
+            with mrcfile.new(fnMRC, overwrite=True) as mrc:
+                mrc.set_data(mrc_data)
+                mrc.voxel_size = self.voxel_size.get()
+                origin = -self.voxel_size.get() * np.array(mrc_data.shape) / 2
+                mrc.header['origin']['x'] = origin[0]
+                mrc.header['origin']['y'] = origin[1]
+                mrc.header['origin']['z'] = origin[2]
+                mrc.update_header_from_data()
+                mrc.update_header_stats()
         else:
-            self.inputVolumeFn = self.inputVolumeFile.get()
+            fnMRC = fnVolume
+
+        from src.density import Volume
+        from src.molecule import Molecule
+        m1 = Volume.from_file(file=fnMRC, sigma=2.0, cutoff=6.0)
+        mol = Molecule(self.inputGenesisMin.get().inputPDB.get().getFileName())
+        mol.center()
+        m2 = Volume.from_coords(mol.coords, size= m1.size, voxel_size=m1.voxel_size,sigma=2.0, cutoff=6.0)
+
+        m1.rescale(method="normal", density=m2)
+        m1.save_mrc(file=self._getExtraPath("target.mrc"))
+
+        prog = self.situs_dir.get() + "/bin/map2map"
+        args = self._getExtraPath("target.mrc") +" "+self._getExtraPath("target.sit") +" <<< \'1\'"
+        with open(self._getExtraPath("runconvert.sh"), "w") as f:
+            f.write("#!/bin/bash \n")
+            f.write(prog+ " "+ args+"\n")
+            f.write("exit")
+        self.runJob("/bin/bash", self._getExtraPath("runconvert.sh"))
+        self.inputVolumeFn = self._getExtraPath("target.sit")
+
 
     def createOutputStep(self):
         outputPrefix = self._getExtraPath("run"+str(self.niter)+"_")
         self._defineOutputs(outputPDB= AtomStruct(outputPrefix+".pdb"))
         with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:
             s=""
-            s += "mol load psf " + self.inputGenesisMin.get().inputPSF.get().getFileName() + " dcd " +outputPrefix+".dcd\n"
+            s += "mol load pdb " + outputPrefix+".pdb dcd " +outputPrefix+".dcd\n"
             s += "set nf [molinfo top get numframes]\n"
             s += "for {set i 0 } {$i < $nf} {incr i} {\n"
             s += "[atomselect top all frame $i] writepdb "+outputPrefix + "$i.pdb\n"
@@ -236,7 +285,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         print(self.crdout_period.get())
         cc, rmsd = get_cc_rmsd(N=(self.n_steps.get()//self.crdout_period.get()), prefix=outputPrefix,
                                target=Molecule(self.target_pdb.get().getFileName()),
-                size=100, voxel_size=2.0, cutoff=10.0, sigma=2.0, step=1, test_idx=True)
+                size=100, voxel_size=2.0, cutoff=6.0, sigma=2.0, step=1, test_idx=True)
         fig, ax = plt.subplots(1,2)
         ax[0].set_xlabel("MD step")
         ax[0].set_ylabel("CC")

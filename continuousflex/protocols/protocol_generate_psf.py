@@ -48,8 +48,8 @@ class FlexProtGeneratePSF(ProtAnalysis3D):
 
 
     def _insertAllSteps(self):
-        self.generatePSF()
-        self.createOutputStep()
+        self._insertFunctionStep("generatePSF")
+        self._insertFunctionStep("createOutputStep")
 
 
     def generatePSF(self):

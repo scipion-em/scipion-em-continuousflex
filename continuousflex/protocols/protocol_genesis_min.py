@@ -96,7 +96,7 @@ class FlexProtGenesisMin(ProtAnalysis3D):
     def generateOutputPDBStep(self):
         with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:
             s=""
-            s += "mol load psf " + self.inputPSF.get().getFileName() + " dcd " +self._getExtraPath("min.dcd")+ "\n"
+            s += "mol load pdb " + self.inputPDB.get().getFileName() + " dcd " +self._getExtraPath("min.dcd")+ "\n"
             s += "set nf [molinfo top get numframes]\n"
             s += "for {set i 0 } {$i < $nf} {incr i} {\n"
             s += "[atomselect top all frame $i] writepdb "+self._getExtraPath("output.pdb")+"\n"

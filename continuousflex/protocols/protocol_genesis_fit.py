@@ -81,6 +81,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
                       help="TODO")
+        form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=0,
+                      choices=['Yes', 'NO'],
+                      help="TODo")
+        form.addParam('boundaryConditions', params.EnumParam, label="Periodic Boundary Conditions", default=0,
+                      choices=['Yes', 'NO'],
+                      help="TODo")
+        form.addParam('boxSizePBC', params.FloatParam, default=100.0, label='PBC box size (A)',
+                      help="TODO")
         form.addParam('time_step', params.FloatParam, default=0.001, label='Time step (ps)',
                       help="TODO")
         form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
@@ -147,11 +155,18 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         elif self.forcefield == 1:
             s += "forcefield = AAGO  # AAGO\n"
         s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
-        s += "switchdist = 4.0  # switch distance \n"
-        s += "cutoffdist = 6.0  # cutoff distance \n"
-        s += "pairlistdist = 8.0  # pair-list distance \n"
-        s += "implicit_solvent = NONE  # use GBSA implicit solvent model \n"
+        s += "switchdist = 10.0  # switch distance \n"
+        s += "cutoffdist = 13.0  # cutoff distance \n"
+        s += "pairlistdist = 16.0  # pair-list distance \n"
         s += "vdw_force_switch = YES \n"
+        if self.implicitSolvent == 0:
+            s += "implicit_solvent = GBSA    # [GBSA] \n"
+            s += "gbsa_eps_solvent = 78.5    # solvent dielectric constant in GB \n"
+            s += "gbsa_eps_solute  = 1.0     # solute dielectric constant in GB \n"
+            s += "gbsa_salt_cons   = 0.2     # salt concentration (mol/L) in GB \n"
+            s += "gbsa_surf_tens   = 0.005   # surface tension (kcal/mol/A^2) in SA \n"
+        else:
+            s += "implicit_solvent = NONE    # [None] \n"
 
         s += "[DYNAMICS] \n"
         s += "integrator = VVER  # [LEAP,VVER] \n"
@@ -173,7 +188,13 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         # s += "gamma_t = 5  # friction coefficient (ps-1) \n"
 
         s += "[BOUNDARY] \n"
-        s += "type = NOBC  # No periodic boundary condition \n"
+        if self.boundaryConditions == 0:
+            s += "type = PBC  # Periodic boundary condition \n"
+            s += "box_size_x = %.1f \n" % self.boxSizePBC
+            s += "box_size_y = %.1f \n" % self.boxSizePBC
+            s += "box_size_z = %.1f \n" % self.boxSizePBC
+        elif self.boundaryConditions == 1:
+            s += "type = NOBC  # No periodic boundary condition \n"
 
         s += "[SELECTION] \n"
         s += "group1 = all and not hydrogen\n"
@@ -247,7 +268,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         mol.center()
         m2 = Volume.from_coords(mol.coords, size= m1.size, voxel_size=m1.voxel_size,sigma=2.0, cutoff=6.0)
 
-        m1.rescale(method="normal", density=m2)
+        m1.rescale(method="match", density=m2)
         m1.save_mrc(file=self._getExtraPath("target.mrc"))
 
         prog = self.situs_dir.get() + "/bin/map2map"

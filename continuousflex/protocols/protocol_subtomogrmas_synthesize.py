@@ -460,36 +460,57 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         else:
             tiltLow, tiltHigh = -90, 90
 
+        # with open(self._getExtraPath('projection.param'), 'a') as file:
+        #     file.write(
+        #         "\n".join([
+        #             "# XMIPP_STAR_1 *",
+        #             "# Projection Parameters",
+        #             "data_noname",
+        #             "# X and Y projection dimensions [Xdim Ydim]",
+        #             "_projDimensions '%(sizeX)s %(sizeY)s'" % locals(),
+        #             "# Angle Set Source -----------------------------------------------------------",
+        #             "# tilt axis, direction defined by rot and tilt angles in degrees",
+        #             "_angleRot 90",
+        #             "_angleTilt 90",
+        #             "# tilt axis offset in pixels",
+        #             "_shiftX 0",
+        #             "_shiftY 0",
+        #             "_shiftZ 0",
+        #             "# Tilting description [tilt0 tiltF tiltStep] in degrees",
+        #             "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
+        #             "# Noise description ----------------------------------------------------------",
+        #             "#     applied to angles [noise (bias)]",
+        #             "_noiseAngles '0 0'",
+        #             "#     applied to pixels [noise (bias)]",
+        #             "_noisePixelLevel '0 0'",
+        #             "#     applied to particle center coordenates [noise (bias)]",
+        #             "_noiseParticleCoord '0 0'"]))
+        # for i in range(numberOfVolumes):
+        #     params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + volumeName)
+        #     params += " --oroot " + self._getExtraPath(str(i + 1).zfill(5) + '_projected')
+        #     params += " --params " + self._getExtraPath('projection.param')
+        #     self.runJob('xmipp_tomo_project', params)
         with open(self._getExtraPath('projection.param'), 'a') as file:
-            file.write(
-                "\n".join([
-                    "# XMIPP_STAR_1 *",
-                    "# Projection Parameters",
-                    "data_noname",
-                    "# X and Y projection dimensions [Xdim Ydim]",
-                    "_projDimensions '%(sizeX)s %(sizeY)s'" % locals(),
-                    "# Angle Set Source -----------------------------------------------------------",
-                    "# tilt axis, direction defined by rot and tilt angles in degrees",
-                    "_angleRot 90",
-                    "_angleTilt 90",
-                    "# tilt axis offset in pixels",
-                    "_shiftX 0",
-                    "_shiftY 0",
-                    "_shiftZ 0",
-                    "# Tilting description [tilt0 tiltF tiltStep] in degrees",
-                    "_projTiltRange '%(tiltLow)s %(tiltHigh)s %(tiltStep)s'" % locals(),
-                    "# Noise description ----------------------------------------------------------",
-                    "#     applied to angles [noise (bias)]",
-                    "_noiseAngles '0 0'",
-                    "#     applied to pixels [noise (bias)]",
-                    "_noisePixelLevel '0 0'",
-                    "#     applied to particle center coordenates [noise (bias)]",
-                    "_noiseParticleCoord '0 0'"]))
+            file.write("""# XMIPP_STAR_1 *
+            data_block1
+            _dimensions2D   '%d %d'
+            _projRotRange    '%f %f %d'
+            _projRotRandomness   even 
+            _projTiltRange    '%f %f %d'
+            _projTiltRandomness   even 
+            _projPsiRange    '0 0 1'
+            _projPsiRandomness   even 
+            _noiseCoord '%f 0'
+            """ % (self.volumeSize.get(), self.volumeSize.get(), 0, 360, 72, 0, 180, 36, 0.0))
         for i in range(numberOfVolumes):
-            params = " -i " +  self._getExtraPath(str(i + 1).zfill(5) + volumeName)
-            params += " --oroot " + self._getExtraPath(str(i + 1).zfill(5) + '_projected')
-            params += " --params " + self._getExtraPath('projection.param')
-            self.runJob('xmipp_tomo_project', params)
+            self.runJob("xmipp_phantom_project",
+                        "-i %s -o %s --params %s --method fourier 2 %f --sym %s" %
+                        (self._getExtraPath(str(i + 1).zfill(5) + volumeName),
+                         self._getExtraPath(str(i + 1).zfill(5) + '_projected.stk'),
+                         self._getExtraPath("projection.param"),
+                         0.25, "c1"))
+            self.runJob("mv", self._getExtraPath(str(i + 1).zfill(5) + '_projected.xmd')+ " "+
+                        self._getExtraPath(str(i + 1).zfill(5) + '_projected.sel'))
 
     def apply_noise_and_ctf(self):
 

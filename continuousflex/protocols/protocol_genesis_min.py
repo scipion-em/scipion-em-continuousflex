@@ -85,8 +85,8 @@ class FlexProtGenesisMin(ProtAnalysis3D):
         s += "crdout_period = " + str(self.n_steps.get()) + "\n"
         s += "rstout_period = " + str(self.n_steps.get()) + "\n"
         s += "nbupdate_period = 10  # nonbond update period\n"
-        s += "\n[BOUNDARY]\n"
-        s += "type = NOBC  # No periodic boundary condition\n"
+        s += "[BOUNDARY] \n"
+        s += "type = NOBC  # No periodic boundary condition \n"
 
         with open(self._getExtraPath("min"), "w") as f:
             f.write(s)

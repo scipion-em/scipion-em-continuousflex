@@ -85,11 +85,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=0,
                       choices=['Yes', 'NO'],
                       help="TODo")
-        form.addParam('boundaryConditions', params.EnumParam, label="Periodic Boundary Conditions", default=0,
+        form.addParam('centerOrigin', params.EnumParam, label="Center Origin", default=0,
                       choices=['Yes', 'NO'],
                       help="TODo")
-        form.addParam('boxSizePBC', params.FloatParam, default=100.0, label='PBC box size (A)',
-                      help="TODO")
         form.addParam('time_step', params.FloatParam, default=0.001, label='Time step (ps)',
                       help="TODO")
         form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
@@ -189,13 +187,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         # s += "gamma_t = 5  # friction coefficient (ps-1) \n"
 
         s += "[BOUNDARY] \n"
-        if self.boundaryConditions == 0:
-            s += "type = PBC  # Periodic boundary condition \n"
-            s += "box_size_x = %.1f \n" % self.boxSizePBC
-            s += "box_size_y = %.1f \n" % self.boxSizePBC
-            s += "box_size_z = %.1f \n" % self.boxSizePBC
-        elif self.boundaryConditions == 1:
-            s += "type = NOBC  # No periodic boundary condition \n"
+        s += "type = NOBC  # No periodic boundary condition \n"
 
         s += "[SELECTION] \n"
         s += "group1 = all and not hydrogen\n"
@@ -270,7 +262,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         m2 = Volume.from_coords(mol.coords, size= m1.size, voxel_size=m1.voxel_size,sigma=2.0, cutoff=6.0)
 
         m1.rescale(method="match", density=m2)
-        m1.save_mrc(file=self._getExtraPath("target.mrc"))
+        if self.centerOrigin.get() ==0:
+            m1.save_mrc(file=self._getExtraPath("target.mrc"), origin=None)
+        else:
+            m1.save_mrc(file=self._getExtraPath("target.mrc"), origin=0.0)
 
         prog = self.situs_dir.get() + "/bin/map2map"
         args = self._getExtraPath("target.mrc") +" "+self._getExtraPath("target.sit") +" <<< \'1\'"

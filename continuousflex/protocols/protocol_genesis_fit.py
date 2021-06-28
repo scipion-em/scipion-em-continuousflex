@@ -22,6 +22,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
+
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from pwem.objects.data import AtomStruct

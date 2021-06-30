@@ -48,12 +48,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
+        # GENERAL =================================================================================================
         form.addSection(label='Input')
         form.addParam('genesisDir', params.FileParam, label="Genesis install path",
                       help='Path to genesis installation')
         form.addParam('forcefield', params.EnumParam, label="Forcefield", default=0,
-                      choices=['CHARMM', 'AAGO'],
-                      help="TODo")
+                      choices=['CHARMM', 'AAGO'],help="TODo")
         form.addParam('inputGenesisMin', params.PointerParam,
                       pointerClass='FlexProtGenesisMin', label="Input Genesis Minimization",
                       help='Select the input minimization', condition="forcefield==0")
@@ -61,6 +61,55 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       pointerClass='EMFile', help='TODO', condition="forcefield==1")
         form.addParam('inputTOP', params.PointerParam, label="Topology file .top",
                       pointerClass='EMFile', help='TODO', condition="forcefield==1")
+        form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
+                      help="TODO")
+        form.addParam('n_threads', params.IntParam, default=1, label='Number of threads',
+                      help="TODO")
+
+        # ENERGY =================================================================================================
+        form.addSection(label='Energy')
+        form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
+                      choices=['Yes', 'NO'],
+                      help="TODo")
+        form.addParam('switch_dist', params.FloatParam, default=10.0, label='Switch Distance', help="TODO")
+        form.addParam('cutoff_dist', params.FloatParam, default=12.0, label='Cutoff Distance', help="TODO")
+        form.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance', help="TODO")
+
+        # DYNAMICS =================================================================================================
+        form.addSection(label='Dynamics')
+        form.addParam('integrator', params.EnumParam, label="Integrator", default=0,
+                      choices=['VVER', 'LEAP'],  help="TODO")
+        form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
+                      help="Select the number of steps in the MD fitting")
+        form.addParam('time_step', params.FloatParam, default=0.001, label='Time step (ps)',
+                      help="TODO")
+        form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
+                      help="TODO")
+        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinates output period',
+                      help="TODO")
+        form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
+                      help="TODO")
+        # Constraints =================================================================================================
+        # form.addSection(label='Constraints')
+
+        # Ensemble =================================================================================================
+        form.addSection(label='Ensemble')
+        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=0,
+                      choices=['LANGEVIN', 'BERENDSEN', 'NO'],
+                      help="TODo")
+        form.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
+                      help="TODO")
+        # Boundary =================================================================================================
+        # form.addSection(label='Boundary')
+
+        # Experiments =================================================================================================
+        form.addSection(label='Experiments')
+        form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
+                      help="TODO")
+        form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
+                      help="TODO")
+        form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
+                      help="TODO")
         form.addParam('convertVolume', params.BooleanParam, label="Convert Volume (SITUS)",
                       default=False,
                       help="If selected, the input MRC volume will be automatically converted to SITUS format")
@@ -72,30 +121,17 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       label="Situs install path", help='Select the root directory of Situs installation')
         form.addParam('inputVolumeFile', params.FileParam, condition="convertVolume==False",
                       label="Input volume", help='Select the SITUS (.sit) volume file')
-        form.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
-                      help="Select the number of steps in the MD fitting")
-        form.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
-                      help="TODO")
-        form.addParam('crdout_period', params.IntParam, default=100, label='Coordinates output period',
-                      help="TODO")
-        form.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
-                      help="TODO")
-        form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
-                      help="TODO")
-        form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=0,
-                      choices=['Yes', 'NO'],
-                      help="TODo")
         form.addParam('centerOrigin', params.EnumParam, label="Center Origin", default=0,
                       choices=['Yes', 'NO'],
                       help="TODo")
-        form.addParam('time_step', params.FloatParam, default=0.001, label='Time step (ps)',
-                      help="TODO")
-        form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
-                      help="TODO")
-        form.addParam('n_rep', params.IntParam, default=1, label='[EXP] Number of repetition',
-                      help="EXP")
         form.addParam('target_pdb', params.PointerParam,
                       pointerClass='AtomStruct', label="[EXP] Target PDB", help='EXP')
+        # Normal modes =================================================================================================
+        form.addSection(label='Normal Modes')
+
+        form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=0,
+                      choices=['Yes', 'No'],
+                      help="TODo")
         form.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
                       label="Normal modes",
                       help='Set of normal mode vectors computed by normal mode analysis.')
@@ -105,60 +141,62 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         form.addParam('global_dt', params.FloatParam, default=10.0, label='Global dt',
                       help="TODO")
-        form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=0,
+        # REMD =================================================================================================
+        form.addSection(label='REMD')
+        form.addParam('replica_exchange', params.EnumParam, label="Do REMD ?", default=1,
                       choices=['Yes', 'No'],
-                      help="TODo")
-        form.addParam('tpcontrol', params.EnumParam, label="Temperature control", default=0,
-                      choices=['LANGEVIN', 'BERENDSEN', 'NO'],
-                      help="TODo")
+                      help="TODO")
+        form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
+                      help="TODO")
+        form.addParam('nreplica', params.IntParam, default=4, label='Number of replicas',
+                      help="TODO")
+        form.addParam('constantKREMD', params.StringParam, label='K values ',
+                      help="TODO")
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         self._insertFunctionStep("createInputStep")
-        self.niter=0
-        self.times = []
-        for i in range(self.n_rep.get()):
-            self._insertFunctionStep("fittingStep")
-            self._insertFunctionStep("createOutputStep")
+        self._insertFunctionStep("fittingStep")
+        self._insertFunctionStep("createOutputStep")
 
     def fittingStep(self):
         min = self.inputGenesisMin.get()
-        outputPrefix = self._getExtraPath("run"+str(self.niter)+"_")
-        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
-            tpcontrol = "LANGEVIN"
-        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
-            tpcontrol = "BERENDSEN"
-        else:
-            tpcontrol = "NO"
 
-        s = "[INPUT] \n"
-        if self.forcefield == 0:
+        s = "\n[INPUT] \n"
+        if self.forcefield.get() == 0:
             s += "topfile = "+min.inputRTF.get()+"\n"
             s += "parfile = "+min.inputPRM.get()+"\n"
-            s += "pdbfile = "+min.inputPDB.get().getFileName()+"\n"
             s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
+            s += "pdbfile = "+min.inputPDB.get().getFileName()+"\n"
             s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
-        elif self.forcefield == 1:
+
+        elif self.forcefield.get() == 1:
             s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"
             s += "grocrdfile = " + self.inputGRO.get().getFileName() + "\n"
 
-        s += "[OUTPUT] \n"
-        s += "dcdfile = "+outputPrefix + ".dcd\n"
-        s += "rstfile = "+outputPrefix + ".rst\n"
-        s += "pdbfile = "+outputPrefix + ".pdb\n"
+        s += "\n[OUTPUT] \n"
+        if self.replica_exchange.get() == 0:
+            outputPrefix = self._getExtraPath("run_r{}")
+            s += "remfile = " + outputPrefix + ".rem\n"
+            s += "logfile = " + outputPrefix + ".log\n"
+        else:
+            outputPrefix = self._getExtraPath("run_r1")
+        s += "dcdfile = " + outputPrefix + ".dcd\n"
+        s += "rstfile = " + outputPrefix + ".rst\n"
+        s += "pdbfile = " + outputPrefix + ".pdb\n"
 
-        s += "[ENERGY] \n"
-        if self.forcefield == 0:
+        s += "\n[ENERGY] \n"
+        if self.forcefield.get() == 0:
             s += "forcefield = CHARMM  # CHARMM force field\n"
-        elif self.forcefield == 1:
+        elif self.forcefield.get() == 1:
             s += "forcefield = AAGO  # AAGO\n"
         s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
-        s += "switchdist = 10.0  # switch distance \n"
-        s += "cutoffdist = 13.0  # cutoff distance \n"
-        s += "pairlistdist = 16.0  # pair-list distance \n"
+        s += "switchdist   = "+str(self.switch_dist.get())+" \n"
+        s += "cutoffdist   = "+str(self.cutoff_dist.get())+" \n"
+        s += "pairlistdist = "+str(self.pairlist_dist.get())+" \n"
         s += "vdw_force_switch = YES \n"
-        if self.implicitSolvent == 0:
+        if self.implicitSolvent.get() == 0:
             s += "implicit_solvent = GBSA    # [GBSA] \n"
             s += "gbsa_eps_solvent = 78.5    # solvent dielectric constant in GB \n"
             s += "gbsa_eps_solute  = 1.0     # solute dielectric constant in GB \n"
@@ -167,8 +205,11 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         else:
             s += "implicit_solvent = NONE    # [None] \n"
 
-        s += "[DYNAMICS] \n"
-        s += "integrator = VVER  # [LEAP,VVER] \n"
+        s += "\n[DYNAMICS] \n"
+        if self.integrator.get() == 0:
+            s += "integrator = VVER  \n"
+        else:
+            s += "integrator = LEAP  \n"
         s += "nsteps = "+str(self.n_steps.get())+" \n"
         s += "timestep = "+str(self.time_step.get())+"  #\n"
         s += "eneout_period = "+str(self.eneout_period.get())+" \n"
@@ -177,34 +218,51 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "nbupdate_period = "+str(self.nbupdate_period.get())+"\n"
         s += "iseed = "+str(np.random.randint(1, 31415))+"  # random number seed  \n"
 
-        s += "[CONSTRAINTS] \n"
+        s += "\n[CONSTRAINTS] \n"
         s += "rigid_bond = NO  # use SHAKE \n"
 
-        s += "[ENSEMBLE] \n"
+        s += "\n[ENSEMBLE] \n"
         s += "ensemble = NVT  # constant temperature \n"
-        s += "tpcontrol = "+tpcontrol+"  # Langevin thermostat \n"
-        s += "temperature = 300  # T = 300 K \n"
-        # s += "gamma_t = 5  # friction coefficient (ps-1) \n"
+        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+            s += "tpcontrol = LANGEVIN  \n"
+        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+            s += "tpcontrol = BERENDSEN  \n"
+        else:
+            s += "tpcontrol = NO  \n"
+        s += "temperature = "+str(self.temperature.get())+" \n"
 
-        s += "[BOUNDARY] \n"
+        s += "\n[BOUNDARY] \n"
         s += "type = NOBC  # No periodic boundary condition \n"
 
-        s += "[SELECTION] \n"
+        s += "\n[SELECTION] \n"
         s += "group1 = all and not hydrogen\n"
 
-        s += "[RESTRAINTS] \n"
+        s += "\n[RESTRAINTS] \n"
         s += "nfunctions = 1 \n"
         s += "function1 = EM  # apply restraints from EM density map \n"
-        s += "constant1 = "+str(self.constantK.get())+" \n"
+        if self.replica_exchange.get() == 0 :
+            s += "constant1 = "+self.constantKREMD.get()+" \n"
+        else:
+            s += "constant1 = "+str(self.constantK.get())+" \n"
+
         s += "select_index1 = 1  # apply restraint force on protein heavy atoms \n"
 
-        s += "[EXPERIMENTS] \n"
+        s += "\n[EXPERIMENTS] \n"
         s += "emfit = YES  # perform EM flexible fitting \n"
         s += "emfit_target = "+self.inputVolumeFn+"\n"
-        s += "emfit_sigma = 2.0  # half of the map resolution (5 A) \n"
-        s += "emfit_tolerance = 0.01  # Tolerance for error (0.1%) \n"
+        s += "emfit_sigma = "+str(self.emfit_sigma.get())+" \n"
+        s += "emfit_tolerance = "+str(self.emfit_tolerance.get())+" \n"
         s += "emfit_period = 1  # emfit force update period \n"
         s += "emfit_nma = "+self._getExtraPath("emfit_nma")+"\n"
+
+        if self.replica_exchange.get() == 0:
+            s += "\n[REMD] \n"
+            s += "dimension = 1 \n"
+            s += "exchange_period = "+ str(self.exchange_period.get())+"\n"
+            s += "type1 = RESTRAINT \n"
+            s += "nreplica1 = "+ str(self.nreplica.get())+" \n"
+            s += "rest_function1 = 1 \n"
+
 
         with open(self._getExtraPath("fitting"), "w") as f:
             f.write(s)
@@ -217,16 +275,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write(str(self.global_dt.get())+"\n")
 
         with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
-            f.write("export OMP_NUM_THREADS="+str(self.n_proc.get())+"\n")
+            f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
             f.write("echo \"OMP NUM THREADS : \"\n")
             f.write("echo $OMP_NUM_THREADS\n")
-            f.write(self.genesisDir.get()+"/bin/atdyn ")
-            f.write(self._getExtraPath("fitting")+"\n")
+            f.write("mpirun -np %s %s/bin/atdyn %s %s\n" %
+                    (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),
+                     " > "+self._getExtraPath("run_r1.log") if self.replica_exchange.get() == 1 else ""))
             f.write("exit")
-        t=time.time()
         self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
         self.runJob(self._getExtraPath("launch_genesis.sh"), "")
-        self.times.append(time.time()-t)
 
     def createInputStep(self):
 
@@ -278,40 +335,69 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
 
     def createOutputStep(self):
-        outputPrefix = self._getExtraPath("run"+str(self.niter)+"_")
-        self._defineOutputs(outputPDB= AtomStruct(outputPrefix+".pdb"))
+        if self.replica_exchange.get() ==0:
+            n_outputs = self.nreplica.get()
+        else:
+            n_outputs=1
+        for i in range(n_outputs):
+            outputPrefix = self._getExtraPath("run_r%i" % (i+1))
+            self._defineOutputs(outputPDB= AtomStruct(outputPrefix+".pdb"))
+
+            rmsd = self.compute_rmsd_from_dcd(outputPrefix)
+            cc = self.read_cc_in_log_file(outputPrefix)
+
+            np.save(file=outputPrefix +"_rmsd.npy", arr=rmsd)
+            np.save(file=outputPrefix +"_cc.npy", arr=cc)
+
+    def compute_rmsd_from_dcd(self, outputPrefix):
         with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:
             s=""
             s += "mol load pdb " + outputPrefix+".pdb dcd " +outputPrefix+".dcd\n"
             s += "set nf [molinfo top get numframes]\n"
             s += "for {set i 0 } {$i < $nf} {incr i} {\n"
-            s += "[atomselect top all frame $i] writepdb "+outputPrefix + "$i.pdb\n"
+            s += "[atomselect top all frame $i] writepdb "+outputPrefix + "tmp$i.pdb\n"
             s += "}\n"
             s += "exit\n"
             f.write(s)
         self.runJob("vmd", "-dispdev text -e "+self._getExtraPath("dcd2pdb.tcl"))
 
-        self.compute_cc_rmsd()
-        self.niter += 1
-        np.save(file=self._getExtraPath("times.npy"), arr =np.array(self.times))
+        from src.molecule import Molecule
+        from src.functions import get_mol_conv, get_RMSD_coords
+        rmsd = []
+        target = Molecule(self.target_pdb.get().getFileName())
+        N = (self.n_steps.get() // self.crdout_period.get())
+        mol = Molecule(self.inputGenesisMin.get().inputPDB.get().getFileName())
+        idx = get_mol_conv(mol, target)
+        if len(idx) > 0:
+            rmsd.append(get_RMSD_coords(mol.coords[idx[:, 0]], target.coords[idx[:, 1]]))
+            for i in range(N):
+                print(i)
+                mol = Molecule(outputPrefix +"tmp"+ str(i + 1) + ".pdb")
+                rmsd.append(get_RMSD_coords(mol.coords[idx[:, 0]], target.coords[idx[:, 1]]))
+        else:
+            rmsd = np.zeros(N+1)
+        # os.system("rm -f %stmp*" %(outputPrefix))
+        return np.array(rmsd)
 
-    def compute_cc_rmsd(self):
-        outputPrefix = self._getExtraPath("run" + str(self.niter) + "_")
-        print(self.n_steps.get())
-        print(self.crdout_period.get())
-        cc, rmsd = get_cc_rmsd(N=(self.n_steps.get()//self.crdout_period.get()), prefix=outputPrefix,
-                               target=Molecule(self.target_pdb.get().getFileName()),
-                size=100, voxel_size=2.0, cutoff=6.0, sigma=2.0, step=1, test_idx=True)
-        fig, ax = plt.subplots(1,2)
-        ax[0].set_xlabel("MD step")
-        ax[0].set_ylabel("CC")
-        ax[0].set_title("Cross correlation")
-        ax[0].plot(cc)
-        ax[1].set_xlabel("MD step")
-        ax[1].set_ylabel("RMSD (A)")
-        ax[1].set_title("Root Mean Square Deviation")
-        ax[1].plot(rmsd)
-        fig.savefig(outputPrefix+".png")
+    def read_cc_in_log_file(self,outputPrefix):
+        with open(outputPrefix+".log","r") as f:
+            read_info = False
+            header = None
+            cc = []
+            cc_idx = 0
+            for i in f:
+                if i.startswith("[STEP5]"):
+                    read_info = True
+                if read_info:
+                    if i.startswith("INFO:"):
+                        if header is None:
+                            header = i.split()
+                            for i in range(len(header)):
+                                if 'RESTR_CVS001' in header[i]:
+                                    cc_idx = i
+                        else:
+                            cc.append(float(i.split()[cc_idx]))
+        return np.array(cc)
 
 
     # --------------------------- STEPS functions --------------------------------------------

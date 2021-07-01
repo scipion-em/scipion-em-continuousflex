@@ -164,6 +164,8 @@ class FlexProtNMA(FlexProtNMABase):
         self.runJob('nma_record_info_PDB.py', "%d %d atoms.pdb %f %f"
                     % (numberOfModes, RTBblockSize, rc, 10.0),
                     env=getNMAEnviron())
+        raise RuntimeError("stop")
+
         self.runJob("nma_elnemo_pdbmat","",env=getNMAEnviron())
         self.runJob("nma_diagrtb","",env=getNMAEnviron())
 
@@ -179,8 +181,8 @@ class FlexProtNMA(FlexProtNMABase):
             msg += "between 200 and 6 times the number of RTB blocks, consider " \
                    "increasing cut-off distance."
             self._printWarnings(redStr(msg) + '\n')
-        self.runJob("rm","-f *.dat_run diagrtb.dat pdbmat.xyzm pdbmat.sdijf "
-                         "pdbmat.dat")
+        # self.runJob("rm","-f *.dat_run diagrtb.dat pdbmat.xyzm pdbmat.sdijf "
+        #                  "pdbmat.dat")
         
         self._leaveWorkingDir()
         

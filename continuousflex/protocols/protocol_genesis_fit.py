@@ -381,22 +381,20 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
     def read_cc_in_log_file(self,outputPrefix):
         with open(outputPrefix+".log","r") as f:
-            read_info = False
             header = None
             cc = []
             cc_idx = 0
             for i in f:
-                if i.startswith("[STEP5]"):
-                    read_info = True
-                if read_info:
-                    if i.startswith("INFO:"):
-                        if header is None:
-                            header = i.split()
-                            for i in range(len(header)):
-                                if 'RESTR_CVS001' in header[i]:
-                                    cc_idx = i
-                        else:
-                            cc.append(float(i.split()[cc_idx]))
+                if i.startswith("INFO:"):
+                    if header is None:
+                        header = i.split()
+                        for i in range(len(header)):
+                            if 'RESTR_CVS001' in header[i]:
+                                cc_idx = i
+                    else:
+                        splitline = i.split()
+                        if len(splitline) == len(header):
+                            cc.append(float(splitline[cc_idx]))
         return np.array(cc)
 
 

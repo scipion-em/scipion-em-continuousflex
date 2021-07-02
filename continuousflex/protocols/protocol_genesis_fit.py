@@ -367,7 +367,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         target = Molecule(self.target_pdb.get().getFileName())
         N = (self.n_steps.get() // self.crdout_period.get())
         mol = Molecule(self.inputGenesisMin.get().inputPDB.get().getFileName())
-        idx = get_mol_conv(mol, target)
+        idx = get_mol_conv(mol, target, ca_only=True)
         if len(idx) > 0:
             rmsd.append(get_RMSD_coords(mol.coords[idx[:, 0]], target.coords[idx[:, 1]]))
             for i in range(N):

@@ -26,6 +26,8 @@ import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from pwem.objects.data import AtomStruct, EMFile
 
+import os
+import numpy as np
 
 class FlexProtGenesisMin(ProtAnalysis3D):
     """ Protocol for minimizing a PDB using Genesis. """
@@ -37,8 +39,8 @@ class FlexProtGenesisMin(ProtAnalysis3D):
         form.addParam('genesisDir', params.FileParam, label="Genesis install path",
                       help='Path to genesis installation')
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct', label="Input PDB", important=True,
-                      help='Select the input PDB.')
+                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB", important=True,
+                      help='Select the input PDB or set of PDBs.')
         form.addParam('inputPSF', params.PointerParam, label="Protein Structure File (PSF)",
                       pointerClass='EMFile', help='Structure file (.psf). Can be generated with generatePSF protocol ')
         form.addParam('inputPRM', params.FileParam, label="Parameter File (PRM)",
@@ -49,66 +51,118 @@ class FlexProtGenesisMin(ProtAnalysis3D):
                            'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
         form.addParam('n_steps', params.IntParam, default=1000, label='Number of steps',
                       help="Select the number of steps in the minimization steepest descend.")
+        form.addParam('molprobity', params.EnumParam, label="Do Molprobity ?", default=0,
+                      choices=['Yes', 'No'],
+                      help="TODO")
+
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
+        if isinstance(self.inputPDB.get(), AtomStruct):
+            self.nPDBs = 1
+            self.inputPDBfname = [self.inputPDB.get().getFileName()]
+            self.outputPrefix = [self._getExtraPath("min")]
+        else:
+            self.nPDBs = 0
+            self.inputPDBfname=[]
+            self.outputPrefix=[]
+            for i in self.inputPDB.get():
+                self.nPDBs +=1
+                self.inputPDBfname.append(i.getFileName())
+                self.outputPrefix.append(self._getExtraPath("min%i"%self.nPDBs))
+
+            print("///////////////////////////////////////////////////////////////////////////////")
+            print(self.inputPDBfname)
+            print(self.outputPrefix)
+
+
         self._insertFunctionStep("minimizeStep")
         self._insertFunctionStep("generateOutputPDBStep")
         self._insertFunctionStep("createOutputStep")
 
+
     def minimizeStep(self):
-        s = ""
-        s += "\n[INPUT]\n"
-        s += "topfile = " + self.inputRTF.get() + "\n"
-        s += "parfile = " + self.inputPRM.get() + "\n"
-        s += "pdbfile = " + self.inputPDB.get().getFileName() + "\n"
-        s += "psffile = " + self.inputPSF.get().getFileName() + "\n"
-        s += "\n[OUTPUT]\n"
-        s += "dcdfile = " + self._getExtraPath("min.dcd") + "\n"
-        s += "rstfile = " + self._getExtraPath("min.rst") + "\n"
-        s += "\n[ENERGY]\n"
-        s += "forcefield = CHARMM  # CHARMM force field\n"
-        s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms\n"
-        s += "switchdist = 23.0  # switch distance\n"
-        s += "cutoffdist = 25.0  # cutoff distance\n"
-        s += "pairlistdist = 27.0  # pair-list distance\n"
-        s += "implicit_solvent = GBSA  # use GBSA implicit solvent model\n"
-        s += "gbsa_salt_cons = 0.15  # salt concentration\n"
-        s += "gbsa_surf_tens = 0.005  # surface tension coefficient in SA term\n"
-        s += "gbsa_eps_solvent = 78.5  # dielectric constant of solvent\n"
-        s += "vdw_force_switch = YES\n"
-        s += "\n[MINIMIZE]\n"
-        s += "method = SD  # Steepest descent\n"
-        s += "nsteps = "+ str(self.n_steps.get()) + "\n"
-        s += "eneout_period = 10  # energy output period\n"
-        s += "crdout_period = " + str(self.n_steps.get()) + "\n"
-        s += "rstout_period = " + str(self.n_steps.get()) + "\n"
-        s += "nbupdate_period = 10  # nonbond update period\n"
-        s += "[BOUNDARY] \n"
-        s += "type = NOBC  # No periodic boundary condition \n"
+        for i in range(self.nPDBs):
+            s = ""
+            s += "\n[INPUT]\n"
+            s += "topfile = " + self.inputRTF.get() + "\n"
+            s += "parfile = " + self.inputPRM.get() + "\n"
+            s += "pdbfile = " + self.inputPDBfname[i] + "\n"
+            s += "psffile = " + self.inputPSF.get().getFileName() + "\n"
+            s += "\n[OUTPUT]\n"
+            s += "dcdfile = %s.dcd \n" % self.outputPrefix[i]
+            s += "rstfile = %s.rst \n" % self.outputPrefix[i]
+            s += "\n[ENERGY]\n"
+            s += "forcefield = CHARMM  # CHARMM force field\n"
+            s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms\n"
+            s += "switchdist = 23.0  # switch distance\n"
+            s += "cutoffdist = 25.0  # cutoff distance\n"
+            s += "pairlistdist = 27.0  # pair-list distance\n"
+            s += "implicit_solvent = GBSA  # use GBSA implicit solvent model\n"
+            s += "gbsa_salt_cons = 0.15  # salt concentration\n"
+            s += "gbsa_surf_tens = 0.005  # surface tension coefficient in SA term\n"
+            s += "gbsa_eps_solvent = 78.5  # dielectric constant of solvent\n"
+            s += "vdw_force_switch = YES\n"
+            s += "\n[MINIMIZE]\n"
+            s += "method = SD  # Steepest descent\n"
+            s += "nsteps = "+ str(self.n_steps.get()) + "\n"
+            s += "eneout_period = 10  # energy output period\n"
+            s += "crdout_period = " + str(self.n_steps.get()) + "\n"
+            s += "rstout_period = " + str(self.n_steps.get()) + "\n"
+            s += "nbupdate_period = 10  # nonbond update period\n"
+            s += "[BOUNDARY] \n"
+            s += "type = NOBC  # No periodic boundary condition \n"
 
-        with open(self._getExtraPath("min"), "w") as f:
-            f.write(s)
+            with open(self.outputPrefix[i], "w") as f:
+                f.write(s)
 
-        self.runJob(self.genesisDir.get()+"/bin/atdyn", self._getExtraPath("min"))
+            self.runJob(self.genesisDir.get()+"/bin/atdyn", self.outputPrefix[i])
 
     def generateOutputPDBStep(self):
-        with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:
-            s=""
-            s += "mol load pdb " + self.inputPDB.get().getFileName() + " dcd " +self._getExtraPath("min.dcd")+ "\n"
-            s += "set nf [molinfo top get numframes]\n"
-            s += "for {set i 0 } {$i < $nf} {incr i} {\n"
-            s += "[atomselect top all frame $i] writepdb "+self._getExtraPath("output.pdb")+"\n"
-            s += "}\n"
-            s += "exit\n"
-            f.write(s)
-        self.runJob("vmd", "-dispdev text -e "+self._getExtraPath("dcd2pdb.tcl"))
+        for i in range(self.nPDBs):
+            with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:
+                s=""
+                s += "mol load pdb %s dcd %s.dcd \n" % (self.inputPDBfname[i], self.outputPrefix[i])
+                s += "set nf [molinfo top get numframes]\n"
+                s += "for {set i 0 } {$i < $nf} {incr i} {\n"
+                s += "[atomselect top all frame $i] writepdb %s.pdb\n" % self.outputPrefix[i]
+                s += "}\n"
+                s += "exit\n"
+                f.write(s)
+            self.runJob("vmd", "-dispdev text -e "+self._getExtraPath("dcd2pdb.tcl"))
 
     def createOutputStep(self):
-        self._defineOutputs(outputPDB= AtomStruct(self._getExtraPath("output.pdb")))
-        rst = EMFile(self._getExtraPath('min.rst'))
-        self._defineOutputs(outputRST=rst)
+        for i in range(self.nPDBs):
+            self._defineOutputs(outputPDB= AtomStruct("%s.pdb" % self.outputPrefix[i]))
+            rst = EMFile("%s.rst" % self.outputPrefix[i])
+            self._defineOutputs(outputRST=rst)
+            if self.molprobity.get() == 0:
+                self.run_molprobity(self.outputPrefix[i])
+
+    # def createOutputSetStep(self, N):
+    #     pdbset = self._createSetOfPDBs("mins")
+    #     for i in range(N):
+
+    def run_molprobity(self, outputPrefix):
+        os.system("~/MolProbity/cmdline/oneline-analysis %s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
+        with open("%s_molprobity.txt"% outputPrefix, "r") as f:
+            header = None
+            molprob = {}
+            for i in f:
+                split_line = (i.split(":"))
+                if header is None:
+                    if split_line[0] == "#pdbFileName":
+                        header = split_line
+                else:
+                    if len(split_line) == len(header):
+                        for i in range(len(header)):
+                            molprob[header[i]] = split_line[i]
+
+        np.save(file = "%s_molprobity.npy"% outputPrefix, arr =
+                np.array([float(molprob["clashscore"]),
+                          float(molprob["MolProbityScore"])
+                          ]))
 
 
 

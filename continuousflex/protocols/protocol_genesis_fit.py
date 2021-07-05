@@ -342,9 +342,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             n_outputs = self.nreplica.get()
         else:
             n_outputs=1
+        pdbset = self._createSetOfPDBs("outputPDBs")
         for i in range(n_outputs):
             outputPrefix = self._getExtraPath("run_r%i" % (i+1))
-            self._defineOutputs(outputPDB= AtomStruct(outputPrefix+".pdb"))
+            pdbset.append(AtomStruct(outputPrefix+".pdb"))
 
             rmsd = self.compute_rmsd_from_dcd(outputPrefix)
             cc = self.read_cc_in_log_file(outputPrefix)
@@ -354,6 +355,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
             np.save(file=outputPrefix +"_rmsd.npy", arr=rmsd)
             np.save(file=outputPrefix +"_cc.npy", arr=cc)
+
+        self._defineOutputs(outputPDBs=pdbset)
 
     def compute_rmsd_from_dcd(self, outputPrefix):
         with open(self._getExtraPath("dcd2pdb.tcl"), "w") as f:

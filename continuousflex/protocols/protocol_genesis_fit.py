@@ -405,7 +405,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
 
     def run_molprobity(self, outputPrefix):
-        os.system("~/Molprobity/cmdline/oneline-analysis %s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
+        os.system("~/MolProbity/cmdline/oneline-analysis %s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
         with open("%s_molprobity.txt"% outputPrefix, "r") as f:
             header = None
             molprob = {}

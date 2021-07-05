@@ -65,6 +65,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         form.addParam('n_threads', params.IntParam, default=1, label='Number of threads',
                       help="TODO")
+        form.addParam('molprobity', params.EnumParam, label="Do Molprobity ?", default=0,
+                      choices=['Yes', 'No'],
+                      help="TODO")
 
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
@@ -346,6 +349,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             rmsd = self.compute_rmsd_from_dcd(outputPrefix)
             cc = self.read_cc_in_log_file(outputPrefix)
 
+            if self.molprobity.get() == 0:
+                self.run_molprobity(outputPrefix)
+
             np.save(file=outputPrefix +"_rmsd.npy", arr=rmsd)
             np.save(file=outputPrefix +"_cc.npy", arr=cc)
 
@@ -396,6 +402,27 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         if len(splitline) == len(header):
                             cc.append(float(splitline[cc_idx]))
         return np.array(cc)
+
+
+    def run_molprobity(self, outputPrefix):
+        os.system("~/Molprobity/cmdline/oneline-analysis %s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
+        with open("%s_molprobity.txt"% outputPrefix, "r") as f:
+            header = None
+            molprob = {}
+            for i in f:
+                split_line = (i.split(":"))
+                if header is None:
+                    if split_line[0] == "#pdbFileName":
+                        header = split_line
+                else:
+                    if len(split_line) == len(header):
+                        for i in range(len(header)):
+                            molprob[header[i]] = split_line[i]
+
+        np.save(file = "%s_molprobity.npy"% outputPrefix, arr =
+                np.array([float(molprob["clashscore"]),
+                          float(molprob["MolProbityScore"])
+                          ]))
 
 
     # --------------------------- STEPS functions --------------------------------------------

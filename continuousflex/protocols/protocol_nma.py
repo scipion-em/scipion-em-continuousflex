@@ -164,8 +164,6 @@ class FlexProtNMA(FlexProtNMABase):
         self.runJob('nma_record_info_PDB.py', "%d %d atoms.pdb %f %f"
                     % (numberOfModes, RTBblockSize, rc, 10.0),
                     env=getNMAEnviron())
-        raise RuntimeError("stop")
-
         self.runJob("nma_elnemo_pdbmat","",env=getNMAEnviron())
         self.runJob("nma_diagrtb","",env=getNMAEnviron())
 

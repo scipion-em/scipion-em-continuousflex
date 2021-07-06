@@ -161,7 +161,9 @@ class FlexProtGenesisMin(ProtAnalysis3D):
 
         np.save(file = "%s_molprobity.npy"% outputPrefix, arr =
                 np.array([float(molprob["clashscore"]),
-                          float(molprob["MolProbityScore"])
+                          float(molprob["MolProbityScore"]),
+                          float(molprob["ramaFavored"]) / float(molprob["numRama"]) ,
+                          float(molprob["rotaFavored"]) / float(molprob["numRota"])
                           ]))
 
 

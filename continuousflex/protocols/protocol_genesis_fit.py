@@ -291,6 +291,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     def createInputStep(self):
 
         fnVolume =self.inputVolume.get().getFileName()
+        os.system("cp %s %s" %(self.inputGenesisMin.get()._getExtraPath("min.rst"), self._getExtraPath("")))
+        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPSF.get().getFileName(), self._getExtraPath("")))
+        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPDB.get().getFileName(), self._getExtraPath("")))
 
         pre, ext = os.path.splitext(os.path.basename(fnVolume))
         if ext != ".mrc":
@@ -424,7 +427,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         np.save(file = "%s_molprobity.npy"% outputPrefix, arr =
                 np.array([float(molprob["clashscore"]),
-                          float(molprob["MolProbityScore"])
+                          float(molprob["MolProbityScore"]),
+                          float(molprob["ramaFavored"]) / float(molprob["numRama"]) ,
+                          float(molprob["rotaFavored"]) / float(molprob["numRota"])
                           ]))
 
 

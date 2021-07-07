@@ -145,7 +145,7 @@ class FlexProtGenesisMin(ProtAnalysis3D):
     #     for i in range(N):
 
     def run_molprobity(self, outputPrefix):
-        os.system("~/MolProbity/cmdline/oneline-analysis %s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
+        self.runJob("~/MolProbity/cmdline/oneline-analysis", "%s.pdb > %s_molprobity.txt" % (outputPrefix,outputPrefix))
         with open("%s_molprobity.txt"% outputPrefix, "r") as f:
             header = None
             molprob = {}
@@ -158,6 +158,9 @@ class FlexProtGenesisMin(ProtAnalysis3D):
                     if len(split_line) == len(header):
                         for i in range(len(header)):
                             molprob[header[i]] = split_line[i]
+
+        print("/////////////////////////////////////////////////////")
+        print(molprob)
 
         np.save(file = "%s_molprobity.npy"% outputPrefix, arr =
                 np.array([float(molprob["clashscore"]),

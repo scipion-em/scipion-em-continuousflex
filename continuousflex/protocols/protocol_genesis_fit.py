@@ -425,7 +425,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         for i in range(len(header)):
                             molprob[header[i]] = split_line[i]
 
-        np.savetxt(fname = "%s_molprobity.npy"% outputPrefix, X =
+        np.savetxt(fname = "%s_molprobity.txt"% outputPrefix, X =
                 np.array([float(molprob["clashscore"]),
                           float(molprob["MolProbityScore"]),
                           float(molprob["ramaFavored"]) / float(molprob["numRama"]) ,

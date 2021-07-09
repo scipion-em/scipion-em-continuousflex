@@ -309,7 +309,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             with mrcfile.new(fnMRC, overwrite=True) as mrc:
                 mrc.set_data(mrc_data)
                 mrc.voxel_size = self.voxel_size.get()
-                origin = -self.voxel_size.get() * ( np.array(mrc_data.shape)+1) / 2
+                origin = -self.voxel_size.get() * ( np.array(mrc_data.shape)) / 2
                 mrc.header['origin']['x'] = origin[0]
                 mrc.header['origin']['y'] = origin[1]
                 mrc.header['origin']['z'] = origin[2]

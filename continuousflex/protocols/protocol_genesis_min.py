@@ -54,7 +54,10 @@ class FlexProtGenesisMin(ProtAnalysis3D):
         form.addParam('molprobity', params.EnumParam, label="Do Molprobity ?", default=0,
                       choices=['Yes', 'No'],
                       help="TODO")
-
+        form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
+                      help="TODO")
+        form.addParam('n_threads', params.IntParam, default=1, label='Number of threads',
+                      help="TODO")
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -117,7 +120,15 @@ class FlexProtGenesisMin(ProtAnalysis3D):
             with open(self.outputPrefix[i], "w") as f:
                 f.write(s)
 
-            self.runJob(self.genesisDir.get()+"/bin/atdyn", self.outputPrefix[i])
+            with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
+                f.write("export OMP_NUM_THREADS=" + str(self.n_threads.get()) + "\n")
+                f.write("echo \"OMP NUM THREADS : \"\n")
+                f.write("echo $OMP_NUM_THREADS\n")
+                f.write("mpirun -np %s %s/bin/atdyn %s\n" %
+                        (self.n_proc.get(), self.genesisDir.get(), self.outputPrefix[i]))
+                f.write("exit")
+            self.runJob("chmod", "777 " + self._getExtraPath("launch_genesis.sh"))
+            self.runJob(self._getExtraPath("launch_genesis.sh"), "")
 
     def generateOutputPDBStep(self):
         for i in range(self.nPDBs):

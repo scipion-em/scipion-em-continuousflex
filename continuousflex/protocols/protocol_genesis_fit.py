@@ -292,8 +292,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         fnVolume =self.inputVolume.get().getFileName()
         os.system("cp %s %s" %(self.inputGenesisMin.get()._getExtraPath("min.rst"), self._getExtraPath("")))
-        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPSF.get().getFileName(), self._getExtraPath("")))
-        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPDB.get().getFileName(), self._getExtraPath("")))
+        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPSF.get().getFileName(), self._getExtraPath("input.psf")))
+        os.system("cp %s %s" %(self.inputGenesisMin.get().inputPDB.get().getFileName(), self._getExtraPath("input.pdb")))
         os.system("cp %s %s" %(self.target_pdb.get().getFileName(), self._getExtraPath("target.pdb")))
 
         pre, ext = os.path.splitext(os.path.basename(fnVolume))

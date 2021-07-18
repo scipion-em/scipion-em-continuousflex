@@ -151,6 +151,12 @@ class FlexProtGenesisMin(ProtAnalysis3D):
             if self.molprobity.get() == 0:
                 self.run_molprobity(self.outputPrefix[i])
 
+        if self.nPDBs > 1 :
+            pdbset = self._createSetOfPDBs("outputPDBs")
+            for i in range(self.nPDBs):
+                pdbset.append(AtomStruct("%s.pdb" % self.outputPrefix[i]))
+            self._defineOutputs(outputPDBs=pdbset)
+
     # def createOutputSetStep(self, N):
     #     pdbset = self._createSetOfPDBs("mins")
     #     for i in range(N):

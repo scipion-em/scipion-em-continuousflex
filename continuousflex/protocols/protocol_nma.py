@@ -145,7 +145,7 @@ class FlexProtNMA(FlexProtNMABase):
     def copyPdbStep(self, inputFn, localFn, isEM):
         """ Copy the input pdb file and also create a link 'atoms.pdb'
         """
-        cifToPdb(inputFn, localFn)
+        copyFile(inputFn, localFn)
 
         if isEM:
             fnOut = self._getPath('pseudoatoms.pdb')

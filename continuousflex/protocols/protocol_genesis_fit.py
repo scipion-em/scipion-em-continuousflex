@@ -131,16 +131,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       pointerClass='AtomStruct', label="[EXP] Target PDB", help='EXP')
         # Normal modes =================================================================================================
         form.addSection(label='Normal Modes')
-
-        form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=0,
-                      choices=['Yes', 'No'],
+        form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=1,
+                      choices=['No', 'Yes'],
                       help="TODo")
-        form.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
-                      label="Normal modes",
-                      help='Set of normal mode vectors computed by normal mode analysis.')
         form.addParam('n_modes', params.IntParam, default=3, label='Number of modes',
-                      help="TODO")
-        form.addParam('first_mode', params.IntParam, default=7, label='First mode',
                       help="TODO")
         form.addParam('global_dt', params.FloatParam, default=10.0, label='Global dt',
                       help="TODO")
@@ -270,19 +264,13 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         with open(self._getExtraPath("fitting"), "w") as f:
             f.write(s)
 
-        with open(self._getExtraPath("emfit_nma"), "w") as f:
-            f.write(str(self.fitGlobal.get())+"\n")
-            f.write(os.path.splitext(self.inputModes.get().getFileName())[0]+"/vec.\n")
-            f.write(str(self.n_modes.get())+"\n")
-            f.write(str(self.first_mode.get())+"\n")
-            f.write(str(self.global_dt.get())+"\n")
-
         with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
             f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
             f.write("echo \"OMP NUM THREADS : \"\n")
             f.write("echo $OMP_NUM_THREADS\n")
-            f.write("mpirun -np %s %s/bin/atdyn %s /opt/genesis-1.4.0/ 0 4 1.0 %s\n" %
-                    (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),
+            f.write("mpirun -np %s %s/bin/atdyn %s %s %i %i %f %s\n" %
+                    (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),self.genesisDir.get(),
+                     self.fitGlobal.get(), self.n_modes.get(), self.global_dt.get(),
                      " > "+self._getExtraPath("run_r1.log") if self.replica_exchange.get() == 1 else ""))
             f.write("exit")
         self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))

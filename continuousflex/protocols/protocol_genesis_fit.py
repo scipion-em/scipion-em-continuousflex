@@ -268,7 +268,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
             f.write("echo \"OMP NUM THREADS : \"\n")
             f.write("echo $OMP_NUM_THREADS\n")
-            f.write("mpirun -np %s %s/bin/atdyn %s %s %i %i %f %s\n" %
+            f.write("mpirun -np %s %s/bin/atdyn %s %s/ %i %i %f %s\n" %
                     (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),self.genesisDir.get(),
                      self.fitGlobal.get(), self.n_modes.get(), self.global_dt.get(),
                      " > "+self._getExtraPath("run_r1.log") if self.replica_exchange.get() == 1 else ""))

@@ -250,7 +250,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "emfit_sigma = "+str(self.emfit_sigma.get())+" \n"
         s += "emfit_tolerance = "+str(self.emfit_tolerance.get())+" \n"
         s += "emfit_period = 1  # emfit force update period \n"
-        s += "emfit_nma = "+self._getExtraPath("emfit_nma")+"\n"
 
         if self.replica_exchange.get() == 0:
             s += "\n[REMD] \n"

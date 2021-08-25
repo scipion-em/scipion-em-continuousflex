@@ -165,8 +165,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "topfile = "+min.inputRTF.get()+"\n"
             s += "parfile = "+min.inputPRM.get()+"\n"
             s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
-            s += "pdbfile = "+min.inputPDB.get().getFileName()+"\n"
-            s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
+            s += "pdbfile = "+min.outputPDB.getFileName()+"\n"
+            # s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
 
         elif self.forcefield.get() == 1:
             s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"

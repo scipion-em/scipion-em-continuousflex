@@ -131,12 +131,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       pointerClass='AtomStruct', label="[EXP] Target PDB", help='EXP')
         # Normal modes =================================================================================================
         form.addSection(label='Normal Modes')
-        form.addParam('fitGlobal', params.EnumParam, label="Fit Global ?", default=1,
-                      choices=['No', 'Yes'],
-                      help="TODo")
         form.addParam('n_modes', params.IntParam, default=3, label='Number of modes',
                       help="TODO")
-        form.addParam('global_dt', params.FloatParam, default=10.0, label='Global dt',
+        form.addParam('global_mass', params.FloatParam, default=1.0, label='Global mass',
                       help="TODO")
         # REMD =================================================================================================
         form.addSection(label='REMD')
@@ -166,7 +163,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "parfile = "+min.inputPRM.get()+"\n"
             s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
             s += "pdbfile = "+min.outputPDB.getFileName()+"\n"
-            # s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
+            s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
 
         elif self.forcefield.get() == 1:
             s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"
@@ -213,7 +210,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s += "crdout_period = "+str(self.crdout_period.get())+" \n"
         s += "rstout_period = "+str(self.n_steps.get())+"\n"
         s += "nbupdate_period = "+str(self.nbupdate_period.get())+"\n"
-        s += "iseed = "+str(np.random.randint(1, 31415))+"  # random number seed  \n"
 
         s += "\n[CONSTRAINTS] \n"
         s += "rigid_bond = NO  # use SHAKE \n"
@@ -264,12 +260,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write(s)
 
         with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
+            # f.write("export OMP_STACKSIZE=262144\n")
+            # f.write("ulimit -s 262144\n")
             f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
-            f.write("echo \"OMP NUM THREADS : \"\n")
-            f.write("echo $OMP_NUM_THREADS\n")
-            f.write("mpirun -np %s %s/bin/atdyn %s %s/ %i %i %f %s\n" %
+            f.write("mpirun -np %s %s/bin/atdyn %s %s/ %i %f %s\n" %
                     (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),self.genesisDir.get(),
-                     self.fitGlobal.get(), self.n_modes.get(), self.global_dt.get(),
+                     self.n_modes.get(), self.global_mass.get(),
                      " > "+self._getExtraPath("run_r1.log") if self.replica_exchange.get() == 1 else ""))
             f.write("exit")
         self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
@@ -285,14 +281,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         pre, ext = os.path.splitext(os.path.basename(fnVolume))
         if ext != ".mrc":
-            fnMRC = self._getExtraPath(pre + ".mrc")
             args = "-i " + fnVolume
             args += " --oext mrc"
-            args += " -o " + fnMRC
+            args += " -o " + self._getExtraPath(pre + "xmipp.mrc")
             self.runJob("xmipp_image_convert", args)
 
-            with mrcfile.open(fnMRC) as mrc:
+            with mrcfile.open(self._getExtraPath(pre + "xmipp.mrc")) as mrc:
                 mrc_data = mrc.data
+
+            fnMRC = self._getExtraPath(pre + ".mrc")
             with mrcfile.new(fnMRC, overwrite=True) as mrc:
                 mrc.set_data(mrc_data)
                 mrc.voxel_size = self.voxel_size.get()
@@ -376,7 +373,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 rmsd.append(get_RMSD_coords(mol.coords[idx[:, 0]], target.coords[idx[:, 1]]))
         else:
             rmsd = np.zeros(N+1)
-        # os.system("rm -f %stmp*" %(outputPrefix))
+        os.system("rm -f %stmp*" %(outputPrefix))
         return np.array(rmsd)
 
     def read_cc_in_log_file(self,outputPrefix):

@@ -135,6 +135,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         form.addParam('global_mass', params.FloatParam, default=1.0, label='Global mass',
                       help="TODO")
+        form.addParam('global_limit', params.FloatParam, default=300.0, label='Global limit',
+                      help="TODO")
         # REMD =================================================================================================
         form.addSection(label='REMD')
         form.addParam('replica_exchange', params.EnumParam, label="Do REMD ?", default=1,
@@ -142,9 +144,11 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
                       help="TODO")
-        form.addParam('nreplica', params.IntParam, default=4, label='Number of replicas',
+        form.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
                       help="TODO")
         form.addParam('constantKREMD', params.StringParam, label='K values ',
+                      help="TODO")
+        form.addParam('nrep', params.IntParam, default=1, label='Number of repetitions [EXP]',
                       help="TODO")
 
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -156,120 +160,139 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
     def fittingStep(self):
         min = self.inputGenesisMin.get()
+        if self.replica_exchange.get() == 0: nreplica=self.nreplica.get()
+        else: nreplica = 1
 
-        s = "\n[INPUT] \n"
-        if self.forcefield.get() == 0:
-            s += "topfile = "+min.inputRTF.get()+"\n"
-            s += "parfile = "+min.inputPRM.get()+"\n"
-            s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
-            s += "pdbfile = "+min.outputPDB.getFileName()+"\n"
-            s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
+        for i in range(self.nrep.get()):
+            outputPrefix = self._getExtraPath("run%i" % (i+1))
 
-        elif self.forcefield.get() == 1:
-            s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"
-            s += "grocrdfile = " + self.inputGRO.get().getFileName() + "\n"
+            s = "\n[INPUT] \n"
+            if self.forcefield.get() == 0:
+                s += "topfile = "+min.inputRTF.get()+"\n"
+                s += "parfile = "+min.inputPRM.get()+"\n"
+                s += "psffile = "+min.inputPSF.get().getFileName()+"\n"
+                s += "pdbfile = "+min.outputPDB.getFileName()+"\n"
+                s += "rstfile = "+min._getExtraPath("min.rst")+"\n"
 
-        s += "\n[OUTPUT] \n"
-        if self.replica_exchange.get() == 0:
-            outputPrefix = self._getExtraPath("run_r{}")
-            s += "remfile = " + outputPrefix + ".rem\n"
-            s += "logfile = " + outputPrefix + ".log\n"
-        else:
-            outputPrefix = self._getExtraPath("run_r1")
-        s += "dcdfile = " + outputPrefix + ".dcd\n"
-        s += "rstfile = " + outputPrefix + ".rst\n"
-        s += "pdbfile = " + outputPrefix + ".pdb\n"
+            elif self.forcefield.get() == 1:
+                s += "grotopfile = " + self.inputTOP.get().getFileName() + "\n"
+                s += "grocrdfile = " + self.inputGRO.get().getFileName() + "\n"
 
-        s += "\n[ENERGY] \n"
-        if self.forcefield.get() == 0:
-            s += "forcefield = CHARMM  # CHARMM force field\n"
-        elif self.forcefield.get() == 1:
-            s += "forcefield = AAGO  # AAGO\n"
-        s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
-        s += "switchdist   = "+str(self.switch_dist.get())+" \n"
-        s += "cutoffdist   = "+str(self.cutoff_dist.get())+" \n"
-        s += "pairlistdist = "+str(self.pairlist_dist.get())+" \n"
-        s += "vdw_force_switch = YES \n"
-        if self.implicitSolvent.get() == 0:
-            s += "implicit_solvent = GBSA    # [GBSA] \n"
-            s += "gbsa_eps_solvent = 78.5    # solvent dielectric constant in GB \n"
-            s += "gbsa_eps_solute  = 1.0     # solute dielectric constant in GB \n"
-            s += "gbsa_salt_cons   = 0.2     # salt concentration (mol/L) in GB \n"
-            s += "gbsa_surf_tens   = 0.005   # surface tension (kcal/mol/A^2) in SA \n"
-        else:
-            s += "implicit_solvent = NONE    # [None] \n"
+            s += "\n[OUTPUT] \n"
+            if self.replica_exchange.get() == 0:
+                outputPrefix += "_remd{}"
+                s += "remfile = " + outputPrefix + ".rem\n"
+                s += "logfile = " + outputPrefix + ".log\n"
+            s += "dcdfile = " + outputPrefix + ".dcd\n"
+            s += "rstfile = " + outputPrefix + ".rst\n"
+            s += "pdbfile = " + outputPrefix + ".pdb\n"
 
-        s += "\n[DYNAMICS] \n"
-        if self.integrator.get() == 0:
-            s += "integrator = VVER  \n"
-        else:
-            s += "integrator = LEAP  \n"
-        s += "nsteps = "+str(self.n_steps.get())+" \n"
-        s += "timestep = "+str(self.time_step.get())+"  #\n"
-        s += "eneout_period = "+str(self.eneout_period.get())+" \n"
-        s += "crdout_period = "+str(self.crdout_period.get())+" \n"
-        s += "rstout_period = "+str(self.n_steps.get())+"\n"
-        s += "nbupdate_period = "+str(self.nbupdate_period.get())+"\n"
+            s += "\n[ENERGY] \n"
+            if self.forcefield.get() == 0:
+                s += "forcefield = CHARMM  # CHARMM force field\n"
+            elif self.forcefield.get() == 1:
+                s += "forcefield = AAGO  # AAGO\n"
+            s += "electrostatic = CUTOFF  # use cutoff scheme for non-bonded terms \n"
+            s += "switchdist   = "+str(self.switch_dist.get())+" \n"
+            s += "cutoffdist   = "+str(self.cutoff_dist.get())+" \n"
+            s += "pairlistdist = "+str(self.pairlist_dist.get())+" \n"
+            s += "vdw_force_switch = YES \n"
+            if self.implicitSolvent.get() == 0:
+                s += "implicit_solvent = GBSA    # [GBSA] \n"
+                s += "gbsa_eps_solvent = 78.5    # solvent dielectric constant in GB \n"
+                s += "gbsa_eps_solute  = 1.0     # solute dielectric constant in GB \n"
+                s += "gbsa_salt_cons   = 0.2     # salt concentration (mol/L) in GB \n"
+                s += "gbsa_surf_tens   = 0.005   # surface tension (kcal/mol/A^2) in SA \n"
+            else:
+                s += "implicit_solvent = NONE    # [None] \n"
 
-        s += "\n[CONSTRAINTS] \n"
-        s += "rigid_bond = NO  # use SHAKE \n"
+            s += "\n[DYNAMICS] \n"
+            if self.integrator.get() == 0:
+                s += "integrator = VVER  \n"
+            else:
+                s += "integrator = LEAP  \n"
+            s += "nsteps = "+str(self.n_steps.get())+" \n"
+            s += "timestep = "+str(self.time_step.get())+"  #\n"
+            s += "eneout_period = "+str(self.eneout_period.get())+" \n"
+            s += "crdout_period = "+str(self.crdout_period.get())+" \n"
+            s += "rstout_period = "+str(self.n_steps.get())+"\n"
+            s += "nbupdate_period = "+str(self.nbupdate_period.get())+"\n"
 
-        s += "\n[ENSEMBLE] \n"
-        s += "ensemble = NVT  # constant temperature \n"
-        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
-            s += "tpcontrol = LANGEVIN  \n"
-        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
-            s += "tpcontrol = BERENDSEN  \n"
-        else:
-            s += "tpcontrol = NO  \n"
-        s += "temperature = "+str(self.temperature.get())+" \n"
+            s += "\n[CONSTRAINTS] \n"
+            s += "rigid_bond = NO  # use SHAKE \n"
 
-        s += "\n[BOUNDARY] \n"
-        s += "type = NOBC  # No periodic boundary condition \n"
+            s += "\n[ENSEMBLE] \n"
+            s += "ensemble = NVT  # constant temperature \n"
+            if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+                s += "tpcontrol = LANGEVIN  \n"
+            elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+                s += "tpcontrol = BERENDSEN  \n"
+            else:
+                s += "tpcontrol = NO  \n"
+            s += "temperature = "+str(self.temperature.get())+" \n"
 
-        s += "\n[SELECTION] \n"
-        s += "group1 = all and not hydrogen\n"
+            s += "\n[BOUNDARY] \n"
+            s += "type = NOBC  # No periodic boundary condition \n"
 
-        s += "\n[RESTRAINTS] \n"
-        s += "nfunctions = 1 \n"
-        s += "function1 = EM  # apply restraints from EM density map \n"
-        if self.replica_exchange.get() == 0 :
-            s += "constant1 = "+self.constantKREMD.get()+" \n"
-        else:
-            s += "constant1 = "+str(self.constantK.get())+" \n"
+            s += "\n[SELECTION] \n"
+            s += "group1 = all and not hydrogen\n"
 
-        s += "select_index1 = 1  # apply restraint force on protein heavy atoms \n"
+            s += "\n[RESTRAINTS] \n"
+            s += "nfunctions = 1 \n"
+            s += "function1 = EM  # apply restraints from EM density map \n"
+            if self.replica_exchange.get() == 0 :
+                s += "constant1 = "+self.constantKREMD.get()+" \n"
+            else:
+                s += "constant1 = "+str(self.constantK.get())+" \n"
 
-        s += "\n[EXPERIMENTS] \n"
-        s += "emfit = YES  # perform EM flexible fitting \n"
-        s += "emfit_target = "+self.inputVolumeFn+"\n"
-        s += "emfit_sigma = "+str(self.emfit_sigma.get())+" \n"
-        s += "emfit_tolerance = "+str(self.emfit_tolerance.get())+" \n"
-        s += "emfit_period = 1  # emfit force update period \n"
+            s += "select_index1 = 1  # apply restraint force on protein heavy atoms \n"
 
-        if self.replica_exchange.get() == 0:
-            s += "\n[REMD] \n"
-            s += "dimension = 1 \n"
-            s += "exchange_period = "+ str(self.exchange_period.get())+"\n"
-            s += "type1 = RESTRAINT \n"
-            s += "nreplica1 = "+ str(self.nreplica.get())+" \n"
-            s += "rest_function1 = 1 \n"
+            s += "\n[EXPERIMENTS] \n"
+            s += "emfit = YES  # perform EM flexible fitting \n"
+            s += "emfit_target = "+self.inputVolumeFn+"\n"
+            s += "emfit_sigma = "+str(self.emfit_sigma.get())+" \n"
+            s += "emfit_tolerance = "+str(self.emfit_tolerance.get())+" \n"
+            s += "emfit_period = 1  # emfit force update period \n"
+
+            if self.replica_exchange.get() == 0:
+                s += "\n[REMD] \n"
+                s += "dimension = 1 \n"
+                s += "exchange_period = "+ str(self.exchange_period.get())+"\n"
+                s += "type1 = RESTRAINT \n"
+                s += "nreplica1 = "+ str(self.nreplica.get())+" \n"
+                s += "rest_function1 = 1 \n"
 
 
-        with open(self._getExtraPath("fitting"), "w") as f:
-            f.write(s)
+            with open(self._getExtraPath("fitting"), "w") as f:
+                f.write(s)
 
-        with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
-            # f.write("export OMP_STACKSIZE=262144\n")
-            # f.write("ulimit -s 262144\n")
-            f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
-            f.write("mpirun -np %s %s/bin/atdyn %s %s/ %i %f %s\n" %
-                    (self.n_proc.get(),self.genesisDir.get(),self._getExtraPath("fitting"),self.genesisDir.get(),
-                     self.n_modes.get(), self.global_mass.get(),
-                     " > "+self._getExtraPath("run_r1.log") if self.replica_exchange.get() == 1 else ""))
-            f.write("exit")
-        self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
-        self.runJob(self._getExtraPath("launch_genesis.sh"), "")
+            with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
+                # f.write("export OMP_STACKSIZE=262144\n")
+                # f.write("ulimit -s 262144\n")
+                f.write("export OMP_NUM_THREADS="+str(self.n_threads.get())+"\n")
+                if (self.n_proc.get() == 1) :
+                    f.write("%s/bin/atdyn %s %s/ %i %f %f %s\n" %
+                            (self.genesisDir.get(),self._getExtraPath("fitting"),self.genesisDir.get(),
+                             self.n_modes.get(), self.global_mass.get(), self.global_limit.get(),
+                             " | tee %s.log"%outputPrefix if self.replica_exchange.get() == 1 else ""))
+                else:
+                    f.write("mpirun -np %s %s/bin/atdyn %s %s/ %i %f %f %s\n" %
+                        (self.n_proc.get(), self.genesisDir.get(), self._getExtraPath("fitting"), self.genesisDir.get(),
+                         self.n_modes.get(), self.global_mass.get(), self.global_limit.get(),
+                         " | tee %s.log" % outputPrefix if self.replica_exchange.get() == 1 else ""))
+                f.write("exit")
+            self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
+            self.runJob(self._getExtraPath("launch_genesis.sh"), "")
+
+            for j in range(nreplica):
+                if self.replica_exchange.get() == 0:
+                    outputPrefix = self._getExtraPath("run%i_remd%i" % (i+1,j+1))
+                else:
+                    outputPrefix = self._getExtraPath("run%i"%(i+1))
+                self.compute_rmsd_from_dcd(outputPrefix)
+                self.read_cc_in_log_file(outputPrefix)
+                if self.molprobity.get() == 0:
+                    self.run_molprobity(outputPrefix)
 
     def createInputStep(self):
 
@@ -326,24 +349,16 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
 
     def createOutputStep(self):
-        if self.replica_exchange.get() ==0:
-            n_outputs = self.nreplica.get()
-        else:
-            n_outputs=1
+        if self.replica_exchange.get() == 0: nreplica=self.nreplica.get()
+        else: nreplica = 1
         pdbset = self._createSetOfPDBs("outputPDBs")
-        for i in range(n_outputs):
-            outputPrefix = self._getExtraPath("run_r%i" % (i+1))
-            pdbset.append(AtomStruct(outputPrefix+".pdb"))
-
-            rmsd = self.compute_rmsd_from_dcd(outputPrefix)
-            cc = self.read_cc_in_log_file(outputPrefix)
-
-            if self.molprobity.get() == 0:
-                self.run_molprobity(outputPrefix)
-
-            np.save(file=outputPrefix +"_rmsd.npy", arr=rmsd)
-            np.save(file=outputPrefix +"_cc.npy", arr=cc)
-
+        for i in range(self.nrep.get()):
+            for j in range(nreplica):
+                if self.replica_exchange.get() == 0:
+                    outputPrefix = self._getExtraPath("run%i_remd%i" % (i+1,j+1))
+                else:
+                    outputPrefix = self._getExtraPath("run%i"%(i+1))
+                pdbset.append(AtomStruct(outputPrefix+".pdb"))
         self._defineOutputs(outputPDBs=pdbset)
 
     def compute_rmsd_from_dcd(self, outputPrefix):
@@ -356,7 +371,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "}\n"
             s += "exit\n"
             f.write(s)
-        self.runJob("vmd", "-dispdev text -e "+self._getExtraPath("dcd2pdb.tcl"))
+        self.runJob("vmd","-dispdev text -e "+self._getExtraPath("dcd2pdb.tcl"))
 
         from src.molecule import Molecule
         from src.functions import get_mol_conv, get_RMSD_coords
@@ -374,7 +389,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         else:
             rmsd = np.zeros(N+1)
         os.system("rm -f %stmp*" %(outputPrefix))
-        return np.array(rmsd)
+        np.save(file=outputPrefix +"_rmsd.npy", arr=np.array(rmsd))
 
     def read_cc_in_log_file(self,outputPrefix):
         with open(outputPrefix+".log","r") as f:
@@ -392,7 +407,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         splitline = i.split()
                         if len(splitline) == len(header):
                             cc.append(float(splitline[cc_idx]))
-        return np.array(cc)
+        np.save(file=outputPrefix +"_cc.npy", arr=np.array(cc))
 
 
     def run_molprobity(self, outputPrefix):

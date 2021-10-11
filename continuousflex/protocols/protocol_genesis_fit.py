@@ -54,7 +54,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,important=True,
                       choices=['CHARMM', 'AAGO'],help="TODo")
         form.addParam('inputPDB', params.PointerParam,
-                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB",
+                      pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
                       help='Select the input PDB or set of PDBs.', condition="forcefield==0")
         form.addParam('inputPRM', params.FileParam, label="Parameter File (PRM)",
                       help='CHARMM force field parameter file (.prm). Can be founded at ' +
@@ -114,7 +114,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
                       help="TODO", condition="EMfitChoice==0")
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume", help='Select the target EM density volume', condition="EMfitChoice==0")
+                      label="Input volume (s)", help='Select the target EM density volume', condition="EMfitChoice==0")
         form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="TODO", condition="EMfitChoice==0")
         form.addParam('situs_dir', params.FileParam,
@@ -415,12 +415,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s +="sigma = %f  \n" % self.emfit_sigma.get()
         s +="tolerance = %f  \n"% self.emfit_tolerance.get()
         s +="auto_margin    = NO\n"
-        s +="x0             = %i \n" % origin[0]
-        s +="y0             = %i \n" % origin[1]
-        s +="z0             = %i \n" % origin[2]
-        s +="box_size_x     =  %i \n" % (inputMRCShape[0]*self.voxel_size.get())
-        s +="box_size_y     =  %i \n" % (inputMRCShape[1]*self.voxel_size.get())
-        s +="box_size_z     =  %i \n" % (inputMRCShape[2]*self.voxel_size.get())
+        s +="x0             = %f \n" % origin[0]
+        s +="y0             = %f \n" % origin[1]
+        s +="z0             = %f \n" % origin[2]
+        s +="box_size_x     =  %f \n" % (inputMRCShape[0]*self.voxel_size.get())
+        s +="box_size_y     =  %f \n" % (inputMRCShape[1]*self.voxel_size.get())
+        s +="box_size_z     =  %f \n" % (inputMRCShape[2]*self.voxel_size.get())
         with open("%s_INP_emmap" % fnTmpVol, "w") as f:
             f.write(s)
         self.runJob("%s/bin/emmap_generator" % self.genesisDir.get(), "%s_INP_emmap" % fnTmpVol)
@@ -456,6 +456,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                                                           "%sConv.mrc"%volPrefix, "%s.sit"%volPrefix))
             f.write("exit")
         self.runJob("/bin/bash", self._getExtraPath("runconvert.sh"))
+
+        # CLEANING
+        os.system("rm -f %s.sit"%fnTmpVol)
+        os.system("rm -f %s.mrc"%fnTmpVol)
+        os.system("rm -f %s"%self._getExtraPath("runconvert.sh"))
+        os.system("rm -f %s_INP_emmap" % fnTmpVol)
+        os.system("rm -f %sConv.mrc"%volPrefix)
+        os.system("rm -f %s.mrc" % volPrefix)
 
         return "%s.sit"%volPrefix
 

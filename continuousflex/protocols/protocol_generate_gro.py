@@ -53,7 +53,7 @@ class FlexProtGenerateGRO(ProtAnalysis3D):
         args = "-AA "
         args += "-i " + self.inputPDB.get().getFileName() + " "
         args += "-dname " + self._getExtraPath("output") + " "
-        args += "-limitbondlength "
+        # args += "-limitbondlength "
         smog = self.smogdir.get() + "bin/smog2"
         self.runJob(smog, args)
 

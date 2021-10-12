@@ -62,10 +62,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('inputRTF', params.FileParam, label="Topology File (RTF)",
                       help='CHARMM force field topology file (.rtf). Can be founded at ' +
                            'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm', condition="forcefield==0")
-        form.addParam('inputGRO', params.PointerParam, label="Coordinate file .gro",
-                      pointerClass='EMFile', help='TODO', condition="forcefield==1")
-        form.addParam('inputTOP', params.PointerParam, label="Topology file .top",
-                      pointerClass='EMFile', help='TODO', condition="forcefield==1")
+        form.addParam('inputGRO', params.FileParam, label="Coordinate file .gro",
+                      help='TODO', condition="forcefield==1")
+        form.addParam('inputTOP', params.FileParam, label="Topology file .top",
+                      help='TODO', condition="forcefield==1")
         form.addParam('restartchoice', params.EnumParam, label="Restart previous run", default=0,
                       choices=['Yes', 'No'],help="TODo")
         form.addParam('inputRST', params.PointerParam, label="Restart File (RST)",
@@ -323,7 +323,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             isinstance(self.inputPDB.get(), SetOfPDBs):
             self.numberOfInputPDB = self.inputPDB.get().getSize()
             for i in self.inputPDB.get():
-                self.innputPSFputPDBfn.append(i.getFileName())
+                self.inputPSFputPDBfn.append(i.getFileName())
         else:
             self.numberOfInputPDB =1
             self.inputPDBfn.append(self.inputPDB.get().getFileName())

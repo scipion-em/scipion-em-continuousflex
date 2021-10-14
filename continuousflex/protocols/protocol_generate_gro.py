@@ -50,9 +50,29 @@ class FlexProtGenerateGRO(ProtAnalysis3D):
         self._insertFunctionStep("createOutputStep")
 
     def generateGROStep(self):
-        args = "-AA "
-        args += "-i " + self.inputPDB.get().getFileName() + " "
-        args += "-dname " + self._getExtraPath("output") + " "
+        import sys
+        sys.path.append("/home/guest/PycharmProjects/bayesian-md-nma/")
+        from src.molecule import Molecule
+
+        inputPDB = self._getExtraPath("inputPDB.pdb")
+        tmpPDB = self._getExtraPath("tmp.pdb")
+
+        print("///////////////////////////////:")
+        print("Grep ATOM ... ")
+        cmd = "grep \"^ATOM\" %s > %s"% (self.inputPDB.get().getFileName(), tmpPDB)
+        print(cmd)
+        os.system(cmd)
+
+        print("END ... ")
+        os.system("echo \"END\" >> %s "%tmpPDB)
+
+        print("Copying ... ")
+        os.system("cp %s %s"%(tmpPDB, inputPDB))
+
+        mol = Molecule(tmpPDB)
+
+        print("SMOG2 ...")
+        args = "-AA -i %s -dname %s " %(inputPDB,self._getExtraPath("output"))
         # args += "-limitbondlength "
         smog = self.smogdir.get() + "bin/smog2"
         self.runJob(smog, args)

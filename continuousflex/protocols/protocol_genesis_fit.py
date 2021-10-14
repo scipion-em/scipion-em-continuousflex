@@ -32,6 +32,7 @@ import mrcfile
 import os
 from skimage.exposure import match_histograms
 from .rmsd_analysis import rmsd_analysis
+from .smog_pdb import smog_pdb
 
 
 class FlexProtGenesisFit(ProtAnalysis3D):
@@ -51,25 +52,40 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
-        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,important=True,
-                      choices=['CHARMM', 'AAGO'],help="TODo")
         form.addParam('inputPDB', params.PointerParam,
                       pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
-                      help='Select the input PDB or set of PDBs.', condition="forcefield==0")
-        form.addParam('inputPRM', params.FileParam, label="Parameter File (PRM)",
+                      help='Select the input PDB or set of PDBs.', important=True)
+        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
+                      choices=['CHARMM', 'AAGO', 'CAGO'], help="TODo")
+        form.addParam('generateTop', params.EnumParam, label="Generate topology files ?", default=0,
+                      choices=['Yes', 'No'], help="TODo")
+        form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
+                      help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop == 0")
+        form.addParam('inputGRO', params.FileParam, label="GROMACS Coordinates File (.gro)",
+                      condition="(forcefield==1 or forcefield==2) and generateTop==1",
+                      help='TODO')
+        form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (.top)",
+                      condition="(forcefield==1 or forcefield==2) and generateTop==1",
+                      help='TODO')
+        form.addParam('inputPRM', params.FileParam, label="CHARMM Parameter File (.prm)",
+                      condition = "forcefield==0",
                       help='CHARMM force field parameter file (.prm). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm', condition="forcefield==0")
-        form.addParam('inputRTF', params.FileParam, label="Topology File (RTF)",
+                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
+        form.addParam('inputRTF', params.FileParam, label="CHARMM Topology File (.rtf)",
+                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop == 0)",
                       help='CHARMM force field topology file (.rtf). Can be founded at ' +
-                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm', condition="forcefield==0")
-        form.addParam('inputGRO', params.FileParam, label="Coordinate file .gro",
-                      help='TODO', condition="forcefield==1")
-        form.addParam('inputTOP', params.FileParam, label="Topology file .top",
-                      help='TODO', condition="forcefield==1")
+                           'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm. '+
+                           'In the case of AAGO/CAGO model, used for completing the missing structure')
+
+
+        form.addParam('inputPSF', params.FileParam, label="Protein Structure File (.psf)",
+                      condition="forcefield==0 and generateTop==1",
+                      help='TODO')
+
         form.addParam('restartchoice', params.EnumParam, label="Restart previous run", default=0,
                       choices=['Yes', 'No'],help="TODo")
-        form.addParam('inputRST', params.PointerParam, label="Restart File (RST)",
-                      pointerClass='EMFile', help='Restart file from previous minimisation or MD run '
+        form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (.rst)",
+                       help='Restart file from previous minimisation or MD run '
                       , condition="restartchoice==0")
 
 
@@ -176,12 +192,21 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 else:
                     s += "pdbfile = %s\n" % self.inputPDBfn[i]
                     s += "psffile = %s\n" % self.inputPSFfn[i]
-                if self.restartchoice.get() == 0:
-                    s += "rstfile = %s\n" % self.inputRST.get().getFileName()
-
-            elif self.forcefield.get() == 1:
-                s += "grotopfile = %s\n" % self.inputTOP.get().getFileName()
-                s += "grocrdfile = %s \n" % self.inputGRO.get().getFileName()
+            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+                if self.numberOfInputPDB == 1:
+                    if len(self.inputGROfn)==0:
+                        s += "pdbfile = %s\n" % self.inputPDBfn[0]
+                    else:
+                        s += "grotopfile = %s\n" % self.inputTOPfn[0]
+                    s += "grocrdfile = %s \n" % self.inputGROfn[0]
+                else:
+                    if len(self.inputGROfn) == 0:
+                        s += "pdbfile = %s\n" % self.inputPDBfn[i]
+                    else:
+                        s += "grotopfile = %s\n" % self.inputTOPfn[i]
+                    s += "grocrdfile = %s \n" % self.inputGROfn[i]
+            if self.restartchoice.get() == 0:
+                s += "rstfile = %s\n" % self.inputRST.get()
 
             s += "\n[OUTPUT] \n"
             if self.replica_exchange.get() == 0:
@@ -328,19 +353,55 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             self.numberOfInputPDB =1
             self.inputPDBfn.append(self.inputPDB.get().getFileName())
 
-        # GENERATE INPUT CHARMM
-        if self.forcefield.get() == 0:
-            self.inputPSFfn = []
-            for i in range(self.numberOfInputPDB):
-                outputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(3))
-                self.generatePSF(self.inputPDBfn[i],outputPrefix)
-                self.inputPDBfn[i]=outputPrefix+".pdb"
-                self.inputPSFfn.append(outputPrefix+".psf")
 
-        # GENERATE INPUT GROMACS
+        # GENERATE TOPOLOGY FILES
+        if self.generateTop.get()==0:
+
+            #CHARMM
+            if self.forcefield.get() == 0:
+                self.inputPSFfn = []
+                for i in range(self.numberOfInputPDB):
+                    inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(3))
+                    self.generatePSF(self.inputPDBfn[i],inputPrefix)
+                    self.inputPDBfn[i]=inputPrefix+".pdb"
+                    self.inputPSFfn.append(inputPrefix+".psf")
+
+            # GROMACS
+            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+                self.inputGROfn = []
+                self.inputTOPfn = []
+                for i in range(self.numberOfInputPDB):
+                    inputPrefix = self._getExtraPath("%s_inputPDB" % str(i + 1).zfill(3))
+                    #groPDB =  inputPrefix + "_gro.pdb"
+                    groPDB = self.inputPDBfn[i]
+
+                    # Convert PDB
+                    smog_pdb(self.inputPDBfn[i], groPDB)
+
+                    # Run Smog2
+                    if self.forcefield.get() == 1:
+                        model ="AA"
+                    elif self.forcefield.get() == 2:
+                        model ="CA"
+                    self.runJob("%s/bin/smog2"% self.smog_dir.get(),
+                                "-i %s -dname %s -%s -limitbondlength -limitcontactlength"%
+                                (groPDB,inputPrefix, model))
+                    self.inputGROfn.append(inputPrefix+".gro")
+                    self.inputTOPfn.append(inputPrefix+".top")
+
+                    #ADD CHARGE TO FILE
+                    self.addChargeGroptopFile(inputPrefix+".top")
+
         else:
-            #TODO GROMACS
-            pass
+            if self.forcefield.get() == 0:
+                self.inputPSFfn = [self.inputPSF.get()]
+
+            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+                if self.inputGRO.get() == "":
+                    self.inputGROfn = []
+                else:
+                    self.inputGROfn = [self.inputGRO.get()]
+                self.inputTOPfn = [self.inputTOP.get()]
 
         # SETUP INPUT VOLUMES
         if self.EMfitChoice.get()==0:
@@ -484,18 +545,22 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             psfgen.write("pdbalias residue T THY\n")
             psfgen.write("pdbalias residue U URA\n")
             psfgen.write("\n")
-            # psfgen.write("set sel [atomselect top nucleic]\n")
-            # psfgen.write("set chains [lsort -unique [$sel get chain]] ;\n")
-            # psfgen.write("foreach chain $chains {\n")
-            # psfgen.write("    set seg ${chain}DNA\n")
-            # psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
-            # psfgen.write("    $sel set segid $seg\n")
-            # psfgen.write("    $sel writepdb tmp.pdb\n")
-            # psfgen.write("    segment $seg { pdb tmp.pdb }\n")
-            # psfgen.write("    coordpdb tmp.pdb\n")
-            # psfgen.write("}\n")
+            psfgen.write("set sel [atomselect top nucleic]\n")
+            psfgen.write("set chains [lsort -unique [$sel get chain]] ;\n")
+            psfgen.write("foreach chain $chains {\n")
+            psfgen.write("    set seg ${chain}DNA\n")
+            psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
+            psfgen.write("    $sel set segid $seg\n")
+            psfgen.write("    $sel writepdb tmp.pdb\n")
+            psfgen.write("    segment $seg { pdb tmp.pdb }\n")
+            psfgen.write("    coordpdb tmp.pdb\n")
+            psfgen.write("}\n")
             psfgen.write("\n")
             psfgen.write("set protein [atomselect top protein]\n")
+            psfgen.write("puts \"///////////////test///////////////\"\n")
+            psfgen.write("puts $protein\n")
+            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
+            psfgen.write("puts \"///////////////test///////////////\"\n")
             psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
             psfgen.write("foreach chain $chains {\n")
             psfgen.write("    set sel [atomselect top \"pfrag $chain\"]\n")
@@ -592,6 +657,30 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         # SAVE
         np.savetxt(outputPrefix +"_cc.txt", np.array(cc))
+
+    def addChargeGroptopFile(self, grotopFile):
+        with open(grotopFile, 'r') as f1:
+            with open(grotopFile+".tmp", 'w') as f2:
+                atom_scope = False
+                write_line = False
+                for line in f1:
+                    if "[" in line and "]" in line:
+                        if "atoms" in line:
+                            atom_scope = True
+                    if atom_scope:
+                        if "[" in line and "]" in line:
+                            if not "atoms" in line:
+                                atom_scope = False
+                                write_line = False
+                        elif not ";" in line and not (not line or line.isspace()):
+                            write_line = True
+                        else:
+                            write_line = False
+                    if write_line:
+                        f2.write("%s\t0.0\n" % line[:-1])
+                    else:
+                        f2.write(line)
+        os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
 
 
     # --------------------------- STEPS functions --------------------------------------------

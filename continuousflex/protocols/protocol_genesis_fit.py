@@ -31,8 +31,7 @@ import numpy as np
 import mrcfile
 import os
 from skimage.exposure import match_histograms
-from .rmsd_analysis import rmsd_analysis
-from .smog_pdb import smog_pdb
+from .utilities.pdb_analysis import Molecule, get_mols_conv
 
 
 class FlexProtGenesisFit(ProtAnalysis3D):
@@ -222,6 +221,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 s += "forcefield = CHARMM \n"
             elif self.forcefield.get() == 1:
                 s += "forcefield = AAGO  \n"
+            elif self.forcefield.get() == 2:
+                s += "forcefield = CAGO  \n"
             s += "electrostatic = CUTOFF  \n"
             s += "switchdist   = %.2f \n" % self.switch_dist.get()
             s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
@@ -343,16 +344,23 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     def convertInputStep(self):
 
         # SETUP INPUT PDBs
-        self.inputPDBfn = []
+        initFn = []
         if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
-            isinstance(self.inputPDB.get(), SetOfPDBs):
+                isinstance(self.inputPDB.get(), SetOfPDBs):
             self.numberOfInputPDB = self.inputPDB.get().getSize()
-            for i in self.inputPDB.get():
-                self.inputPSFputPDBfn.append(i.getFileName())
+            for i in range(self.inputPDB.get().getSize()):
+                initFn.append(self.inputPDB.get()[i+1].getFileName())
+
         else:
             self.numberOfInputPDB =1
-            self.inputPDBfn.append(self.inputPDB.get().getFileName())
+            initFn.append(self.inputPDB.get().getFileName())
 
+        # COPY INIT PDBs
+        self.inputPDBfn = []
+        for i in range(self.numberOfInputPDB):
+            newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(3))
+            self.inputPDBfn.append(newPDB)
+            os.system("cp %s %s"%(initFn[i], newPDB))
 
         # GENERATE TOPOLOGY FILES
         if self.generateTop.get()==0:
@@ -363,7 +371,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 for i in range(self.numberOfInputPDB):
                     inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(3))
                     self.generatePSF(self.inputPDBfn[i],inputPrefix)
-                    self.inputPDBfn[i]=inputPrefix+".pdb"
                     self.inputPSFfn.append(inputPrefix+".psf")
 
             # GROMACS
@@ -372,25 +379,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 self.inputTOPfn = []
                 for i in range(self.numberOfInputPDB):
                     inputPrefix = self._getExtraPath("%s_inputPDB" % str(i + 1).zfill(3))
-                    #groPDB =  inputPrefix + "_gro.pdb"
-                    groPDB = self.inputPDBfn[i]
-
-                    # Convert PDB
-                    smog_pdb(self.inputPDBfn[i], groPDB)
-
-                    # Run Smog2
-                    if self.forcefield.get() == 1:
-                        model ="AA"
-                    elif self.forcefield.get() == 2:
-                        model ="CA"
-                    self.runJob("%s/bin/smog2"% self.smog_dir.get(),
-                                "-i %s -dname %s -%s -limitbondlength -limitcontactlength"%
-                                (groPDB,inputPrefix, model))
+                    self.generatePSF(self.inputPDBfn[i], inputPrefix)
+                    self.generateGROTOP(self.inputPDBfn[i], inputPrefix)
                     self.inputGROfn.append(inputPrefix+".gro")
                     self.inputTOPfn.append(inputPrefix+".top")
-
-                    #ADD CHARGE TO FILE
-                    self.addChargeGroptopFile(inputPrefix+".top")
 
         else:
             if self.forcefield.get() == 0:
@@ -576,89 +568,39 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             psfgen.write("exit\n")
         self.runJob("vmd", "-dispdev text -e "+fnPSFgen)
 
-    def rmsdFromDCD(self, outputPrefix, inputPDB):
-        rmsd_analysis(outputPrefix = outputPrefix,
-                      targetPDB = self.target_pdb.get().getFileName(),
-                      initPDB = inputPDB,
-                      nsteps = self.n_steps.get(),
-                      outputPeriod = self.crdout_period.get(),
-                      ca_only=True)
-    # def rmsdFromDCD(self, outputPrefix, inputPDB):
-    #
-    #     # COMPUTE FIRST RMSD VALUE
-    #     s = "[INPUT]\n"
-    #     s += "reffile = %s\n" %self.target_pdb.get().getFileName()
-    #     s += "[OUTPUT]\n"
-    #     s += "rmsfile = %s.rms\n" %outputPrefix
-    #     s += "[TRAJECTORY]\n"
-    #     s += "trjfile1 = %s\n" % inputPDB
-    #     s += "trj_format = PDB\n"
-    #     s += "trj_type = COOR+BOX\n"
-    #     s += "trj_natom = 0\n"
-    #     s += "md_step1 = 1\n"
-    #     s += "[SELECTION]\n"
-    #     s += "group1 = an:CA\n"
-    #     s += "[FITTING]\n"
-    #     s += "fitting_method = NO\n"
-    #     s += "fitting_atom = 1\n"
-    #     s += "[OPTION]\n"
-    #     s += "check_only = NO\n"
-    #     s += "analysis_atom = 1\n"
-    #     with open("%s_INP_rmsd"%outputPrefix, "w") as f:
-    #         f.write(s)
-    #     self.runJob("%s/bin/rmsd_analysis"%self.genesisDir.get(),"%s_INP_rmsd"%outputPrefix)
-    #     first_rmsd = np.loadtxt("%s.rms" %outputPrefix)[1]
-    #     os.system("rm -f %s.rms" % outputPrefix)
-    #
-    #     # COMPUTE TRAJ RMSD VALUES
-    #     s = "[INPUT]\n"
-    #     s += "reffile = %s\n" %self.target_pdb.get().getFileName()
-    #     s += "[OUTPUT]\n"
-    #     s += "rmsfile = %s.rms\n" %outputPrefix
-    #     s += "[TRAJECTORY]\n"
-    #     s += "trjfile1 = %s.dcd\n" %outputPrefix
-    #     s += "trj_format = DCD\n"
-    #     s += "trj_type = COOR+BOX\n"
-    #     s += "trj_natom = 0\n"
-    #     s += "[SELECTION]\n"
-    #     s += "group1 = an:CA\n"
-    #     s += "[FITTING]\n"
-    #     s += "fitting_method = NO\n"
-    #     s += "fitting_atom = 1\n"
-    #     s += "[OPTION]\n"
-    #     s += "check_only = NO\n"
-    #     s += "analysis_atom = 1\n"
-    #     with open("%s_INP_rmsd"%outputPrefix, "w") as f:
-    #         f.write(s)
-    #     self.runJob("%s/bin/rmsd_analysis"%self.genesisDir.get(),"%s_INP_rmsd"%outputPrefix)
-    #     rmsd = np.loadtxt("%s.rms" %outputPrefix)[:,1]
-    #     os.system("rm -f %s.rms" % outputPrefix)
-    #
-    #     # MERGE FIRST AND TRAJ THEN SAVE
-    #     np.savetxt(outputPrefix + "_rmsd.txt", [first_rmsd] + list(rmsd)  )
+    def generateGROTOP(self,inputPDB, inputPrefix):
+        mol = Molecule(inputPDB)
+        mol.remove_alter_atom()
+        mol.remove_hydrogens()
+        mol.alias_atom("CD", "CD1", "ILE")
+        mol.alias_atom("OT1", "O")
+        mol.alias_atom("OT2", "OXT")
+        mol.alias_res("HSE", "HIS")
+        mol.alias_res("CYT", "C")
+        mol.alias_res("GUA", "G")
+        mol.alias_res("ADE", "A")
+        mol.alias_res("URA", "U")
+        mol.alias_atom("O1'", "O1*")
+        mol.alias_atom("O2'", "O2*")
+        mol.alias_atom("O3'", "O3*")
+        mol.alias_atom("O4'", "O4*")
+        mol.alias_atom("O5'", "O5*")
+        mol.alias_atom("C1'", "C1*")
+        mol.alias_atom("C2'", "C2*")
+        mol.alias_atom("C3'", "C3*")
+        mol.alias_atom("C4'", "C4*")
+        mol.alias_atom("C5'", "C5*")
+        mol.add_terminal_res()
+        mol.atom_res_reorder()
+        mol.save_pdb(inputPDB)
 
-    def ccFromLogFile(self,outputPrefix):
-        # READ CC IN GENESIS LOG FILE
-        with open(outputPrefix+".log","r") as f:
-            header = None
-            cc = []
-            cc_idx = 0
-            for i in f:
-                if i.startswith("INFO:"):
-                    if header is None:
-                        header = i.split()
-                        for i in range(len(header)):
-                            if 'RESTR_CVS001' in header[i]:
-                                cc_idx = i
-                    else:
-                        splitline = i.split()
-                        if len(splitline) == len(header):
-                            cc.append(float(splitline[cc_idx]))
+        # Run Smog2
+        self.runJob("%s/bin/smog2" % self.smog_dir.get(),
+                    "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
+                    (inputPDB, inputPrefix, "CA" if self.forcefield.get() == 2 else "AA"))
 
-        # SAVE
-        np.savetxt(outputPrefix +"_cc.txt", np.array(cc))
-
-    def addChargeGroptopFile(self, grotopFile):
+        # ADD CHARGE TO FILE
+        grotopFile = inputPrefix + ".top"
         with open(grotopFile, 'r') as f1:
             with open(grotopFile+".tmp", 'w') as f2:
                 atom_scope = False
@@ -681,6 +623,70 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                     else:
                         f2.write(line)
         os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
+
+        # SELECT CA ATOMS IF CAGO MODEL
+        if self.forcefield.get() == 2 :
+            initPDB = Molecule(inputPDB)
+            initPDB.allatoms2ca()
+            initPDB.save_pdb(inputPDB)
+
+    def rmsdFromDCD(self, outputPrefix, inputPDB):
+
+        # EXTRACT PDBs from dcd file
+        with open("%s_dcd2pdb.tcl" % outputPrefix, "w") as f:
+            s = ""
+            s += "mol load pdb %s dcd %s.dcd\n" % (inputPDB, outputPrefix)
+            s += "set nf [molinfo top get numframes]\n"
+            s += "for {set i 0 } {$i < $nf} {incr i} {\n"
+            s += "[atomselect top all frame $i] writepdb %stmp$i.pdb\n" % outputPrefix
+            s += "}\n"
+            s += "exit\n"
+            f.write(s)
+        os.system("vmd -dispdev text -e %s_dcd2pdb.tcl > /dev/null" % outputPrefix)
+
+        # DEF RMSD
+        def RMSD(c1, c2):
+            return np.sqrt(np.mean(np.square(np.linalg.norm(c1 - c2, axis=1))))
+
+        # COMPUTE RMSD
+        rmsd = []
+        N = (self.n_steps.get() // self.crdout_period.get())
+        initPDB = Molecule(inputPDB)
+        targetPDB = Molecule(self.target_pdb.get().getFileName())
+
+        idx = get_mols_conv([initPDB, targetPDB], ca_only=True)
+        if len(idx) > 0:
+            rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
+            for i in range(N):
+                mol = Molecule(outputPrefix + "tmp" + str(i + 1) + ".pdb")
+                rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
+        else:
+            rmsd = np.zeros(N + 1)
+
+        # CLEAN TMP FILES AND SAVE
+        os.system("rm -f %stmp*" % (outputPrefix))
+        np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
+
+    def ccFromLogFile(self,outputPrefix):
+        # READ CC IN GENESIS LOG FILE
+        with open(outputPrefix+".log","r") as f:
+            header = None
+            cc = []
+            cc_idx = 0
+            for i in f:
+                if i.startswith("INFO:"):
+                    if header is None:
+                        header = i.split()
+                        for i in range(len(header)):
+                            if 'RESTR_CVS001' in header[i]:
+                                cc_idx = i
+                    else:
+                        splitline = i.split()
+                        if len(splitline) == len(header):
+                            cc.append(float(splitline[cc_idx]))
+
+        # SAVE
+        np.savetxt(outputPrefix +"_cc.txt", np.array(cc))
 
 
     # --------------------------- STEPS functions --------------------------------------------

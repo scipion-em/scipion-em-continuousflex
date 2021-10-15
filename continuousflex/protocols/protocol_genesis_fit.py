@@ -35,8 +35,8 @@ from .utilities.pdb_analysis import Molecule, get_mols_conv
 
 
 class FlexProtGenesisFit(ProtAnalysis3D):
-    """ Protocol for flexible fitting a PDB into a cryo EM map using Genesis. """
-    _label = 'genesis fit'
+    """ Protocol to use GENESIS. """
+    _label = 'Genesis'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):

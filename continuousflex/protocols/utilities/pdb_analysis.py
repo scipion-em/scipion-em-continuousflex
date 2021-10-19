@@ -291,3 +291,6 @@ def alignPDBs(mol1, mol2, idx= None):
     mol2.coords = np.dot(mol2.coords, rot) + tran
 
     print("\t Done")
+
+
+

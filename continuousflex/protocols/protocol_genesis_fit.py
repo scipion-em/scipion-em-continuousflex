@@ -25,14 +25,34 @@
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
-from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes
+from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles
 
 import numpy as np
 import mrcfile
 import os
 from skimage.exposure import match_histograms
-from .utilities.pdb_analysis import Molecule, get_mols_conv
+from .utilities.pdb_analysis import PDBMol, matchPDBatoms
 
+EMFIT_NONE = 0
+EMFIT_VOLUMES = 1
+EMFIT_IMAGES = 2
+
+FORCEFIELD_CHARMM = 0
+FORCEFIELD_AAGO = 1
+FORCEFIELD_CAGO = 2
+
+SIMULATION_MD = 0
+SIMULATION_MIN = 1
+
+INTEGRATOR_VVERLET = 0
+INTEGRATOR_LEAPFROG = 1
+
+IMPLICIT_SOLVENT_GBSA = 0
+IMPLICIT_SOLVENT_NONE = 1
+
+TPCONTROL_LANGEVIN = 0
+TPCONTROL_BERENDSEN = 1
+TPCONTROL_NONE = 2
 
 class FlexProtGenesisFit(ProtAnalysis3D):
     """ Protocol to use GENESIS. """
@@ -56,36 +76,36 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help='Select the input PDB or set of PDBs.', important=True)
         form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
                       choices=['CHARMM', 'AAGO', 'CAGO'], help="TODo")
-        form.addParam('generateTop', params.EnumParam, label="Generate topology files ?", default=0,
-                      choices=['Yes', 'No'], help="TODo")
+        form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
+                      default=False, help="TODo")
         form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
-                      help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop == 0")
+                      help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop")
         form.addParam('inputGRO', params.FileParam, label="GROMACS Coordinates File (.gro)",
-                      condition="(forcefield==1 or forcefield==2) and generateTop==1",
+                      condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='TODO')
         form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (.top)",
-                      condition="(forcefield==1 or forcefield==2) and generateTop==1",
+                      condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='TODO')
         form.addParam('inputPRM', params.FileParam, label="CHARMM Parameter File (.prm)",
                       condition = "forcefield==0",
                       help='CHARMM force field parameter file (.prm). Can be founded at ' +
                            'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm')
         form.addParam('inputRTF', params.FileParam, label="CHARMM Topology File (.rtf)",
-                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop == 0)",
+                      condition="forcefield==0 or ((forcefield==1 or forcefield==2) and generateTop)",
                       help='CHARMM force field topology file (.rtf). Can be founded at ' +
                            'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm. '+
                            'In the case of AAGO/CAGO model, used for completing the missing structure')
 
 
         form.addParam('inputPSF', params.FileParam, label="Protein Structure File (.psf)",
-                      condition="forcefield==0 and generateTop==1",
+                      condition="forcefield==0 and not generateTop",
                       help='TODO')
 
-        form.addParam('restartchoice', params.EnumParam, label="Restart previous run", default=0,
-                      choices=['Yes', 'No'],help="TODo")
+        form.addParam('restartchoice', params.BooleanParam, label="Restart previous run ?", default=False,
+                     help="TODo")
         form.addParam('inputRST', params.FileParam, label="GENESIS Restart File (.rst)",
                        help='Restart file from previous minimisation or MD run '
-                      , condition="restartchoice==0")
+                      , condition="restartchoice")
 
 
         # Simulation =================================================================================================
@@ -119,59 +139,63 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO")
         # EM fit =================================================================================================
         form.addSection(label='EM fit')
-        form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=1,
-                      choices=['Yes', 'No'], important=True,
+        form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
+                      choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="TODO")
         form.addParam('constantK', params.IntParam, default=10000, label='Force constant K',
-                      help="TODO", condition="EMfitChoice==0")
+                      help="TODO", condition="EMfitChoice!=0")
         form.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EMfit Sigma",
-                      help="TODO", condition="EMfitChoice==0")
+                      help="TODO", condition="EMfitChoice!=0")
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
-                      help="TODO", condition="EMfitChoice==0")
+                      help="TODO", condition="EMfitChoice!=0")
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
-                      label="Input volume (s)", help='Select the target EM density volume', condition="EMfitChoice==0")
+                      label="Input volume (s)", help='Select the target EM density volume',
+                      condition="EMfitChoice==1")
+        form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
+                      label="Input image (s)", help='Select the target EM density map',
+                      condition="EMfitChoice==2")
         form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="TODO", condition="EMfitChoice==0")
+                      help="TODO", condition="EMfitChoice==1")
         form.addParam('situs_dir', params.FileParam,
                       label="Situs install path", help='Select the root directory of Situs installation'
-                      , condition="EMfitChoice==0")
-        form.addParam('centerOrigin', params.EnumParam, label="Center Origin", default=0,
-                      choices=['Yes', 'NO'],
-                      help="TODo", condition="EMfitChoice==0")
+                      , condition="EMfitChoice==1")
+        form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+                      help="TODo", condition="EMfitChoice==1")
         # NMMD =================================================================================================
         form.addSection(label='NMMD')
-        form.addParam('normalModesChoice', params.EnumParam, label="Normal Mode Molecular Dynamics", default=1,
-                      choices=['Yes', 'No'], important=True,
-                      help="TODO")
+        form.addParam('normalModesChoice', params.BooleanParam, label="Normal Mode Molecular Dynamics",
+                      default=True, important=False, help="TODO")
         form.addParam('n_modes', params.IntParam, default=10, label='Number of normal modes',
-                      help="TODO", condition="normalModesChoice==0")
+                      help="TODO", condition="normalModesChoice")
         form.addParam('global_mass', params.FloatParam, default=1.0, label='Normal modes amplitude mass',
-                      help="TODO", condition="normalModesChoice==0")
+                      help="TODO", condition="normalModesChoice")
         form.addParam('global_limit', params.FloatParam, default=300.0, label='Normal mode amplitude threshold',
-                      help="TODO", condition="normalModesChoice==0")
+                      help="TODO", condition="normalModesChoice")
         # REMD =================================================================================================
         form.addSection(label='REMD')
-        form.addParam('replica_exchange', params.EnumParam, label="Replica Exchange", default=1,
-                      choices=['Yes', 'No'], important=True,
+        form.addParam('replica_exchange', params.BooleanParam, label="Replica Exchange",
+                      default=False, important=True,
                       help="TODO")
         form.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="TODO", condition="replica_exchange==0")
+                      help="TODO", condition="replica_exchange")
         form.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="TODO", condition="replica_exchange==0")
+                      help="TODO", condition="replica_exchange")
         form.addParam('constantKREMD', params.StringParam, label='K values ',
-                      help="TODO", condition="replica_exchange==0")
+                      help="TODO", condition="replica_exchange")
         # Outputs =================================================================================================
         form.addSection(label='Outputs')
-        form.addParam('rmsdChoice', params.EnumParam, label="RMSD to target PDB", default=1,
-                      choices=['Yes', 'No'], important=False,
+        form.addParam('rmsdChoice', params.BooleanParam, label="RMSD to target PDB",
+                      default=False, important=False,
                       help="TODO")
         form.addParam('target_pdb', params.PointerParam,
-                      pointerClass='AtomStruct', label="Target PDB", help='TODO', condition="rmsdChoice==0")
+                      pointerClass='AtomStruct', label="Target PDB", help='TODO', condition="rmsdChoice")
 
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
-        self._insertFunctionStep("convertInputStep")
+        self._insertFunctionStep("convertInputPDBStep")
+        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
+            self._insertFunctionStep("convertInputVolStep")
         self._insertFunctionStep("createINPStep")
         self._insertFunctionStep("fittingStep")
         self._insertFunctionStep("createOutputStep")
@@ -182,7 +206,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             outputPrefix = self._getExtraPath("%s_output" % (str(i+1).zfill(3)))
 
             s = "\n[INPUT] \n"
-            if self.forcefield.get() == 0:
+            if self.forcefield.get() == FORCEFIELD_CHARMM:
                 s += "topfile = %s\n" % self.inputRTF.get()
                 s += "parfile = %s\n" % self.inputPRM.get()
                 if self.numberOfInputPDB == 1:
@@ -191,7 +215,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 else:
                     s += "pdbfile = %s\n" % self.inputPDBfn[i]
                     s += "psffile = %s\n" % self.inputPSFfn[i]
-            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+            elif self.forcefield.get() == FORCEFIELD_AAGO\
+                    or self.forcefield.get() == FORCEFIELD_CAGO:
                 if self.numberOfInputPDB == 1:
                     if len(self.inputGROfn)==0:
                         s += "pdbfile = %s\n" % self.inputPDBfn[0]
@@ -204,11 +229,11 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                     else:
                         s += "grotopfile = %s\n" % self.inputTOPfn[i]
                     s += "grocrdfile = %s \n" % self.inputGROfn[i]
-            if self.restartchoice.get() == 0:
+            if self.restartchoice.get():
                 s += "rstfile = %s\n" % self.inputRST.get()
 
             s += "\n[OUTPUT] \n"
-            if self.replica_exchange.get() == 0:
+            if self.replica_exchange.get():
                 outputPrefix += "_remd{}"
                 s += "remfile = %s.rem\n" %outputPrefix
                 s += "logfile = %s.log\n" %outputPrefix
@@ -217,18 +242,18 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "pdbfile = %s.pdb\n" %outputPrefix
 
             s += "\n[ENERGY] \n"
-            if self.forcefield.get() == 0:
+            if self.forcefield.get() == FORCEFIELD_CHARMM:
                 s += "forcefield = CHARMM \n"
-            elif self.forcefield.get() == 1:
+            elif self.forcefield.get() == FORCEFIELD_AAGO:
                 s += "forcefield = AAGO  \n"
-            elif self.forcefield.get() == 2:
+            elif self.forcefield.get() == FORCEFIELD_CAGO:
                 s += "forcefield = CAGO  \n"
             s += "electrostatic = CUTOFF  \n"
             s += "switchdist   = %.2f \n" % self.switch_dist.get()
             s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
             s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
             s += "vdw_force_switch = YES \n"
-            if self.implicitSolvent.get() == 0:
+            if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
                 s += "implicit_solvent = GBSA \n"
                 s += "gbsa_eps_solvent = 78.5 \n"
                 s += "gbsa_eps_solute  = 1.0 \n"
@@ -237,12 +262,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             else:
                 s += "implicit_solvent = NONE  \n"
 
-            if self.simulationType.get() == 1:
+            if self.simulationType.get() == SIMULATION_MIN:
                 s += "\n[MINIMIZE]\n"
                 s += "method = SD\n"
             else:
                 s += "\n[DYNAMICS] \n"
-                if self.integrator.get() == 0:
+                if self.integrator.get() == INTEGRATOR_VVERLET:
                     s += "integrator = VVER  \n"
                 else:
                     s += "integrator = LEAP  \n"
@@ -258,9 +283,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
             s += "\n[ENSEMBLE] \n"
             s += "ensemble = NVT \n"
-            if self.tpcontrol.get() == 0:
+            if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
                 s += "tpcontrol = LANGEVIN  \n"
-            elif self.tpcontrol.get() == 1:
+            elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
                 s += "tpcontrol = BERENDSEN  \n"
             else:
                 s += "tpcontrol = NO  \n"
@@ -269,14 +294,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "\n[BOUNDARY] \n"
             s += "type = NOBC  \n"
 
-            if self.EMfitChoice.get()==0 and self.simulationType.get() == 0:
+            if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
+                    and self.simulationType.get() == SIMULATION_MD:
                 s += "\n[SELECTION] \n"
                 s += "group1 = all and not hydrogen\n"
 
                 s += "\n[RESTRAINTS] \n"
                 s += "nfunctions = 1 \n"
                 s += "function1 = EM \n"
-                if self.replica_exchange.get() == 0:
+                if self.replica_exchange.get():
                     s += "constant1 = %s \n" % self.constantKREMD.get()
                 else:
                     s += "constant1 = %.2f \n" % self.constantK.get()
@@ -292,7 +318,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
                 s += "emfit_period = 1  \n"
 
-                if self.replica_exchange.get() == 0:
+                if self.replica_exchange.get():
                     s += "\n[REMD] \n"
                     s += "dimension = 1 \n"
                     s += "exchange_period = %i \n" % self.exchange_period.get()
@@ -314,34 +340,37 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 f.write("%s/bin/atdyn %s " %
                         (self.genesisDir.get(),
                          self._getExtraPath("%s_INP"% str(i+1).zfill(3))))
-                if self.normalModesChoice.get() == 0:
+                if self.normalModesChoice.get():
                     f.write("%s/ %i %f %f" % (self.genesisDir.get(),
                              self.n_modes.get(),
                              self.global_mass.get(),
                              self.global_limit.get()))
-                if self.replica_exchange.get() == 1:
+                if not self.replica_exchange.get():
                         f.write(" | tee %s.log"%outputPrefix)
                 f.write("\nexit")
             self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
             self.runJob(self._getExtraPath("launch_genesis.sh"), "")
 
             # COMPUTE CC AND RMSD IF NEEDED
-            if self.EMfitChoice.get()==0:
-                for j in range(self.numberOfReplicas):
-                    if self.replica_exchange.get() == 0 :
+            numberOfReplicas = self.nreplica.get() \
+                if self.replica_exchange.get() else 1
+
+            if self.EMfitChoice.get()== EMFIT_VOLUMES:
+                for j in range(numberOfReplicas):
+                    if self.replica_exchange.get() :
                         outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i+1).zfill(3), j+1))
 
                     # comp CC
                     self.ccFromLogFile(outputPrefix)
 
                     # comp RMSD
-                    if self.rmsdChoice.get() == 0:
+                    if self.rmsdChoice.get():
                         inputPDB = self.inputPDBfn[0] \
                             if self.numberOfInputPDB == 1 else self.inputPDBfn[i]
                         self.rmsdFromDCD(outputPrefix, inputPDB)
 
 
-    def convertInputStep(self):
+    def convertInputPDBStep(self):
 
         # SETUP INPUT PDBs
         initFn = []
@@ -361,12 +390,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(3))
             self.inputPDBfn.append(newPDB)
             os.system("cp %s %s"%(initFn[i], newPDB))
+        self.numberOfFitting = self.numberOfInputPDB
 
         # GENERATE TOPOLOGY FILES
-        if self.generateTop.get()==0:
-
+        if self.generateTop.get():
             #CHARMM
-            if self.forcefield.get() == 0:
+            if self.forcefield.get() == FORCEFIELD_CHARMM:
                 self.inputPSFfn = []
                 for i in range(self.numberOfInputPDB):
                     inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(3))
@@ -374,7 +403,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                     self.inputPSFfn.append(inputPrefix+".psf")
 
             # GROMACS
-            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+            elif self.forcefield.get() == FORCEFIELD_AAGO\
+                    or self.forcefield.get() == FORCEFIELD_CAGO:
                 self.inputGROfn = []
                 self.inputTOPfn = []
                 for i in range(self.numberOfInputPDB):
@@ -385,19 +415,25 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                     self.inputTOPfn.append(inputPrefix+".top")
 
         else:
-            if self.forcefield.get() == 0:
+            # CHARMM
+            if self.forcefield.get() == FORCEFIELD_CHARMM:
                 self.inputPSFfn = [self.inputPSF.get()]
 
-            elif self.forcefield.get() == 1 or self.forcefield.get() == 2:
+            # GROMACS
+            elif self.forcefield.get() == FORCEFIELD_AAGO\
+                    or self.forcefield.get() == FORCEFIELD_CAGO:
                 if self.inputGRO.get() == "":
                     self.inputGROfn = []
                 else:
                     self.inputGROfn = [self.inputGRO.get()]
                 self.inputTOPfn = [self.inputTOP.get()]
 
-        # SETUP INPUT VOLUMES
-        if self.EMfitChoice.get()==0:
-            self.inputVolumefn = []
+    def convertInputVolStep(self):
+        # SETUP INPUT VOLUMES / IMAGES
+        self.inputVolumefn = []
+
+        # Get volumes number and file names
+        if self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), SetOfVolumes) :
                 self.numberOfInputVol = self.inputVolume.get().getSize()
                 for i in self.inputVolume.get():
@@ -406,32 +442,43 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 self.numberOfInputVol =1
                 self.inputVolumefn.append(self.inputVolume.get().getFileName())
 
-            if self.numberOfInputPDB != self.numberOfInputVol and \
-                    self.numberOfInputVol != 1 and self.numberOfInputPDB != 1:
-                raise RuntimeError("Number of input volumes and PDBs must be the same.")
+        # Get images number and file names
+        elif self.EMfitChoice.get() == EMFIT_IMAGES:
+            if isinstance(self.inputImage.get(), SetOfParticles) :
+                self.numberOfInputVol = self.inputImage.get().getSize()
+                for i in self.inputImage.get():
+                    self.inputVolumefn.append(i.getFileName())
+            else:
+                self.numberOfInputVol =1
+                self.inputVolumefn.append(self.inputImage.get().getFileName())
 
-            # CONVERT VOLUMES
+        # Check input volumes/images correspond to input PDBs
+        if self.numberOfInputPDB != self.numberOfInputVol and \
+                self.numberOfInputVol != 1 and self.numberOfInputPDB != 1:
+            raise RuntimeError("Number of input volumes and PDBs must be the same.")
+        if self.numberOfFitting <self.numberOfInputVol :
+            self.numberOfFitting = self.numberOfInputVol
+
+        # CONVERT VOLUMES
+        if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(self.numberOfInputVol):
                 volPrefix = self._getExtraPath("%s_inputVol" % str(i+1).zfill(3))
                 fnPDB = self.inputPDBfn[0] if self.numberOfInputPDB == 1 else self.inputPDBfn[i]
 
                 self.inputVolumefn[i]  = self.convertVol(fnInput=self.inputVolumefn[i],
                                    volPrefix = volPrefix, fnPDB=fnPDB)
-        else:
-            self.numberOfInputVol=0
-
-        self.numberOfReplicas = self.nreplica.get() if self.replica_exchange.get() == 0 else 1
-        self.numberOfFitting = np.max([self.numberOfInputPDB,self.numberOfInputVol])
-
 
     def createOutputStep(self):
 
         # CREATE SET OF PDBs
         pdbset = self._createSetOfPDBs("outputPDBs")
+        numberOfReplicas = self.nreplica.get() \
+            if self.replica_exchange.get() else 1
+
         for i in range(self.numberOfFitting):
             outputPrefix = self._getExtraPath("%s_output" % str(i + 1).zfill(3))
-            for j in range(self.numberOfReplicas):
-                if self.replica_exchange.get() == 0:
+            for j in range(numberOfReplicas):
+                if self.replica_exchange.get():
                     outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(3), j + 1))
                 pdbset.append(AtomStruct(outputPrefix + ".pdb"))
 
@@ -451,7 +498,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         with mrcfile.open("%s.mrc" % volPrefix) as input_mrc:
             inputMRCData = input_mrc.data
             inputMRCShape = inputMRCData.shape
-            if self.centerOrigin.get() == 0 :
+            if self.centerOrigin.get():
                 origin = -self.voxel_size.get() * (np.array(inputMRCData.shape)) / 2
             else:
                 origin = np.zeros(3)
@@ -569,7 +616,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         self.runJob("vmd", "-dispdev text -e "+fnPSFgen)
 
     def generateGROTOP(self,inputPDB, inputPrefix):
-        mol = Molecule(inputPDB)
+        mol = PDBMol(inputPDB)
         mol.remove_alter_atom()
         mol.remove_hydrogens()
         mol.alias_atom("CD", "CD1", "ILE")
@@ -592,12 +639,13 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         mol.alias_atom("C5'", "C5*")
         mol.add_terminal_res()
         mol.atom_res_reorder()
-        mol.save_pdb(inputPDB)
+        mol.save(inputPDB)
 
         # Run Smog2
         self.runJob("%s/bin/smog2" % self.smog_dir.get(),
                     "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
-                    (inputPDB, inputPrefix, "CA" if self.forcefield.get() == 2 else "AA"))
+                    (inputPDB, inputPrefix,
+                     "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA"))
 
         # ADD CHARGE TO FILE
         grotopFile = inputPrefix + ".top"
@@ -625,10 +673,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
 
         # SELECT CA ATOMS IF CAGO MODEL
-        if self.forcefield.get() == 2 :
-            initPDB = Molecule(inputPDB)
+        if self.forcefield.get() == FORCEFIELD_CAGO:
+            initPDB = PDBMol(inputPDB)
             initPDB.allatoms2ca()
-            initPDB.save_pdb(inputPDB)
+            initPDB.save(inputPDB)
 
     def rmsdFromDCD(self, outputPrefix, inputPDB):
 
@@ -651,14 +699,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         # COMPUTE RMSD
         rmsd = []
         N = (self.n_steps.get() // self.crdout_period.get())
-        initPDB = Molecule(inputPDB)
-        targetPDB = Molecule(self.target_pdb.get().getFileName())
+        initPDB = PDBMol(inputPDB)
+        targetPDB = PDBMol(self.target_pdb.get().getFileName())
 
-        idx = get_mols_conv([initPDB, targetPDB], ca_only=True)
+        idx = matchPDBatoms([initPDB, targetPDB], ca_only=True)
         if len(idx) > 0:
             rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
             for i in range(N):
-                mol = Molecule(outputPrefix + "tmp" + str(i + 1) + ".pdb")
+                mol = PDBMol(outputPrefix + "tmp" + str(i + 1) + ".pdb")
                 rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
         else:
             rmsd = np.zeros(N + 1)

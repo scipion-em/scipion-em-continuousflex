@@ -1,10 +1,7 @@
 import numpy as np
+from Bio.SVDSuperimposer import SVDSuperimposer
 
-class Molecule:
-    """
-    Atomic structure of a molecule
-    """
-
+class PDBMol:
     def __init__(self, pdb_file):
         """
         Contructor
@@ -63,7 +60,7 @@ class Molecule:
         self.chainID = np.array(chainID, dtype='<U4')
         self.elemName = np.array(elemName, dtype='<U2')
 
-    def save_pdb(self, file):
+    def save(self, file):
         """
         Save to PDB Format
         :param file: pdb file path
@@ -237,8 +234,8 @@ class Molecule:
                 new_idx.append(i)
         self.select_atoms(np.array(new_idx))
 
-def get_mols_conv(mols, ca_only=False):
-    print("> Converting molecule coordinates ...")
+def matchPDBatoms(mols, ca_only=False):
+    print("> Matching PDBs atoms ...")
     n_mols = len(mols)
 
     if mols[0].chainName[0] in mols[1].chainName:
@@ -274,7 +271,23 @@ def get_mols_conv(mols, ca_only=False):
             idx.append(idx_line)
 
     if len(idx)==0:
-        print("\t Warning : No matching coordinates")
+        print("\t Warning : No matching atoms")
     print("\t Done")
 
     return np.array(idx)
+
+def alignPDBs(mol1, mol2, idx= None):
+    print("> Aligning PDBs coordinates ...")
+    sup = SVDSuperimposer()
+    if idx is not None:
+        c1 = mol1.coords[idx[:,0]]
+        c2 = mol2.coords[idx[:,1]]
+    else:
+        c1 = mol1.coords
+        c2 = mol2.coords
+    sup.set(c1, c2)
+    sup.run()
+    rot, tran = sup.get_rotran()
+    mol2.coords = np.dot(mol2.coords, rot) + tran
+
+    print("\t Done")

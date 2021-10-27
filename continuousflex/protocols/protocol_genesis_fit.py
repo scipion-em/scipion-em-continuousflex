@@ -32,6 +32,7 @@ import mrcfile
 import os
 from skimage.exposure import match_histograms
 from .utilities.pdb_analysis import PDBMol, matchPDBatoms
+import pwem.emlib.metadata as md
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -53,6 +54,12 @@ IMPLICIT_SOLVENT_NONE = 1
 TPCONTROL_LANGEVIN = 0
 TPCONTROL_BERENDSEN = 1
 TPCONTROL_NONE = 2
+
+NUCLEIC_NO = 0
+NUCLEIC_RNA =1
+NUCLEIC_DNA = 2
+
+
 
 class FlexProtGenesisFit(ProtAnalysis3D):
     """ Protocol to use GENESIS. """
@@ -80,9 +87,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       default=False, help="TODo")
         form.addParam('smog_dir', params.FileParam, label="SMOG2 directory",
                       help='TODO', condition="(forcefield==1 or forcefield==2) and generateTop")
-        form.addParam('inputGRO', params.FileParam, label="GROMACS Coordinates File (.gro)",
-                      condition="(forcefield==1 or forcefield==2) and not generateTop",
-                      help='TODO')
         form.addParam('inputTOP', params.FileParam, label="GROMACS Topology File (.top)",
                       condition="(forcefield==1 or forcefield==2) and not generateTop",
                       help='TODO')
@@ -95,7 +99,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help='CHARMM force field topology file (.rtf). Can be founded at ' +
                            'http://mackerell.umaryland.edu/charmm_ff.shtml#charmm. '+
                            'In the case of AAGO/CAGO model, used for completing the missing structure')
-
+        form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=0,
+                      choices=['NO', 'RNA', 'DNA'], condition ="generateTop",help="TODo")
 
         form.addParam('inputPSF', params.FileParam, label="Protein Structure File (.psf)",
                       condition="forcefield==0 and not generateTop",
@@ -148,12 +153,11 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       help="TODO", condition="EMfitChoice!=0")
         form.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EMfit Tolerance',
                       help="TODO", condition="EMfitChoice!=0")
+
+        # Volumes
         form.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
                       label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==1")
-        form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
-                      label="Input image (s)", help='Select the target EM density map',
-                      condition="EMfitChoice==2")
         form.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
                       help="TODO", condition="EMfitChoice==1")
         form.addParam('situs_dir', params.FileParam,
@@ -161,10 +165,20 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                       , condition="EMfitChoice==1")
         form.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
                       help="TODo", condition="EMfitChoice==1")
+
+        # Images
+        form.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
+                      label="Input image (s)", help='Select the target EM density map',
+                      condition="EMfitChoice==2")
+        form.addParam('image_size', params.IntParam, default=64, label='Image Size',
+                      help="TODO", condition="EMfitChoice==2")
+        form.addParam('n_iter', params.IntParam, default=10, label='Number of iterations',
+                      help="TODO", condition="EMfitChoice==2")
+
         # NMMD =================================================================================================
         form.addSection(label='NMMD')
         form.addParam('normalModesChoice', params.BooleanParam, label="Normal Mode Molecular Dynamics",
-                      default=True, important=False, help="TODO")
+                      default=False, important=True, help="TODO")
         form.addParam('n_modes', params.IntParam, default=10, label='Number of normal modes',
                       help="TODO", condition="normalModesChoice")
         form.addParam('global_mass', params.FloatParam, default=1.0, label='Normal modes amplitude mass',
@@ -196,179 +210,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         self._insertFunctionStep("convertInputPDBStep")
         if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
             self._insertFunctionStep("convertInputVolStep")
-        self._insertFunctionStep("createINPStep")
         self._insertFunctionStep("fittingStep")
         self._insertFunctionStep("createOutputStep")
 
-    def createINPStep(self):
-        # CREATE INPUT FILE FOR GENESIS
-        for i in range(self.numberOfFitting):
-            outputPrefix = self._getExtraPath("%s_output" % (str(i+1).zfill(3)))
-
-            s = "\n[INPUT] \n"
-            if self.forcefield.get() == FORCEFIELD_CHARMM:
-                s += "topfile = %s\n" % self.inputRTF.get()
-                s += "parfile = %s\n" % self.inputPRM.get()
-                if self.numberOfInputPDB == 1:
-                    s += "pdbfile = %s\n" % self.inputPDBfn[0]
-                    s += "psffile = %s\n" % self.inputPSFfn[0]
-                else:
-                    s += "pdbfile = %s\n" % self.inputPDBfn[i]
-                    s += "psffile = %s\n" % self.inputPSFfn[i]
-            elif self.forcefield.get() == FORCEFIELD_AAGO\
-                    or self.forcefield.get() == FORCEFIELD_CAGO:
-                if self.numberOfInputPDB == 1:
-                    if len(self.inputGROfn)==0:
-                        s += "pdbfile = %s\n" % self.inputPDBfn[0]
-                    else:
-                        s += "grotopfile = %s\n" % self.inputTOPfn[0]
-                    s += "grocrdfile = %s \n" % self.inputGROfn[0]
-                else:
-                    if len(self.inputGROfn) == 0:
-                        s += "pdbfile = %s\n" % self.inputPDBfn[i]
-                    else:
-                        s += "grotopfile = %s\n" % self.inputTOPfn[i]
-                    s += "grocrdfile = %s \n" % self.inputGROfn[i]
-            if self.restartchoice.get():
-                s += "rstfile = %s\n" % self.inputRST.get()
-
-            s += "\n[OUTPUT] \n"
-            if self.replica_exchange.get():
-                outputPrefix += "_remd{}"
-                s += "remfile = %s.rem\n" %outputPrefix
-                s += "logfile = %s.log\n" %outputPrefix
-            s += "dcdfile = %s.dcd\n" %outputPrefix
-            s += "rstfile = %s.rst\n" %outputPrefix
-            s += "pdbfile = %s.pdb\n" %outputPrefix
-
-            s += "\n[ENERGY] \n"
-            if self.forcefield.get() == FORCEFIELD_CHARMM:
-                s += "forcefield = CHARMM \n"
-            elif self.forcefield.get() == FORCEFIELD_AAGO:
-                s += "forcefield = AAGO  \n"
-            elif self.forcefield.get() == FORCEFIELD_CAGO:
-                s += "forcefield = CAGO  \n"
-            s += "electrostatic = CUTOFF  \n"
-            s += "switchdist   = %.2f \n" % self.switch_dist.get()
-            s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
-            s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
-            s += "vdw_force_switch = YES \n"
-            if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
-                s += "implicit_solvent = GBSA \n"
-                s += "gbsa_eps_solvent = 78.5 \n"
-                s += "gbsa_eps_solute  = 1.0 \n"
-                s += "gbsa_salt_cons   = 0.2 \n"
-                s += "gbsa_surf_tens   = 0.005 \n"
-            else:
-                s += "implicit_solvent = NONE  \n"
-
-            if self.simulationType.get() == SIMULATION_MIN:
-                s += "\n[MINIMIZE]\n"
-                s += "method = SD\n"
-            else:
-                s += "\n[DYNAMICS] \n"
-                if self.integrator.get() == INTEGRATOR_VVERLET:
-                    s += "integrator = VVER  \n"
-                else:
-                    s += "integrator = LEAP  \n"
-                s += "timestep = %f \n" % self.time_step.get()
-            s += "nsteps = %i \n" % self.n_steps.get()
-            s += "eneout_period = %i \n" % self.eneout_period.get()
-            s += "crdout_period = %i \n" % self.crdout_period.get()
-            s += "rstout_period = %i \n" % self.n_steps.get()
-            s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
-
-            s += "\n[CONSTRAINTS] \n"
-            s += "rigid_bond = NO \n"
-
-            s += "\n[ENSEMBLE] \n"
-            s += "ensemble = NVT \n"
-            if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
-                s += "tpcontrol = LANGEVIN  \n"
-            elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
-                s += "tpcontrol = BERENDSEN  \n"
-            else:
-                s += "tpcontrol = NO  \n"
-            s += "temperature = %.2f \n" % self.temperature.get()
-
-            s += "\n[BOUNDARY] \n"
-            s += "type = NOBC  \n"
-
-            if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
-                    and self.simulationType.get() == SIMULATION_MD:
-                s += "\n[SELECTION] \n"
-                s += "group1 = all and not hydrogen\n"
-
-                s += "\n[RESTRAINTS] \n"
-                s += "nfunctions = 1 \n"
-                s += "function1 = EM \n"
-                if self.replica_exchange.get():
-                    s += "constant1 = %s \n" % self.constantKREMD.get()
-                else:
-                    s += "constant1 = %.2f \n" % self.constantK.get()
-                s += "select_index1 = 1 \n"
-
-                s += "\n[EXPERIMENTS] \n"
-                s += "emfit = YES  \n"
-                if self.numberOfInputVol == 1 :
-                    s += "emfit_target = %s \n" % self.inputVolumefn[0]
-                else:
-                    s += "emfit_target = %s \n" % self.inputVolumefn[i]
-                s += "emfit_sigma = %.4f \n" % self.emfit_sigma.get()
-                s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
-                s += "emfit_period = 1  \n"
-
-                if self.replica_exchange.get():
-                    s += "\n[REMD] \n"
-                    s += "dimension = 1 \n"
-                    s += "exchange_period = %i \n" % self.exchange_period.get()
-                    s += "type1 = RESTRAINT \n"
-                    s += "nreplica1 = %i \n" % self.nreplica.get()
-                    s += "rest_function1 = 1 \n"
-
-            with open(self._getExtraPath("%s_INP"% str(i+1).zfill(3)), "w") as f:
-                f.write(s)
-
-    def fittingStep(self):
-        # RUN GENESIS FOR EACH INP FILE
-        for i in range(self.numberOfFitting):
-            outputPrefix = self._getExtraPath("%s_output" % (str(i+1).zfill(3)))
-            with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
-                f.write("export OMP_NUM_THREADS=%i\n"% self.n_threads.get())
-                if (self.n_proc.get() != 1) :
-                    f.write("mpirun -np %s " %self.n_proc.get())
-                f.write("%s/bin/atdyn %s " %
-                        (self.genesisDir.get(),
-                         self._getExtraPath("%s_INP"% str(i+1).zfill(3))))
-                if self.normalModesChoice.get():
-                    f.write("%s/ %i %f %f" % (self.genesisDir.get(),
-                             self.n_modes.get(),
-                             self.global_mass.get(),
-                             self.global_limit.get()))
-                if not self.replica_exchange.get():
-                        f.write(" | tee %s.log"%outputPrefix)
-                f.write("\nexit")
-            self.runJob("chmod", "777 "+self._getExtraPath("launch_genesis.sh"))
-            self.runJob(self._getExtraPath("launch_genesis.sh"), "")
-
-            # COMPUTE CC AND RMSD IF NEEDED
-            numberOfReplicas = self.nreplica.get() \
-                if self.replica_exchange.get() else 1
-
-            if self.EMfitChoice.get()== EMFIT_VOLUMES:
-                for j in range(numberOfReplicas):
-                    if self.replica_exchange.get() :
-                        outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i+1).zfill(3), j+1))
-
-                    # comp CC
-                    self.ccFromLogFile(outputPrefix)
-
-                    # comp RMSD
-                    if self.rmsdChoice.get():
-                        inputPDB = self.inputPDBfn[0] \
-                            if self.numberOfInputPDB == 1 else self.inputPDBfn[i]
-                        self.rmsdFromDCD(outputPrefix, inputPDB)
-
+    ################################################################################
+    ##////////////////////////////////////////////////////////////////////////////##
+    ##                 CONVERT INPUT PDB
+    ##\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\##
+    ################################################################################
 
     def convertInputPDBStep(self):
 
@@ -387,7 +236,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         # COPY INIT PDBs
         self.inputPDBfn = []
         for i in range(self.numberOfInputPDB):
-            newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(3))
+            newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(5))
             self.inputPDBfn.append(newPDB)
             os.system("cp %s %s"%(initFn[i], newPDB))
         self.numberOfFitting = self.numberOfInputPDB
@@ -398,35 +247,164 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             if self.forcefield.get() == FORCEFIELD_CHARMM:
                 self.inputPSFfn = []
                 for i in range(self.numberOfInputPDB):
-                    inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(3))
+                    inputPrefix = self._getExtraPath("%s_inputPDB"%str(i+1).zfill(5))
                     self.generatePSF(self.inputPDBfn[i],inputPrefix)
                     self.inputPSFfn.append(inputPrefix+".psf")
 
             # GROMACS
             elif self.forcefield.get() == FORCEFIELD_AAGO\
                     or self.forcefield.get() == FORCEFIELD_CAGO:
-                self.inputGROfn = []
                 self.inputTOPfn = []
                 for i in range(self.numberOfInputPDB):
-                    inputPrefix = self._getExtraPath("%s_inputPDB" % str(i + 1).zfill(3))
+                    inputPrefix = self._getExtraPath("%s_inputPDB" % str(i + 1).zfill(5))
                     self.generatePSF(self.inputPDBfn[i], inputPrefix)
                     self.generateGROTOP(self.inputPDBfn[i], inputPrefix)
-                    self.inputGROfn.append(inputPrefix+".gro")
                     self.inputTOPfn.append(inputPrefix+".top")
 
         else:
             # CHARMM
             if self.forcefield.get() == FORCEFIELD_CHARMM:
-                self.inputPSFfn = [self.inputPSF.get()]
+                self.inputPSFfn = [self.inputPSF.get() for i in range(self.numberOfInputPDB)]
 
             # GROMACS
             elif self.forcefield.get() == FORCEFIELD_AAGO\
                     or self.forcefield.get() == FORCEFIELD_CAGO:
-                if self.inputGRO.get() == "":
-                    self.inputGROfn = []
-                else:
-                    self.inputGROfn = [self.inputGRO.get()]
-                self.inputTOPfn = [self.inputTOP.get()]
+                self.inputTOPfn = [self.inputTOP.get() for i in range(self.numberOfInputPDB)]
+    def generatePSF(self, inputPDB, outputPrefix):
+
+        fnPSFgen = self._getExtraPath("psfgen.tcl")
+        with open(fnPSFgen, "w") as psfgen:
+            psfgen.write("mol load pdb %s\n" % inputPDB)
+            psfgen.write("\n")
+            psfgen.write("package require psfgen\n")
+            psfgen.write("topology %s\n" % self.inputRTF.get())
+            psfgen.write("pdbalias residue HIS HSE\n")
+            psfgen.write("pdbalias residue MSE MET\n")
+            psfgen.write("pdbalias atom ILE CD1 CD\n")
+            if self.nucleicChoice.get() == NUCLEIC_RNA:
+                psfgen.write("pdbalias residue A ADE\n")
+                psfgen.write("pdbalias residue G GUA\n")
+                psfgen.write("pdbalias residue C CYT\n")
+                psfgen.write("pdbalias residue U URA\n")
+            elif self.nucleicChoice.get() == NUCLEIC_DNA:
+                psfgen.write("pdbalias residue DA ADE\n")
+                psfgen.write("pdbalias residue DG GUA\n")
+                psfgen.write("pdbalias residue DC CYT\n")
+                psfgen.write("pdbalias residue DT THY\n")
+            psfgen.write("\n")
+            if self.nucleicChoice.get() == NUCLEIC_RNA or self.nucleicChoice.get() == NUCLEIC_DNA:
+                psfgen.write("set nucleic [atomselect top nucleic]\n")
+                psfgen.write("set chains [lsort -unique [$nucleic get chain]] ;\n")
+                psfgen.write("foreach chain $chains {\n")
+                psfgen.write("    set seg ${chain}DNA\n")
+                psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
+                psfgen.write("    $sel set segid $seg\n")
+                psfgen.write("    $sel writepdb tmp.pdb\n")
+                psfgen.write("    segment $seg { pdb tmp.pdb }\n")
+                psfgen.write("    coordpdb tmp.pdb\n")
+                if self.nucleicChoice.get() == NUCLEIC_DNA:
+                    psfgen.write("    set resids [lsort -unique [$sel get resid]]\n")
+                    psfgen.write("    foreach r $resids {\n")
+                    psfgen.write("        patch DEOX ${chain}DNA:$r\n")
+                    psfgen.write("    }\n")
+                psfgen.write("}\n")
+                psfgen.write("regenerate angles dihedrals\n")
+                psfgen.write("\n")
+            psfgen.write("set protein [atomselect top protein]\n")
+            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
+            psfgen.write("foreach chain $chains {\n")
+            psfgen.write("    set sel [atomselect top \"pfrag $chain\"]\n")
+            psfgen.write("    $sel writepdb tmp.pdb\n")
+            psfgen.write("    segment U${chain} {pdb tmp.pdb}\n")
+            psfgen.write("    coordpdb tmp.pdb U${chain}\n")
+            psfgen.write("}\n")
+            psfgen.write("rm -f tmp.pdb\n")
+            psfgen.write("\n")
+            psfgen.write("guesscoord\n")
+            psfgen.write("writepdb %s.pdb\n" % outputPrefix)
+            psfgen.write("writepsf %s.psf\n" % outputPrefix)
+            psfgen.write("exit\n")
+        self.runJob("vmd", "-dispdev text -e "+fnPSFgen)
+
+    def generateGROTOP(self,inputPDB, inputPrefix):
+        mol = PDBMol(inputPDB)
+        mol.remove_alter_atom()
+        mol.remove_hydrogens()
+        mol.alias_atom("CD", "CD1", "ILE")
+        mol.alias_atom("OT1", "O")
+        mol.alias_atom("OT2", "OXT")
+        mol.alias_res("HSE", "HIS")
+
+        if self.nucleicChoice.get() == NUCLEIC_RNA:
+            mol.alias_res("CYT", "C")
+            mol.alias_res("GUA", "G")
+            mol.alias_res("ADE", "A")
+            mol.alias_res("URA", "U")
+
+        elif self.nucleicChoice.get() == NUCLEIC_DNA:
+            mol.alias_res("CYT", "DC")
+            mol.alias_res("GUA", "DG")
+            mol.alias_res("ADE", "DA")
+            mol.alias_res("THY", "DT")
+
+        mol.alias_atom("O1'", "O1*")
+        mol.alias_atom("O2'", "O2*")
+        mol.alias_atom("O3'", "O3*")
+        mol.alias_atom("O4'", "O4*")
+        mol.alias_atom("O5'", "O5*")
+        mol.alias_atom("C1'", "C1*")
+        mol.alias_atom("C2'", "C2*")
+        mol.alias_atom("C3'", "C3*")
+        mol.alias_atom("C4'", "C4*")
+        mol.alias_atom("C5'", "C5*")
+        mol.alias_atom("C5M", "C7")
+        mol.add_terminal_res()
+        mol.atom_res_reorder()
+        mol.save(inputPDB)
+
+        # Run Smog2
+        self.runJob("%s/bin/smog2" % self.smog_dir.get(),
+                    "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
+                    (inputPDB, inputPrefix,
+                     "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA"))
+
+        # ADD CHARGE TO FILE
+        grotopFile = inputPrefix + ".top"
+        with open(grotopFile, 'r') as f1:
+            with open(grotopFile+".tmp", 'w') as f2:
+                atom_scope = False
+                write_line = False
+                for line in f1:
+                    if "[" in line and "]" in line:
+                        if "atoms" in line:
+                            atom_scope = True
+                    if atom_scope:
+                        if "[" in line and "]" in line:
+                            if not "atoms" in line:
+                                atom_scope = False
+                                write_line = False
+                        elif not ";" in line and not (not line or line.isspace()):
+                            write_line = True
+                        else:
+                            write_line = False
+                    if write_line:
+                        f2.write("%s\t0.0\n" % line[:-1])
+                    else:
+                        f2.write(line)
+        os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
+
+        # SELECT CA ATOMS IF CAGO MODEL
+        if self.forcefield.get() == FORCEFIELD_CAGO:
+            initPDB = PDBMol(inputPDB)
+            initPDB.allatoms2ca()
+            initPDB.save(inputPDB)
+
+
+    ################################################################################
+    ##////////////////////////////////////////////////////////////////////////////##
+    ##                 CONVERT INPUT VOLUME/IMAGE
+    ##\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\##
+    ################################################################################
 
     def convertInputVolStep(self):
         # SETUP INPUT VOLUMES / IMAGES
@@ -456,33 +434,28 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         if self.numberOfInputPDB != self.numberOfInputVol and \
                 self.numberOfInputVol != 1 and self.numberOfInputPDB != 1:
             raise RuntimeError("Number of input volumes and PDBs must be the same.")
+
+        ##############################################################################
+        # If number of Volume is > to number of PDBs, change the inputPDB files to
+        #   correspond to volumes
         if self.numberOfFitting <self.numberOfInputVol :
             self.numberOfFitting = self.numberOfInputVol
+            self.inputPDBfn = [self.inputPDBfn[0] for i in range(self.numberOfFitting)]
+            if self.forcefield.get() == FORCEFIELD_CHARMM:
+                self.inputPSFfn = [self.inputPSFfn[0] for i in range(self.numberOfFitting)]
+
+            # GROMACS
+            elif self.forcefield.get() == FORCEFIELD_AAGO\
+                    or self.forcefield.get() == FORCEFIELD_CAGO:
+                self.inputTOPfn = [self.inputTOPfn[0] for i in range(self.numberOfFitting)]
+        ##########################################################################
 
         # CONVERT VOLUMES
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(self.numberOfInputVol):
-                volPrefix = self._getExtraPath("%s_inputVol" % str(i+1).zfill(3))
-                fnPDB = self.inputPDBfn[0] if self.numberOfInputPDB == 1 else self.inputPDBfn[i]
-
+                volPrefix = self._getExtraPath("%s_inputVol" % str(i + 1).zfill(5))
                 self.inputVolumefn[i]  = self.convertVol(fnInput=self.inputVolumefn[i],
-                                   volPrefix = volPrefix, fnPDB=fnPDB)
-
-    def createOutputStep(self):
-
-        # CREATE SET OF PDBs
-        pdbset = self._createSetOfPDBs("outputPDBs")
-        numberOfReplicas = self.nreplica.get() \
-            if self.replica_exchange.get() else 1
-
-        for i in range(self.numberOfFitting):
-            outputPrefix = self._getExtraPath("%s_output" % str(i + 1).zfill(3))
-            for j in range(numberOfReplicas):
-                if self.replica_exchange.get():
-                    outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(3), j + 1))
-                pdbset.append(AtomStruct(outputPrefix + ".pdb"))
-
-        self._defineOutputs(outputPDBs=pdbset)
+                                   volPrefix = volPrefix, fnPDB=self.inputPDBfn[i])
 
     def convertVol(self,fnInput,volPrefix, fnPDB):
 
@@ -567,121 +540,278 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         return "%s.sit"%volPrefix
 
-    def generatePSF(self, inputPDB, outputPrefix):
 
-        fnPSFgen = self._getExtraPath("psfgen.tcl")
-        with open(fnPSFgen, "w") as psfgen:
-            psfgen.write("mol load pdb %s\n" % inputPDB)
-            psfgen.write("\n")
-            psfgen.write("package require psfgen\n")
-            psfgen.write("topology %s\n" % self.inputRTF.get())
-            psfgen.write("pdbalias residue HIS HSE\n")
-            psfgen.write("pdbalias residue MSE MET\n")
-            psfgen.write("pdbalias atom ILE CD1 CD\n")
-            psfgen.write("pdbalias residue A ADE\n")
-            psfgen.write("pdbalias residue G GUA\n")
-            psfgen.write("pdbalias residue C CYT\n")
-            psfgen.write("pdbalias residue T THY\n")
-            psfgen.write("pdbalias residue U URA\n")
-            psfgen.write("pdbalias residue DA ADE\n")
-            psfgen.write("pdbalias residue DG GUA\n")
-            psfgen.write("pdbalias residue DC CYT\n")
-            psfgen.write("pdbalias residue DT THY\n")
-            psfgen.write("pdbalias residue DU URA\n")
-            psfgen.write("\n")
-            psfgen.write("set sel [atomselect top nucleic]\n")
-            psfgen.write("set chains [lsort -unique [$sel get chain]] ;\n")
-            psfgen.write("foreach chain $chains {\n")
-            psfgen.write("    set seg ${chain}DNA\n")
-            psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
-            psfgen.write("    $sel set segid $seg\n")
-            psfgen.write("    $sel writepdb tmp.pdb\n")
-            psfgen.write("    segment $seg { pdb tmp.pdb }\n")
-            psfgen.write("    coordpdb tmp.pdb\n")
-            psfgen.write("}\n")
-            psfgen.write("\n")
-            psfgen.write("set protein [atomselect top protein]\n")
-            psfgen.write("puts \"///////////////test///////////////\"\n")
-            psfgen.write("puts $protein\n")
-            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
-            psfgen.write("puts \"///////////////test///////////////\"\n")
-            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
-            psfgen.write("foreach chain $chains {\n")
-            psfgen.write("    set sel [atomselect top \"pfrag $chain\"]\n")
-            psfgen.write("    $sel writepdb tmp.pdb\n")
-            psfgen.write("    segment U${chain} {pdb tmp.pdb}\n")
-            psfgen.write("    coordpdb tmp.pdb U${chain}\n")
-            psfgen.write("}\n")
-            psfgen.write("rm -f tmp.pdb\n")
-            psfgen.write("\n")
-            psfgen.write("guesscoord\n")
-            psfgen.write("writepdb %s.pdb\n" % outputPrefix)
-            psfgen.write("writepsf %s.psf\n" % outputPrefix)
-            psfgen.write("exit\n")
-        self.runJob("vmd", "-dispdev text -e "+fnPSFgen)
+    ################################################################################
+    ##////////////////////////////////////////////////////////////////////////////##
+    ##                 FITTING STEP
+    ##\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\##
+    ################################################################################
 
-    def generateGROTOP(self,inputPDB, inputPrefix):
-        mol = PDBMol(inputPDB)
-        mol.remove_alter_atom()
-        mol.remove_hydrogens()
-        mol.alias_atom("CD", "CD1", "ILE")
-        mol.alias_atom("OT1", "O")
-        mol.alias_atom("OT2", "OXT")
-        mol.alias_res("HSE", "HIS")
-        mol.alias_res("CYT", "C")
-        mol.alias_res("GUA", "G")
-        mol.alias_res("ADE", "A")
-        mol.alias_res("URA", "U")
-        mol.alias_atom("O1'", "O1*")
-        mol.alias_atom("O2'", "O2*")
-        mol.alias_atom("O3'", "O3*")
-        mol.alias_atom("O4'", "O4*")
-        mol.alias_atom("O5'", "O5*")
-        mol.alias_atom("C1'", "C1*")
-        mol.alias_atom("C2'", "C2*")
-        mol.alias_atom("C3'", "C3*")
-        mol.alias_atom("C4'", "C4*")
-        mol.alias_atom("C5'", "C5*")
-        mol.add_terminal_res()
-        mol.atom_res_reorder()
-        mol.save(inputPDB)
+    def fittingStep(self):
+        if self.EMfitChoice.get() != EMFIT_IMAGES:
+            for i in range(self.numberOfFitting):
+                prefix = self._getExtraPath(str(i+1).zfill(5))
 
-        # Run Smog2
-        self.runJob("%s/bin/smog2" % self.smog_dir.get(),
-                    "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
-                    (inputPDB, inputPrefix,
-                     "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA"))
+                # Create INP file
+                self.createINP(prefix=prefix, indexFit = i)
 
-        # ADD CHARGE TO FILE
-        grotopFile = inputPrefix + ".top"
-        with open(grotopFile, 'r') as f1:
-            with open(grotopFile+".tmp", 'w') as f2:
-                atom_scope = False
-                write_line = False
-                for line in f1:
-                    if "[" in line and "]" in line:
-                        if "atoms" in line:
-                            atom_scope = True
-                    if atom_scope:
-                        if "[" in line and "]" in line:
-                            if not "atoms" in line:
-                                atom_scope = False
-                                write_line = False
-                        elif not ";" in line and not (not line or line.isspace()):
-                            write_line = True
-                        else:
-                            write_line = False
-                    if write_line:
-                        f2.write("%s\t0.0\n" % line[:-1])
-                    else:
-                        f2.write(line)
-        os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
+                # run GENESIS
+                self.launchGenesis(prefix=prefix,
+                                   n_proc=self.n_proc.get(), n_threads=self.n_threads.get())
+        else:
+            for i in range(self.numberOfFitting):
+                tmpPrefix = self._getExtraPath("%s_tmp"% str(i + 1).zfill(5))
 
-        # SELECT CA ATOMS IF CAGO MODEL
-        if self.forcefield.get() == FORCEFIELD_CAGO:
-            initPDB = PDBMol(inputPDB)
-            initPDB.allatoms2ca()
-            initPDB.save(inputPDB)
+                # Loop rigidbody align / GENESIS fitting
+                for iterFit in range(self.n_iter.get()):
+                    prefix = self._getExtraPath("%s_iter%i"%(str(i+1).zfill(5), iterFit))
+
+                    #Align PDB
+                    self.alignPDBImg(inputPDB=self.inputPDBfn[i], inputImage=self.inputVolumefn[i],
+                                     outputPDB="%s.pdb"%prefix, tmpPrefix=tmpPrefix)
+                    self.inputPDBfn[i] = "%s.pdb"%prefix
+
+                    # Create INP file
+                    self.createINP(prefix=prefix, indexFit=i)
+
+                    # run GENESIS
+                    self.launchGenesis(prefix=prefix,
+                                       n_proc=self.n_proc.get(), n_threads=self.n_threads.get())
+                    self.inputPDBfn[i] = "%s_output.pdb" % prefix
+
+    def launchGenesis(self, prefix, n_proc, n_threads):
+        with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
+            f.write("export OMP_NUM_THREADS=%i\n" % n_threads)
+            if (n_proc != 1):
+                f.write("mpirun -np %s " % n_proc)
+            f.write("%s/bin/atdyn %s " %
+                    (self.genesisDir.get(),"%s_INP" % prefix))
+            if self.normalModesChoice.get():
+                f.write("%s/ %i %f %f" % (self.genesisDir.get(),
+                                          self.n_modes.get(),
+                                          self.global_mass.get(),
+                                          self.global_limit.get()))
+            if not self.replica_exchange.get():
+                f.write(" | tee %s_output.log" % prefix)
+            f.write("\nexit")
+        self.runJob("chmod", "777 " + self._getExtraPath("launch_genesis.sh"))
+        self.runJob(self._getExtraPath("launch_genesis.sh"), "")
+
+    def createINP(self,prefix, indexFit):
+        # CREATE INPUT FILE FOR GENESIS
+        outputPrefix = "%s_output"%prefix
+        s = "\n[INPUT] \n"
+        s += "pdbfile = %s\n" % self.inputPDBfn[indexFit]
+        if self.forcefield.get() == FORCEFIELD_CHARMM:
+            s += "topfile = %s\n" % self.inputRTF.get()
+            s += "parfile = %s\n" % self.inputPRM.get()
+            s += "psffile = %s\n" % self.inputPSFfn[indexFit]
+        elif self.forcefield.get() == FORCEFIELD_AAGO\
+                or self.forcefield.get() == FORCEFIELD_CAGO:
+            s += "grotopfile = %s\n" % self.inputTOPfn[indexFit]
+        if self.restartchoice.get():
+            s += "rstfile = %s\n" % self.inputRST.get()
+
+        s += "\n[OUTPUT] \n"
+        if self.replica_exchange.get():
+            outputPrefix += "_remd{}"
+            s += "remfile = %s.rem\n" %outputPrefix
+            s += "logfile = %s.log\n" %outputPrefix
+        s += "dcdfile = %s.dcd\n" %outputPrefix
+        s += "rstfile = %s.rst\n" %outputPrefix
+        s += "pdbfile = %s.pdb\n" %outputPrefix
+
+        s += "\n[ENERGY] \n"
+        if self.forcefield.get() == FORCEFIELD_CHARMM:
+            s += "forcefield = CHARMM \n"
+        elif self.forcefield.get() == FORCEFIELD_AAGO:
+            s += "forcefield = AAGO  \n"
+        elif self.forcefield.get() == FORCEFIELD_CAGO:
+            s += "forcefield = CAGO  \n"
+        s += "electrostatic = CUTOFF  \n"
+        s += "switchdist   = %.2f \n" % self.switch_dist.get()
+        s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
+        s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
+        s += "vdw_force_switch = YES \n"
+        if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
+            s += "implicit_solvent = GBSA \n"
+            s += "gbsa_eps_solvent = 78.5 \n"
+            s += "gbsa_eps_solute  = 1.0 \n"
+            s += "gbsa_salt_cons   = 0.2 \n"
+            s += "gbsa_surf_tens   = 0.005 \n"
+        else:
+            s += "implicit_solvent = NONE  \n"
+
+        if self.simulationType.get() == SIMULATION_MIN:
+            s += "\n[MINIMIZE]\n"
+            s += "method = SD\n"
+        else:
+            s += "\n[DYNAMICS] \n"
+            if self.integrator.get() == INTEGRATOR_VVERLET:
+                s += "integrator = VVER  \n"
+            else:
+                s += "integrator = LEAP  \n"
+            s += "timestep = %f \n" % self.time_step.get()
+        s += "nsteps = %i \n" % self.n_steps.get()
+        s += "eneout_period = %i \n" % self.eneout_period.get()
+        s += "crdout_period = %i \n" % self.crdout_period.get()
+        s += "rstout_period = %i \n" % self.n_steps.get()
+        s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
+
+        s += "\n[CONSTRAINTS] \n"
+        s += "rigid_bond = NO \n"
+
+        s += "\n[ENSEMBLE] \n"
+        s += "ensemble = NVT \n"
+        if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+            s += "tpcontrol = LANGEVIN  \n"
+        elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+            s += "tpcontrol = BERENDSEN  \n"
+        else:
+            s += "tpcontrol = NO  \n"
+        s += "temperature = %.2f \n" % self.temperature.get()
+
+        s += "\n[BOUNDARY] \n"
+        s += "type = NOBC  \n"
+
+        if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
+                and self.simulationType.get() == SIMULATION_MD:
+            s += "\n[SELECTION] \n"
+            s += "group1 = all and not hydrogen\n"
+
+            s += "\n[RESTRAINTS] \n"
+            s += "nfunctions = 1 \n"
+            s += "function1 = EM \n"
+            if self.replica_exchange.get():
+                s += "constant1 = %s \n" % self.constantKREMD.get()
+            else:
+                s += "constant1 = %.2f \n" % self.constantK.get()
+            s += "select_index1 = 1 \n"
+
+            s += "\n[EXPERIMENTS] \n"
+            s += "emfit = YES  \n"
+            s += "emfit_sigma = %.4f \n" % self.emfit_sigma.get()
+            s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
+            s += "emfit_period = 1  \n"
+            if self.EMfitChoice.get() == EMFIT_VOLUMES:
+                s += "emfit_target = %s \n" % self.inputVolumefn[indexFit]
+            else:
+                s += "emfit_target = /home/guest/GenesisAlex/AK_close.sit \n"
+
+            if self.EMfitChoice.get()==EMFIT_IMAGES :
+                s += "\n[EXPERIMENTSIMAGE] \n"
+                s += "emfit_mode = Image_Fit  \n"
+                s += "emfit_image_type = MICROSCOPE  \n"
+                s += "emfit_exp_image = %s \n" % self.inputVolumefn[indexFit]
+                s += "emfit_roll_angle = 0.0\n"
+                s += "emfit_tilt_angle = 0.0\n"
+                s += "emfit_yaw_angle =  0.0\n"
+                s += "emfit_image_size =  128\n"
+                s += "emfit_image_out =  TRUE\n"
+                s += "emfit_pixel_size = %f \n" %self.voxel_size.get()
+                s += "\n[CODEOPTIMISER] \n"
+                s += "optimizer_mode = TRUE  \n"
+                s += "gradient_optimizer = 10  \n"
+                s += "image_gen_optimizer = 2  \n"
+                s += "MPI_mode = DISACTIVE  \n"
+                s += "image_size = %i \n" % self.image_size.get()
+                s += "image_out = FALSE \n"
+                s += "emfit_target =  \n"
+
+            if self.replica_exchange.get():
+                s += "\n[REMD] \n"
+                s += "dimension = 1 \n"
+                s += "exchange_period = %i \n" % self.exchange_period.get()
+                s += "type1 = RESTRAINT \n"
+                s += "nreplica1 = %i \n" % self.nreplica.get()
+                s += "rest_function1 = 1 \n"
+
+        with open("%s_INP"% prefix, "w") as f:
+            f.write(s)
+
+
+    def alignPDBImg(self, inputPDB, inputImage, outputPDB, tmpPrefix):
+        cmd = "xmipp_volume_from_pdb"
+        args = "-i %s  -o %s --sampling %f --size 128 128 128"%\
+               (inputPDB, tmpPrefix,self.voxel_size.get())
+        self.runJob(cmd, args)
+
+        cmd = "xmipp_angular_project_library"
+        args = "-i %s.vol -o %s.stk --sampling_rate 5.0 " % (tmpPrefix, tmpPrefix)
+        args +="--sym c1h --compute_neighbors --angular_distance -1 --method real_space "
+        args += "--experimental_images %s"%inputImage
+        self.runJob(cmd, args)
+
+        cmd = "xmipp_angular_projection_matching "
+        args= "-i %s -o %s.xmd --ref %s.stk "%(inputImage, tmpPrefix, tmpPrefix)
+        args +="--Ri 0.0 --Ro 64.0 --max_shift 1000.0 --search5d_shift 5.0 --search5d_step 2.0"
+        self.runJob(cmd, args)
+
+        mdImgs = md.MetaData("%s.xmd"%tmpPrefix)
+        Ts = self.voxel_size.get()
+        for objId in mdImgs:
+            rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))
+            tilt = str(mdImgs.getValue(md.MDL_ANGLE_TILT, objId))
+            psi = str(mdImgs.getValue(md.MDL_ANGLE_PSI, objId))
+
+            shiftx = str(-mdImgs.getValue(md.MDL_SHIFT_X, objId)*Ts)
+            shifty = str(-mdImgs.getValue(md.MDL_SHIFT_Y, objId)*Ts)
+
+            cmd = "xmipp_phantom_transform "
+            args = "-i %s -o %s.pdb --operation rotate_euler %s %s %s" % \
+                   (inputPDB, tmpPrefix, rot, tilt,psi)
+            self.runJob(cmd, args)
+
+
+            cmd = "xmipp_phantom_transform "
+            args = "-i %s.pdb -o %s --operation shift %s %s 0.0" % \
+                   (tmpPrefix, outputPDB, shiftx, shifty)
+            self.runJob(cmd, args)
+
+    ################################################################################
+    ##////////////////////////////////////////////////////////////////////////////##
+    ##                 CREATE OUTPUT STEP
+    ##\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\##
+    ################################################################################
+
+    def createOutputStep(self):
+
+        # COMPUTE CC AND RMSD IF NEEDED
+        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
+            self.generateExtraOutputs()
+
+        # CREATE SET OF PDBs
+        pdbset = self._createSetOfPDBs("outputPDBs")
+        numberOfReplicas = self.nreplica.get() \
+            if self.replica_exchange.get() else 1
+
+        for i in range(self.numberOfFitting):
+            outputPrefix = self._getExtraPath("%s_output" % str(i + 1).zfill(5))
+            for j in range(numberOfReplicas):
+                if self.replica_exchange.get():
+                    outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i + 1).zfill(5), j + 1))
+                pdbset.append(AtomStruct(outputPrefix + ".pdb"))
+
+        self._defineOutputs(outputPDBs=pdbset)
+
+    def generateExtraOutputs(self):
+        # COMPUTE CC AND RMSD IF NEEDED
+        for i in range(self.numberOfFitting):
+            outputPrefix = self._getExtraPath("%s_output" % (str(i + 1).zfill(5)))
+            numberOfReplicas = self.nreplica.get() \
+                if self.replica_exchange.get() else 1
+
+            for j in range(numberOfReplicas):
+                if self.replica_exchange.get() :
+                    outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i+1).zfill(5), j+1))
+
+                # comp CC
+                self.ccFromLogFile(outputPrefix)
+
+                # comp RMSD
+                if self.rmsdChoice.get():
+                    self.rmsdFromDCD(outputPrefix, self.inputPDBfn[i])
+
 
     def rmsdFromDCD(self, outputPrefix, inputPDB):
 
@@ -740,7 +870,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
         # SAVE
         np.savetxt(outputPrefix +"_cc.txt", np.array(cc))
-
 
     # --------------------------- STEPS functions --------------------------------------------
     # --------------------------- INFO functions --------------------------------------------

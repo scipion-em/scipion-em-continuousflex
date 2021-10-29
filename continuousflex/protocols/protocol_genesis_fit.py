@@ -24,6 +24,7 @@
 
 
 import pyworkflow.protocol.params as params
+from numpy.distutils.system_info import tmp
 from pwem.protocols import ProtAnalysis3D
 from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolumes,SetOfParticles
 
@@ -33,6 +34,9 @@ import os
 from skimage.exposure import match_histograms
 from .utilities.pdb_analysis import PDBMol, matchPDBatoms
 import pwem.emlib.metadata as md
+from pwem.utils import runProgram
+from subprocess import Popen
+import xmipp3.convert
 
 EMFIT_NONE = 0
 EMFIT_VOLUMES = 1
@@ -67,21 +71,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
-        # GENERAL =================================================================================================
-        form.addSection(label='General Params')
-        form.addParam('genesisDir', params.FileParam, label="Genesis install path",
-                      help='Path to genesis installation', important=True)
-        form.addParam('n_proc', params.IntParam, default=1, label='Number of processors',
-                      help="TODO")
-        form.addParam('n_threads', params.IntParam, default=1, label='Number of threads',
-                      help="TODO")
 
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
+        form.addParam('genesisDir', params.FileParam, label="Genesis install path",
+                      help='Path to genesis installation', important=True)
         form.addParam('inputPDB', params.PointerParam,
                       pointerClass='AtomStruct, SetOfPDBs, SetOfAtomStructs', label="Input PDB (s)",
-                      help='Select the input PDB or set of PDBs.', important=True)
-        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0, important=True,
+                      help='Select the input PDB or set of PDBs.')
+        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=0,
                       choices=['CHARMM', 'AAGO', 'CAGO'], help="TODo")
         form.addParam('generateTop', params.BooleanParam, label="Generate topology files ?",
                       default=False, help="TODo")
@@ -204,6 +202,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         form.addParam('target_pdb', params.PointerParam,
                       pointerClass='AtomStruct', label="Target PDB", help='TODO', condition="rmsdChoice")
 
+        form.addParallelSection(threads=1, mpi=8)
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
@@ -220,7 +219,6 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     ################################################################################
 
     def convertInputPDBStep(self):
-
         # SETUP INPUT PDBs
         initFn = []
         if isinstance(self.inputPDB.get(), SetOfAtomStructs) or \
@@ -238,7 +236,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         for i in range(self.numberOfInputPDB):
             newPDB = self._getExtraPath("%s_inputPDB.pdb" % str(i + 1).zfill(5))
             self.inputPDBfn.append(newPDB)
-            os.system("cp %s %s"%(initFn[i], newPDB))
+            runProgram("cp","%s %s"%(initFn[i], newPDB))
         self.numberOfFitting = self.numberOfInputPDB
 
         # GENERATE TOPOLOGY FILES
@@ -324,7 +322,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             psfgen.write("writepdb %s.pdb\n" % outputPrefix)
             psfgen.write("writepsf %s.psf\n" % outputPrefix)
             psfgen.write("exit\n")
-        self.runJob("vmd", "-dispdev text -e "+fnPSFgen)
+        runProgram("vmd", "-dispdev text -e "+fnPSFgen)
 
     def generateGROTOP(self,inputPDB, inputPrefix):
         mol = PDBMol(inputPDB)
@@ -363,7 +361,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         mol.save(inputPDB)
 
         # Run Smog2
-        self.runJob("%s/bin/smog2" % self.smog_dir.get(),
+        runProgram("%s/bin/smog2" % self.smog_dir.get(),
                     "-i %s -dname %s -%s -limitbondlength -limitcontactlength" %
                     (inputPDB, inputPrefix,
                      "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA"))
@@ -391,7 +389,8 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         f2.write("%s\t0.0\n" % line[:-1])
                     else:
                         f2.write(line)
-        os.system("cp %s.tmp %s ; rm -f %s.tmp"%(grotopFile,grotopFile,grotopFile))
+        runProgram("cp","%s.tmp %s"%(grotopFile,grotopFile))
+        runProgram("rm","-f %s.tmp"%grotopFile)
 
         # SELECT CA ATOMS IF CAGO MODEL
         if self.forcefield.get() == FORCEFIELD_CAGO:
@@ -462,10 +461,10 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         # CONVERT TO MRC
         pre, ext = os.path.splitext(os.path.basename(fnInput))
         if ext != ".mrc":
-            self.runJob("xmipp_image_convert", "-i %s --oext mrc -o %s.mrc" %
+            runProgram("xmipp_image_convert", "-i %s --oext mrc -o %s.mrc" %
                         (fnInput,volPrefix))
         else:
-            os.system("cp %s %s.mrc" %(fnInput,volPrefix))
+            runProgram("cp","%s %s.mrc" %(fnInput,volPrefix))
 
         # READ INPUT MRC
         with mrcfile.open("%s.mrc" % volPrefix) as input_mrc:
@@ -496,14 +495,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         s +="box_size_z     =  %f \n" % (inputMRCShape[2]*self.voxel_size.get())
         with open("%s_INP_emmap" % fnTmpVol, "w") as f:
             f.write(s)
-        self.runJob("%s/bin/emmap_generator" % self.genesisDir.get(), "%s_INP_emmap" % fnTmpVol)
+        runProgram("%s/bin/emmap_generator" % self.genesisDir.get(), "%s_INP_emmap" % fnTmpVol)
 
         # CONVERT SITUS TMP FILE TO MRC
         with open(self._getExtraPath("runconvert.sh"), "w") as f:
             f.write("#!/bin/bash \n")
             f.write("%s/bin/map2map %s %s <<< \'1\'\n" % (self.situs_dir.get(), fnTmpVol+".sit", fnTmpVol+".mrc"))
             f.write("exit")
-        self.runJob("/bin/bash", self._getExtraPath("runconvert.sh"))
+        os.system("/bin/bash "+self._getExtraPath("runconvert.sh"))
 
         # READ GENERATED MRC
         with mrcfile.open(fnTmpVol+".mrc") as tmp_mrc:
@@ -528,15 +527,15 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write("%s/bin/map2map %s %s <<< \'1\'\n" % (self.situs_dir.get(),
                                                           "%sConv.mrc"%volPrefix, "%s.sit"%volPrefix))
             f.write("exit")
-        self.runJob("/bin/bash", self._getExtraPath("runconvert.sh"))
+        os.system("/bin/bash " + self._getExtraPath("runconvert.sh"))
 
         # CLEANING
-        os.system("rm -f %s.sit"%fnTmpVol)
-        os.system("rm -f %s.mrc"%fnTmpVol)
-        os.system("rm -f %s"%self._getExtraPath("runconvert.sh"))
-        os.system("rm -f %s_INP_emmap" % fnTmpVol)
-        os.system("rm -f %sConv.mrc"%volPrefix)
-        os.system("rm -f %s.mrc" % volPrefix)
+        runProgram("rm","-f %s.sit"%fnTmpVol)
+        runProgram("rm","-f %s.mrc"%fnTmpVol)
+        runProgram("rm","-f %s"%self._getExtraPath("runconvert.sh"))
+        runProgram("rm","-f %s_INP_emmap" % fnTmpVol)
+        runProgram("rm","-f %sConv.mrc"%volPrefix)
+        runProgram("rm","-f %s.mrc" % volPrefix)
 
         return "%s.sit"%volPrefix
 
@@ -548,54 +547,126 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     ################################################################################
 
     def fittingStep(self):
-        if self.EMfitChoice.get() != EMFIT_IMAGES:
-            for i in range(self.numberOfFitting):
-                prefix = self._getExtraPath(str(i+1).zfill(5))
-
-                # Create INP file
-                self.createINP(prefix=prefix, indexFit = i)
-
-                # run GENESIS
-                self.launchGenesis(prefix=prefix,
-                                   n_proc=self.n_proc.get(), n_threads=self.n_threads.get())
+        # SETUP parallel computation
+        if self.numberOfFitting <= self.numberOfMpi.get():
+            numberOfMpiPerFit =self.numberOfMpi.get()//self.numberOfFitting
+            numberOfLinearFit = 1
+            numberOfParallelFit = self.numberOfFitting
+            lastIter=0
         else:
-            for i in range(self.numberOfFitting):
-                tmpPrefix = self._getExtraPath("%s_tmp"% str(i + 1).zfill(5))
+            numberOfMpiPerFit = 1
+            numberOfLinearFit = self.numberOfFitting//self.numberOfMpi.get()
+            numberOfParallelFit = self.numberOfMpi.get()
+            lastIter = self.numberOfFitting % self.numberOfMpi.get()
+
+        # RUN PARALLEL FITTING
+        if self.EMfitChoice.get() != EMFIT_IMAGES:
+            for i1 in range(numberOfLinearFit+1):
+                cmds= []
+                n_parallel = numberOfParallelFit if i1<numberOfLinearFit else lastIter
+                for i2 in range(n_parallel):
+                    indexFit = i2 + i1*numberOfParallelFit
+                    prefix = self._getExtraPath(str(indexFit + 1).zfill(5))
+
+                    # Create INP file
+                    self.createINP(prefix=prefix, indexFit=indexFit)
+
+                    # Create Genesis command
+                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
+
+                # Run Genesis
+                self.runParallelJobs(cmds, n_threads=self.numberOfThreads.get())
+
+
+        # RUN PARALLEL FITTING FOR IMAGES
+        else:
+            for i1 in range(numberOfLinearFit + 1):
+                n_parallel = numberOfParallelFit if i1 < numberOfLinearFit else lastIter
 
                 # Loop rigidbody align / GENESIS fitting
                 for iterFit in range(self.n_iter.get()):
-                    prefix = self._getExtraPath("%s_iter%i"%(str(i+1).zfill(5), iterFit))
 
-                    #Align PDB
-                    self.alignPDBImg(inputPDB=self.inputPDBfn[i], inputImage=self.inputVolumefn[i],
-                                     outputPDB="%s.pdb"%prefix, tmpPrefix=tmpPrefix)
-                    self.inputPDBfn[i] = "%s.pdb"%prefix
+                    # Align PDB
+                    cmds_pdb2vol = []
+                    cmds_projectVol = []
+                    cmds_projectMatch = []
+                    for i2 in range(n_parallel):
+                        indexFit = i2 + i1 * numberOfParallelFit
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
+                        inputPDB = self.inputPDBfn[indexFit]
+                        inputImage = self.inputVolumefn[indexFit]
 
-                    # Create INP file
-                    self.createINP(prefix=prefix, indexFit=i)
+                        # get commands
+                        cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, tmpPrefix=tmpPrefix))
+                        cmds_projectVol.append(self.projectVol(inputImage=inputImage, tmpPrefix=tmpPrefix))
+                        cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, tmpPrefix=tmpPrefix))
+
+                    # run parallel jobs
+                    self.runParallelJobs(cmds_pdb2vol, n_threads=self.numberOfThreads)
+                    self.runParallelJobs(cmds_projectVol, n_threads=self.numberOfThreads)
+                    self.runParallelJobs(cmds_projectMatch, n_threads=self.numberOfThreads)
+
+                    # Apply alignement
+                    for i2 in range(n_parallel):
+                        indexFit = i2 + i1 * numberOfParallelFit
+                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
+                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
+
+                        self.applyTransform2PDB(inputPDB=self.inputPDBfn[indexFit],
+                            outputPDB="%s.pdb" % prefix, tmpPrefix=tmpPrefix)
+                        self.inputPDBfn[indexFit] = "%s.pdb" % prefix
 
                     # run GENESIS
-                    self.launchGenesis(prefix=prefix,
-                                       n_proc=self.n_proc.get(), n_threads=self.n_threads.get())
-                    self.inputPDBfn[i] = "%s_output.pdb" % prefix
+                    cmds = []
+                    for i2 in range(n_parallel):
+                        indexFit = i2 + i1 * numberOfParallelFit
+                        prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
 
-    def launchGenesis(self, prefix, n_proc, n_threads):
-        with open(self._getExtraPath("launch_genesis.sh"), "w") as f:
-            f.write("export OMP_NUM_THREADS=%i\n" % n_threads)
-            if (n_proc != 1):
-                f.write("mpirun -np %s " % n_proc)
-            f.write("%s/bin/atdyn %s " %
-                    (self.genesisDir.get(),"%s_INP" % prefix))
-            if self.normalModesChoice.get():
-                f.write("%s/ %i %f %f" % (self.genesisDir.get(),
-                                          self.n_modes.get(),
-                                          self.global_mass.get(),
-                                          self.global_limit.get()))
-            if not self.replica_exchange.get():
-                f.write(" | tee %s_output.log" % prefix)
-            f.write("\nexit")
-        self.runJob("chmod", "777 " + self._getExtraPath("launch_genesis.sh"))
-        self.runJob(self._getExtraPath("launch_genesis.sh"), "")
+                        # Create INP file
+                        self.createINP(prefix=prefix, indexFit=indexFit)
+
+                        # run GENESIS
+                        cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
+
+                        self.inputPDBfn[indexFit] = "%s_output.pdb" % prefix
+
+                    self.runParallelJobs(cmds, n_threads=self.numberOfThreads.get())
+
+                for i2 in range(n_parallel):
+                    indexFit = i2 + i1 * numberOfParallelFit
+                    runProgram("cp","%s %s" % (self.inputPDBfn[indexFit],
+                                            self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))))
+
+    def runParallelJobs(self, cmds, n_threads):
+
+        # Set env
+        env = os.environ.copy()
+        env["OMP_NUM_THREADS"] = str(n_threads)
+
+        # run process
+        processes = []
+        for cmd in cmds:
+            print("Running command : %s" %cmd)
+            processes.append(Popen(cmd, shell=True, env=env))
+
+        # Wait for processes
+        for p in processes:
+            exitcode = p.wait()
+            print("Process done %s" %str(exitcode))
+            if exitcode != 0:
+                raise RuntimeError("Process failed, check .log file ")
+
+    def getGenesisCmd(self, prefix,n_mpi):
+        cmd=""
+        if (n_mpi != 1):
+            cmd += "mpirun -np %s " % n_mpi
+        cmd +=  "%s/bin/atdyn %s " % (self.genesisDir.get(),"%s_INP" % prefix)
+        if self.normalModesChoice.get():
+            cmd += "%s/ %i %f %f" % (self.genesisDir.get(), self.n_modes.get(),
+                                      self.global_mass.get(), self.global_limit.get())
+        cmd += " > %s_output.log" % prefix
+        return cmd
 
     def createINP(self,prefix, indexFit):
         # CREATE INPUT FILE FOR GENESIS
@@ -715,8 +786,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                 s += "image_gen_optimizer = 2  \n"
                 s += "MPI_mode = DISACTIVE  \n"
                 s += "image_size = %i \n" % self.image_size.get()
-                s += "image_out = FALSE \n"
-                s += "emfit_target =  \n"
+                s += "image_out = TRUE \n"
 
             if self.replica_exchange.get():
                 s += "\n[REMD] \n"
@@ -730,22 +800,26 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write(s)
 
 
-    def alignPDBImg(self, inputPDB, inputImage, outputPDB, tmpPrefix):
+    def pdb2vol(self, inputPDB, tmpPrefix):
         cmd = "xmipp_volume_from_pdb"
         args = "-i %s  -o %s --sampling %f --size 128 128 128"%\
                (inputPDB, tmpPrefix,self.voxel_size.get())
-        self.runJob(cmd, args)
+        return cmd+ " "+ args
 
+    def projectVol(self, inputImage, tmpPrefix):
         cmd = "xmipp_angular_project_library"
         args = "-i %s.vol -o %s.stk --sampling_rate 5.0 " % (tmpPrefix, tmpPrefix)
         args +="--sym c1h --compute_neighbors --angular_distance -1 --method real_space "
         args += "--experimental_images %s"%inputImage
-        self.runJob(cmd, args)
+        return cmd+ " "+ args
 
+    def projectMatch(self, inputImage, tmpPrefix):
         cmd = "xmipp_angular_projection_matching "
         args= "-i %s -o %s.xmd --ref %s.stk "%(inputImage, tmpPrefix, tmpPrefix)
         args +="--Ri 0.0 --Ro 64.0 --max_shift 1000.0 --search5d_shift 5.0 --search5d_step 2.0"
-        self.runJob(cmd, args)
+        return cmd + " "+ args
+
+    def applyTransform2PDB(self, inputPDB, outputPDB, tmpPrefix):
 
         mdImgs = md.MetaData("%s.xmd"%tmpPrefix)
         Ts = self.voxel_size.get()
@@ -760,13 +834,12 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             cmd = "xmipp_phantom_transform "
             args = "-i %s -o %s.pdb --operation rotate_euler %s %s %s" % \
                    (inputPDB, tmpPrefix, rot, tilt,psi)
-            self.runJob(cmd, args)
-
+            runProgram(cmd, args)
 
             cmd = "xmipp_phantom_transform "
             args = "-i %s.pdb -o %s --operation shift %s %s 0.0" % \
                    (tmpPrefix, outputPDB, shiftx, shifty)
-            self.runJob(cmd, args)
+            runProgram(cmd, args)
 
     ################################################################################
     ##////////////////////////////////////////////////////////////////////////////##
@@ -777,7 +850,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
     def createOutputStep(self):
 
         # COMPUTE CC AND RMSD IF NEEDED
-        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES:
+        if self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES :
             self.generateExtraOutputs()
 
         # CREATE SET OF PDBs
@@ -796,23 +869,39 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
     def generateExtraOutputs(self):
         # COMPUTE CC AND RMSD IF NEEDED
+        print("//////////////////////1")
         for i in range(self.numberOfFitting):
+            print("//////////////////////2")
             outputPrefix = self._getExtraPath("%s_output" % (str(i + 1).zfill(5)))
             numberOfReplicas = self.nreplica.get() \
                 if self.replica_exchange.get() else 1
-
+            print("//////////////////////3")
+            numberOfIterImg = self.n_iter.get() if self.EMfitChoice.get() == EMFIT_IMAGES else 1
+            print("//////////////////////4")
             for j in range(numberOfReplicas):
-                if self.replica_exchange.get() :
-                    outputPrefix = self._getExtraPath("%s_output_remd%i" % (str(i+1).zfill(5), j+1))
+                for k in range(numberOfIterImg):
+                    print("//////////////////////5")
+                    if self.EMfitChoice.get() == EMFIT_IMAGES:
+                        outputPrefix = self._getExtraPath("%s_iter%i_output" % (str(i + 1).zfill(5), k))
+                    if self.replica_exchange.get() :
+                        outputPrefix += "_remd%i" % (j+1)
 
-                # comp CC
-                self.ccFromLogFile(outputPrefix)
+                    print("//////////////////////6")
 
-                # comp RMSD
-                if self.rmsdChoice.get():
-                    self.rmsdFromDCD(outputPrefix, self.inputPDBfn[i])
+                    # comp CC
+                    cc = self.ccFromLogFile(outputPrefix)
+                    np.savetxt(outputPrefix + "_cc.txt", cc)
 
+                    print("//////////////////////7")
 
+                    # comp RMSD
+                    if self.rmsdChoice.get():
+                        inputPDB = self.inputPDBfn[i] if self.EMfitChoice.get() == EMFIT_IMAGES \
+                            else self._getExtraPath("%s_iter%i.pdb" % (str(i + 1).zfill(5), k))
+                        rmsd = self.rmsdFromDCD(outputPrefix, inputPDB)
+                        np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
+
+                    print("//////////////////////8")
     def rmsdFromDCD(self, outputPrefix, inputPDB):
 
         # EXTRACT PDBs from dcd file
@@ -825,7 +914,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             s += "}\n"
             s += "exit\n"
             f.write(s)
-        os.system("vmd -dispdev text -e %s_dcd2pdb.tcl > /dev/null" % outputPrefix)
+        runProgram("vmd"," -dispdev text -e %s_dcd2pdb.tcl > /dev/null" % outputPrefix)
 
         # DEF RMSD
         def RMSD(c1, c2):
@@ -838,17 +927,14 @@ class FlexProtGenesisFit(ProtAnalysis3D):
         targetPDB = PDBMol(self.target_pdb.get().getFileName())
 
         idx = matchPDBatoms([initPDB, targetPDB], ca_only=True)
-        if len(idx) > 0:
-            rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
-            for i in range(N):
-                mol = PDBMol(outputPrefix + "tmp" + str(i + 1) + ".pdb")
-                rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
-        else:
-            rmsd = np.zeros(N + 1)
+        rmsd.append(RMSD(initPDB.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
+        for i in range(N):
+            mol = PDBMol(outputPrefix + "tmp" + str(i + 1) + ".pdb")
+            rmsd.append(RMSD(mol.coords[idx[:, 0]], targetPDB.coords[idx[:, 1]]))
 
         # CLEAN TMP FILES AND SAVE
-        os.system("rm -f %stmp*" % (outputPrefix))
-        np.savetxt(outputPrefix + "_rmsd.txt", rmsd)
+        runProgram("rm","-f %stmp*" % (outputPrefix))
+        return rmsd
 
     def ccFromLogFile(self,outputPrefix):
         # READ CC IN GENESIS LOG FILE
@@ -868,8 +954,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         if len(splitline) == len(header):
                             cc.append(float(splitline[cc_idx]))
 
-        # SAVE
-        np.savetxt(outputPrefix +"_cc.txt", np.array(cc))
+        return cc
 
     # --------------------------- STEPS functions --------------------------------------------
     # --------------------------- INFO functions --------------------------------------------

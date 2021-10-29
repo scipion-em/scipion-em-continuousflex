@@ -598,9 +598,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         inputImage = self.inputVolumefn[indexFit]
 
                         # get commands
-                        cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, tmpPrefix=tmpPrefix))
-                        cmds_projectVol.append(self.projectVol(inputImage=inputImage, tmpPrefix=tmpPrefix))
-                        cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, tmpPrefix=tmpPrefix))
+                        cmds_pdb2vol.append(self.pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix))
+                        cmds_projectVol.append(self.projectVol(inputImage=inputImage, inputVol=tmpPrefix, outputProj=tmpPrefix))
+                        cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, inputProj=tmpPrefix, outputMeta=prefix))
 
                     # run parallel jobs
                     self.runParallelJobs(cmds_pdb2vol, n_threads=self.numberOfThreads)
@@ -614,7 +614,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         prefix = self._getExtraPath("%s_iter%i" % (str(indexFit + 1).zfill(5), iterFit))
 
                         self.applyTransform2PDB(inputPDB=self.inputPDBfn[indexFit],
-                            outputPDB="%s.pdb" % prefix, tmpPrefix=tmpPrefix)
+                            outputPDB="%s.pdb" % prefix, tmpPrefix=tmpPrefix, inputMeta=prefix)
                         self.inputPDBfn[indexFit] = "%s.pdb" % prefix
 
                     # run GENESIS
@@ -800,28 +800,28 @@ class FlexProtGenesisFit(ProtAnalysis3D):
             f.write(s)
 
 
-    def pdb2vol(self, inputPDB, tmpPrefix):
+    def pdb2vol(self, inputPDB, outputVol):
         cmd = "xmipp_volume_from_pdb"
         args = "-i %s  -o %s --sampling %f --size 128 128 128"%\
-               (inputPDB, tmpPrefix,self.voxel_size.get())
+               (inputPDB, outputVol,self.voxel_size.get())
         return cmd+ " "+ args
 
-    def projectVol(self, inputImage, tmpPrefix):
+    def projectVol(self, inputImage, inputVol, outputProj):
         cmd = "xmipp_angular_project_library"
-        args = "-i %s.vol -o %s.stk --sampling_rate 5.0 " % (tmpPrefix, tmpPrefix)
+        args = "-i %s.vol -o %s.stk --sampling_rate 5.0 " % (inputVol, outputProj)
         args +="--sym c1h --compute_neighbors --angular_distance -1 --method real_space "
         args += "--experimental_images %s"%inputImage
         return cmd+ " "+ args
 
-    def projectMatch(self, inputImage, tmpPrefix):
+    def projectMatch(self, inputImage, inputProj, outputMeta):
         cmd = "xmipp_angular_projection_matching "
-        args= "-i %s -o %s.xmd --ref %s.stk "%(inputImage, tmpPrefix, tmpPrefix)
+        args= "-i %s -o %s.xmd --ref %s.stk "%(inputImage, outputMeta, inputProj)
         args +="--Ri 0.0 --Ro 64.0 --max_shift 1000.0 --search5d_shift 5.0 --search5d_step 2.0"
         return cmd + " "+ args
 
-    def applyTransform2PDB(self, inputPDB, outputPDB, tmpPrefix):
+    def applyTransform2PDB(self, inputPDB, outputPDB, inputMeta, tmpPrefix):
 
-        mdImgs = md.MetaData("%s.xmd"%tmpPrefix)
+        mdImgs = md.MetaData("%s.xmd"%inputMeta)
         Ts = self.voxel_size.get()
         for objId in mdImgs:
             rot = str(mdImgs.getValue(md.MDL_ANGLE_ROT, objId))

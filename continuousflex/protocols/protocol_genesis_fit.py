@@ -36,6 +36,7 @@ from .utilities.pdb_analysis import PDBMol, matchPDBatoms
 import pwem.emlib.metadata as md
 from pwem.utils import runProgram
 from subprocess import Popen
+from xmippLib import Euler_angles2matrix
 import xmipp3.convert
 
 EMFIT_NONE = 0
@@ -575,7 +576,7 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                     cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
 
                 # Run Genesis
-                self.runParallelJobs(cmds, n_threads=self.numberOfThreads.get())
+                self.runParallelJobs(cmds)
 
 
         # RUN PARALLEL FITTING FOR IMAGES
@@ -603,9 +604,9 @@ class FlexProtGenesisFit(ProtAnalysis3D):
                         cmds_projectMatch.append(self.projectMatch(inputImage= inputImage, inputProj=tmpPrefix, outputMeta=prefix))
 
                     # run parallel jobs
-                    self.runParallelJobs(cmds_pdb2vol, n_threads=self.numberOfThreads)
-                    self.runParallelJobs(cmds_projectVol, n_threads=self.numberOfThreads)
-                    self.runParallelJobs(cmds_projectMatch, n_threads=self.numberOfThreads)
+                    self.runParallelJobs(cmds_pdb2vol)
+                    self.runParallelJobs(cmds_projectVol)
+                    self.runParallelJobs(cmds_projectMatch)
 
                     # Apply alignement
                     for i2 in range(n_parallel):
@@ -628,21 +629,32 @@ class FlexProtGenesisFit(ProtAnalysis3D):
 
                         # run GENESIS
                         cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numberOfMpiPerFit))
-
                         self.inputPDBfn[indexFit] = "%s_output.pdb" % prefix
 
-                    self.runParallelJobs(cmds, n_threads=self.numberOfThreads.get())
+                    self.runParallelJobs(cmds)
 
+                # Apply rigid body inverse to output PDBs
                 for i2 in range(n_parallel):
                     indexFit = i2 + i1 * numberOfParallelFit
-                    runProgram("cp","%s %s" % (self.inputPDBfn[indexFit],
-                                            self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5))))
+                    mol = PDBMol(self.inputPDBfn[indexFit])
+                    for iterFit in range(self.n_iter.get()):
+                        mdImg = md.MetaData(self._getExtraPath("%s_iter%i.xmd" % (str(indexFit + 1).zfill(5), iterFit)))
+                        for objId in mdImg:
+                            rot = mdImg.getValue(md.MDL_ANGLE_ROT, objId)
+                            tilt = mdImg.getValue(md.MDL_ANGLE_TILT, objId)
+                            psi = mdImg.getValue(md.MDL_ANGLE_PSI, objId)
+                            shiftx = -mdImg.getValue(md.MDL_SHIFT_X, objId)
+                            shifty = -mdImg.getValue(md.MDL_SHIFT_Y, objId)
+                        mol.coords -= np.array([shiftx, shifty, 0.0])
+                        inv_m = np.linalg.inv(Euler_angles2matrix(rot, tilt, psi))
+                        mol.coords = np.dot(inv_m, mol.coords.T).T
+                    mol.save(self._getExtraPath("%s_output.pdb" % str(indexFit + 1).zfill(5)))
 
-    def runParallelJobs(self, cmds, n_threads):
+    def runParallelJobs(self, cmds):
 
         # Set env
         env = os.environ.copy()
-        env["OMP_NUM_THREADS"] = str(n_threads)
+        env["OMP_NUM_THREADS"] = str(self.numberOfThreads)
 
         # run process
         processes = []

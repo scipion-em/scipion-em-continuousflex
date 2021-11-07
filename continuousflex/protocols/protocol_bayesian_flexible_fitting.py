@@ -31,12 +31,12 @@ from pwem.objects.data import AtomStruct, SetOfVolumes, Volume
 
 import sys
 import os
-sys.path.append('/home/guest/PycharmProjects/bayesian-md-nma')
-import src.molecule
-import src.density
-import src.functions
-from src.viewers import chimera_fit_viewer, chimera_molecule_viewer
-from src.flexible_fitting import FlexibleFitting, multiple_fitting
+# sys.path.append('/home/guest/PycharmProjects/bayesian-md-nma')
+# import src.molecule
+# import src.density
+# import src.functions
+# from src.viewers import chimera_fit_viewer, chimera_molecule_viewer
+# from src.flexible_fitting import FlexibleFitting, multiple_fitting
 import numpy as np
 
 ATOMICMODEL_CARBONALPHA=0

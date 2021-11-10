@@ -1,7 +1,7 @@
 # **************************************************************************
 # *
 # * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
-# *             Rémi Vuillemot             (remi.vuillemot@upmc.fr)
+# *             Rémi Vuillemot               (remi.vuillemot@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 # *
 # **************************************************************************
 
-from os.path import basename
+from os.path import basename, exists
 import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
@@ -32,7 +32,7 @@ from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix
 import pwem as em
 import pwem.emlib.metadata as md
 from xmipp3 import XmippMdRow
-from pyworkflow.utils.path import copyFile, cleanPath
+from pyworkflow.utils.path import copyFile, cleanPath, makePath
 import pyworkflow.protocol.params as params
 from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
@@ -40,7 +40,6 @@ from pwem.convert.atom_struct import cifToPdb
 from pyworkflow.utils import replaceBaseExt
 from pwem.utils import runProgram
 from pwem import Domain
-
 
 
 class FlexProtNMOF(ProtAnalysis3D):
@@ -55,7 +54,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         group = form.addGroup('Input normal modes',
                                condition='NMA')
         group.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
-                      label="Normal modes",
+                      label="Normal modes", allowsNull=True,
                       help='Set of modes computed by normal mode analysis.')
         group.addParam('modeList', NumericRangeParam,
                       label="Modes selection (optional)",
@@ -69,125 +68,83 @@ class FlexProtNMOF(ProtAnalysis3D):
         group = form.addGroup('Input PDB (using optical flow fitting only)',
                               condition='NMA is False')
         group.addParam('pdb', params.PointerParam, label='input (pseudo)atomic structure',
-                       pointerClass='AtomStruct',
+                       pointerClass='AtomStruct', allowsNull=True,
                        help='The input structure can be an atomic model '
                             '(true PDB) or a pseudoatomic model\n'
-                            '(an EM volume converted into pseudoatoms)'
-                       )
+                            '(an EM volume converted into pseudoatoms)')
         form.addParam('inputVolumes', params.PointerParam,
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select a volume or a set of volumes that will be fitted using the method')
-        form.addParam('iterations', params.IntParam,
+        form.addParam('iterations', params.IntParam, default=1,
                       label='number of iterations',
                       help = 'To do')
         form.addParam('do_rigidbody', params.BooleanParam, default=True,
-                      label='Perform rigid-body alignment on the volume(s)?'
-                      )
+                      label='Perform rigid-body alignment on the volume(s)?')
+        group = form.addGroup('rigid-body alignment settings (Fast rotational matching)',
+                              condition='do_rigidbody')
+        group.addParam('frm_freq', params.FloatParam, default=0.25,
+                      label='Maximum cross correlation frequency',
+                      help='The normalized frequency should be between 0 and 0.5 '
+                           'The more it is, the bigger the search frequency is, the more time it demands, '
+                           'keeping it as default is recommended.')
+        group.addParam('frm_maxshift', params.IntParam, default=10,
+                      label='Maximum shift for rigid body alignment (in pixels)',
+                      help='The maximum shift is a number between 1 and half the size of your volume. '
+                           'It represents the maximum distance searched in x,y and z directions. Keep as default'
+                           ' if your target is near the center in your subtomograms')
 
-        # form.addParam('copyDeformations', params.PathParam,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='Precomputed results (for developmemt)',
-        #               help='Enter a metadata file with precomputed elastic  \n'
-        #                    'and rigid-body alignment parameters to perform \n'
-        #                    'remaining steps using this file.')
-        # form.addSection(label='Missing-wedge Compensation')
-        # form.addParam('WedgeMode', params.EnumParam,
-        #               choices=['Do not compensate', 'Compensate'],
-        #               default=WEDGE_MASK_THRE,
-        #               label='Wedge mode', display=params.EnumParam.DISPLAY_COMBO,
-        #               help='Choose to compensate for the missing wedge if the data is subtomograms.'
-        #                    ' However, if you correct the missing wedge in advance, then choose not to compensate.'
-        #                    ' You can also choose not to compensate if your data is not subtomograms but EM-maps.'
-        #                    ' The missing wedge is assumed to be in the Y-axis direction.')
-        # form.addParam('tiltLow', params.IntParam, default=-60,
-        #               # expertLevel=params.LEVEL_ADVANCED,
-        #               condition='WedgeMode==%d' % WEDGE_MASK_THRE,
-        #               label='Lower tilt value',
-        #               help='The lower tilt angle used in obtaining the tilt series')
-        # form.addParam('tiltHigh', params.IntParam, default=60,
-        #               # expertLevel=params.LEVEL_ADVANCED,
-        #               condition='WedgeMode==%d' % WEDGE_MASK_THRE,
-        #               label='Upper tilt value',
-        #               help='The upper tilt angle used in obtaining the tilt series')
-        #
-        # form.addSection(label='Combined elastic and rigid-body alignment')
-        # form.addParam('trustRegionScale', params.FloatParam, default=1.0,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='Elastic alignment trust region scale ',
-        #               help='For elastic alignment, this parameter scales the initial '
-        #                    'value of the trust region radius of CONDOR optimization. '
-        #                    'The default value of 1 works in majority of cases. \n'
-        #                    'This value should not be changed except by expert users. '
-        #                    'Larger values (e.g., between 1 and 2) can be tried '
-        #                    'for larger expected amplitudes of conformational change.')
-        # form.addParam('rhoStartBase', params.FloatParam, default=250.0,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter rhoStartBase',
-        #               help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
-        #                    ' yet the slower')
-        # form.addParam('rhoEndBase', params.FloatParam, default=50.0,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter rhoEndBase ',
-        #               help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
-        #                    'however it is better to keep it < 1000 if set very high we risk distortions')
-        # form.addParam('niter', params.IntParam, default=10000,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter niter',
-        #               help='niter should be big enough to guarantee that the search converges to the '
-        #                    'right set of nma deformation amplitudes')
-        # form.addParam('frm_freq', params.FloatParam, default=0.25,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='Maximum cross correlation frequency',
-        #               help='The normalized frequency should be between 0 and 0.5 '
-        #                    'The more it is, the bigger the search frequency is, the more time it demands, '
-        #                    'keeping it as default is recommended.')
-        # form.addParam('frm_maxshift', params.IntParam, default=10,
-        #               expertlevel=params.LEVEL_ADVANCED,
-        #               label='Maximum shift for rigid body alignment (in pixels)',
-        #               help='The maximum shift is a number between 1 and half the size of your volume. '
-        #                    'It represents the maximum distance searched in x,y and z directions. Keep as default'
-        #                    ' if your target is near the center in your subtomograms')
-        # form.addParallelSection(threads=0, mpi=5)
+        form.addParallelSection(threads=0, mpi=5)
 
     # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
-        pass
-        # atomsFn = self.getInputPdb().getFileName()
-        # # Define some outputs filenames
-        # self.imgsFn = self._getExtraPath('volumes.xmd')
-        # self.imgsFn_backup = self._getExtraPath('volumes_backup.xmd')
-        # self.modesFn = self._getExtraPath('modes.xmd')
-        # self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
-        # if self.structureEM:
-        #     self.atomsFn = self._getExtraPath(basename(atomsFn))
-        #     copyFile(atomsFn, self.atomsFn)
-        # else:
-        #     pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
-        #     self.atomsFn = self._getExtraPath(basename(pdb_name))
-        #     copyFile(pdb_name, self.atomsFn)
-        #
-        # self._insertFunctionStep('convertInputStep', atomsFn)
-        #
-        # if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
-        #     self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
-        # else:
-        #     self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
-        #
-        # self._insertFunctionStep('createOutputStep')
+        # Define some outputs filenames
+        self.imgsFn = self._getExtraPath('volumes.xmd')
+        self.imgsFn_backup = self._getExtraPath('volumes_backup.xmd')
+        self.modesFn = self._getExtraPath('modes.xmd')
+        # Copy the input PDB to self.atomsFn
+        if(self.NMA.get()):
+            atomsFn = self.getInputPdb().getFileName()
+            self.structureEM = self.inputModes.get().getPdb().getPseudoAtoms()
+            if self.structureEM:
+                self.atomsFn = self._getExtraPath(basename(atomsFn))
+                copyFile(atomsFn, self.atomsFn)
+            else:
+                pdb_name = os.path.dirname(self.inputModes.get().getFileName()) + '/atoms.pdb'
+                self.atomsFn = self._getExtraPath(basename(pdb_name))
+                copyFile(pdb_name, self.atomsFn)
+        else:
+            atomsFn = self.pdb.get().getFileName()
+            self.atomsFn = self._getExtraPath(basename(atomsFn))
+            copyFile(atomsFn, self.atomsFn)
+
+        # Write a metadata file input volumes and maybe modes
+        self._insertFunctionStep('convertInputStep')
+
+        # Align volumes if needed
+        if(self.do_rigidbody):
+            self._insertFunctionStep('alignInputVolumes')
+
+        self._insertFunctionStep("performNMOF")
+        self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
-    def convertInputStep(self, atomsFn):
-        # Write the modes metadata taking into account the selection
-        self.writeModesMetaData()
-        # Write a metadata with the normal modes information
-        # to launch the nma alignment programs
-        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
-        writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn_backup)
-        # Copy the atoms file to current working dir
-        # copyFile(atomsFn, self.atomsFn)
+    def convertInputStep(self):
+        if(self.NMA.get()):
+            # Write the modes metadata taking into account the selection
+            self.writeSelectedModesMetaData()
+        # Write metadata file with input volumes
+        try:
+            # If we have a set of volumes
+            writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
+        except:
+            # If one volume
+            mdF = md.MetaData()
+            mdF.setValue(md.MDL_IMAGE, self.inputVolumes.get().getFileName(), mdF.addObject())
+            mdF.write(self.imgsFn)
 
-    def writeModesMetaData(self):
+
+    def writeSelectedModesMetaData(self):
         """ Iterate over the input SetOfNormalModes and write
         the proper Xmipp metadata.
         Take into account a possible selection of modes
@@ -209,19 +166,69 @@ class FlexProtNMOF(ProtAnalysis3D):
                 row.writeToMd(mdModes, mdModes.addObject())
         mdModes.write(self.modesFn)
 
-    def performNmaStep(self, atomsFn, modesFn):
+    def alignInputVolumes(self):
+        # Generate a volume from the input PDB:
+        atomFn = self.atomsFn
+        reference = self._getExtraPath('ref')
         sampling = self.inputVolumes.get().getSamplingRate()
-        # trustRegionScale = self.trustRegionScale.get()
-        odir = self._getTmpPath()
-        imgFn = self.imgsFn
+        size = self.inputVolumes.get().getXDim()
+        args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
+        # print('xmipp_volume_from_pdb ', args)
+        runProgram('xmipp_volume_from_pdb', args)
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-        # rhoStartBase = self.rhoStartBase.get()
-        # rhoEndBase = self.rhoEndBase.get()
-        # niter = self.niter.get()
-        # rhoStartBase = 250.0
-        # rhoEndBase = 50.0
-        # niter = 10000
+        tempdir = self._getTmpPath('')
+        # Perform the alignment using MPI
+        imgFn = self.imgsFn
+        imgFnAligned = self._getExtraPath('aligned.xmd')
+        # The stupid xmipp program adds .vol by default
+        reference = self._getExtraPath('ref.vol')
+        args = "-i %(imgFn)s -o %(imgFnAligned)s --odir %(tempdir)s --resume --ref %(reference)s" \
+               " --frm_parameters %(frm_freq)f %(frm_maxshift)d " % locals()
+        # print('xmipp_volumeset_align ', args)
+        # This is needed to run MPI
+        self.runJob("xmipp_volumeset_align", args,
+                    env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
+        # apply the alignment
+        alignedPath = self._getExtraPath('alinged/')
+        makePath(alignedPath)
+        mdImgs = md.MetaData(imgFnAligned)
+        for objId in mdImgs:
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            new_imgPath = alignedPath+basename(imgPath)
+            mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
+
+            params = '-i %(imgPath)s -o %(new_imgPath)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
+
+            runProgram('xmipp_transform_geometry', params)
+        mdImgs.write(imgFnAligned)
+        self.imgsFn = imgFnAligned
+
+
+    def performNMOF(self):
+        reference = self._getExtraPath('ref.vol')
+        if(exists(reference)): # if rigid-body alignment was done
+            pass
+        else:
+            atomFn = self.atomsFn
+            reference = self._getExtraPath('ref')
+            sampling = self.inputVolumes.get().getSamplingRate()
+            size = self.inputVolumes.get().getXDim()
+            args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
+            # print('xmipp_volume_from_pdb ', args)
+            runProgram('xmipp_volume_from_pdb', args)
+            reference = self._getExtraPath('ref.vol')
+
+
+            
 
         # args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
         # args += "--odir %(odir)s --centerPDB "
@@ -245,35 +252,35 @@ class FlexProtNMOF(ProtAnalysis3D):
         #             env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
         # cleanPath(self._getPath('nmaTodo.xmd'))
-
-        inputSet = self.inputVolumes.get()
-        mdImgs = md.MetaData(self.imgsFn)
-
-        for objId in mdImgs:
-            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-            index, fn = xmippToLocation(imgPath)
-            if(index): # case the input is a stack
-                # Conside the index is the id in the input set
-                particle = inputSet[index]
-            else: # input is not a stack
-                # convert the inputSet to metadata:
-                mdtemp = md.MetaData(self.imgsFn_backup)
-                # Loop and find the index based on the basename:
-                bn_retrieved = basename(imgPath)
-                for searched_index in mdtemp:
-                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE,searched_index)
-                    bn_searched = basename(imgPath_temp)
-                    if bn_searched == bn_retrieved:
-                        index = searched_index
-                        particle = inputSet[index]
-                        break
-            mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-            mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        mdImgs.sort(md.MDL_ITEM_ID)
-        mdImgs.write(self.imgsFn)
-
-        mdImgs.write(self.imgsFn)
-        cleanPath(self._getExtraPath('copy.xmd'))
+        #
+        # inputSet = self.inputVolumes.get()
+        # mdImgs = md.MetaData(self.imgsFn)
+        #
+        # for objId in mdImgs:
+        #     imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+        #     index, fn = xmippToLocation(imgPath)
+        #     if(index): # case the input is a stack
+        #         # Conside the index is the id in the input set
+        #         particle = inputSet[index]
+        #     else: # input is not a stack
+        #         # convert the inputSet to metadata:
+        #         mdtemp = md.MetaData(self.imgsFn_backup)
+        #         # Loop and find the index based on the basename:
+        #         bn_retrieved = basename(imgPath)
+        #         for searched_index in mdtemp:
+        #             imgPath_temp = mdtemp.getValue(md.MDL_IMAGE,searched_index)
+        #             bn_searched = basename(imgPath_temp)
+        #             if bn_searched == bn_retrieved:
+        #                 index = searched_index
+        #                 particle = inputSet[index]
+        #                 break
+        #     mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
+        #     mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
+        # mdImgs.sort(md.MDL_ITEM_ID)
+        # mdImgs.write(self.imgsFn)
+        #
+        # mdImgs.write(self.imgsFn)
+        # cleanPath(self._getExtraPath('copy.xmd'))
 
     def createOutputStep(self):
         pass
@@ -328,4 +335,5 @@ class FlexProtNMOF(ProtAnalysis3D):
 
     def getInputPdb(self):
         """ Return the Pdb object associated with the normal modes. """
+
         return self.inputModes.get().getPdb()

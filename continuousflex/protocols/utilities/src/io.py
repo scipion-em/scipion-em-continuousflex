@@ -40,7 +40,7 @@ def read_pdb(file, hetatm=False):
     temp = []
     chainID = []
     elemName=[]
-    print("> Reading pdb file ...")
+    # print("> Reading pdb file ...")
     with open(file, "r") as f :
         for line in f:
             spl = line.split()
@@ -60,7 +60,7 @@ def read_pdb(file, hetatm=False):
                     temp.append(l[10])
                     chainID.append(l[11])
                     elemName.append(l[12])
-    print("\t Done \n")
+    # print("\t Done \n")
 
     return {
         "atom" : np.array(atom),
@@ -82,7 +82,7 @@ def save_pdb(data, file):
     :param data: dictionary with pdb data
     :param file: PDB file
     """
-    print("> Saving pdb file ...")
+    # print("> Saving pdb file ...")
     with open(file, "w") as file:
         past_chainName= data["chainName"][0]
         for i in range(len(data["atom"])):
@@ -106,7 +106,7 @@ def save_pdb(data, file):
             file.write("%s%s  %s%s%s%s    %s%s%s%s%s%s%s\n" % (atom,atomNum, atomName, resName, chainName, resNum,
                                                               coordx, coordy, coordz, occ, temp, chainID, elemName))
         file.write("END\n")
-    print("\t Done \n")
+    # print("\t Done \n")
 
 def read_mrc(file):
     """

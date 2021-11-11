@@ -230,7 +230,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         reference = self._getExtraPath('ref')
         sampling = self.inputVolumes.get().getSamplingRate()
         size = self.inputVolumes.get().getXDim()
-        args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
+        args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s -v 0" % locals()
         # print('xmipp_volume_from_pdb ', args)
         runProgram('xmipp_volume_from_pdb', args)
         frm_freq = self.frm_freq.get()
@@ -275,31 +275,15 @@ class FlexProtNMOF(ProtAnalysis3D):
 
 
     def performNMOF(self):
-        # reference = self._getExtraPath('ref.vol')
-        # if(exists(reference)): # if rigid-body alignment was done
-        #     pass
-        # else:
-        #     atomFn = self.atomsFn
-        #     reference = self._getExtraPath('ref')
-        #     sampling = self.inputVolumes.get().getSamplingRate()
-        #     size = self.inputVolumes.get().getXDim()
-        #     args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
-        #     # print('xmipp_volume_from_pdb ', args)
-        #     runProgram('xmipp_volume_from_pdb', args)
-        #     reference = self._getExtraPath('ref.vol')
-
         # if target PDBs are passed, get them and sort them
-
         pdbs_list = []
         if(self.do_rmsd.get()):
             pdbs_list = [f for f in glob.glob(self.targetPDBs.get())]
             pdbs_list.sort()
         # Loop over the volumes:
         mdImgs = md.MetaData(self.imgsFn)
+        rmsd = []
         for objId in mdImgs:
-            print(objId)
-            if(self.do_rmsd.get()):
-                print(pdbs_list[objId-1])
             # Wrapping the method
             path_reference = self.atomsFn
             path_target = mdImgs.getValue(md.MDL_IMAGE, objId)
@@ -312,13 +296,13 @@ class FlexProtNMOF(ProtAnalysis3D):
             fit_directory = self._getExtraPath(removeBaseExt(basename(path_target)))
             makePath(fit_directory)
             copyFile(path_reference, fit_directory + '/ref0.pdb' )
-
+            # Loop for each volume and iteratively approach its conformation
             for n in range(n_loop):
                 print("Loop #%i" % n)
                 # Transform to vol
                 structure_i = fit_directory + '/ref%i.pdb' %n
                 volume_i = fit_directory + '/ref%i' %n
-                args = '-i %(structure_i)s -o %(volume_i)s --sampling %(voxel_size)s --size %(size)s' %locals()
+                args = '-i %(structure_i)s -o %(volume_i)s --sampling %(voxel_size)s --size %(size)s -v 0' %locals()
                 runProgram('xmipp_volume_from_pdb', args)
 
                 # stupid xmipp program adds .vol to any volume name
@@ -358,14 +342,14 @@ class FlexProtNMOF(ProtAnalysis3D):
                 # Pickiling the optical flow
                 dump(optFlow, fit_directory + '/optical_flow.pkl')
 
-                print("> Apply optical flow to PDB ...")
+                # print("> Apply optical flow to PDB ...")
                 # Reading Molecule
                 init = Molecule(structure_i)
 
                 # preparing variables
                 optFlow = np.transpose(optFlow, (0, 3, 2, 1))
                 optFlowAtom = np.zeros((init.n_atoms, 3))
-                target = init.copy()
+                fitted = init.copy()
                 origin = -np.ones(3) * size // 2
 
                 for i in range(init.n_atoms):
@@ -382,73 +366,58 @@ class FlexProtNMOF(ProtAnalysis3D):
                     optFlowAtom[i] = np.mean(optFlows, axis=0)
 
                     # Apply transformation to atoms
-                    target.coords[i] = init.coords[i] + -optFlowAtom[i]
+                    fitted.coords[i] = init.coords[i] + -optFlowAtom[i]
 
                 # Save the new PDB
-                target.save_pdb(fit_directory + '/ref%i.pdb' % (n + 1))
+                fitted.save_pdb(fit_directory + '/ref%i.pdb' % (n + 1))
 
-                # COmpute RMSD (optional)
-                target_pdb = Molecule(path_target_pdb)
-                idx = get_mol_conv(target, target_pdb)
-                rmsd = get_RMSD_coords(target.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
-                print("RMSD = %f" % rmsd)
+                # If NMA is used, then project the optical flow on the selected normal modes then use the resultant
+                # amplidutes to generate a fitted structure
+                amplitudes = []
+                if(self.NMA.get()):
+                    # the structure with normal modes
+                    ref_path = fit_directory + '/ref0.pdb'
+                    # This will be overwritten
+                    fitted_path = fit_directory + '/ref%i.pdb' % (n + 1)
+                    fit_directory + '/ref%i.pdb' % (n + 1)
+                    ref_nma = Molecule(ref_path)
+                    diff = np.array(fitted.coords - ref_nma.coords)
+                    modes = readModes(self.modesFn)
+                    for mode in modes:
+                        amplitudes.append(np.dot(diff.flatten(), mode.flatten()))
+                    amplitudes = ' '.join(map(str, amplitudes))
+                    modesFn = self.modesFn
+                    args = '--pdb %(ref_path)s --nma %(modesFn)s --deformations' \
+                           ' %(amplitudes)s -o %(fitted_path)s -v 0' % locals()
+                    runProgram('xmipp_pdb_nma_deform', args)
+                    # Read the updated fitted structure (in case rmsd will be found)
+                    fitted = Molecule(fitted_path)
 
-            target.save_pdb(fit_directory + '/final.pdb')
 
+                if(n == 0):
+                    if(self.do_rmsd.get()):
+                        # Add the rmsd with the initial structure
+                        target_pdb = Molecule(path_target_pdb)
+                        idx = get_mol_conv(init, target_pdb)
+                        rmsd_i = get_RMSD_coords(init.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
+                        rmsd.append(rmsd_i)
 
+                if (self.do_rmsd.get()):
+                    # Compute RMSD
+                    target_pdb = Molecule(path_target_pdb)
+                    idx = get_mol_conv(fitted, target_pdb)
+                    rmsd_i = get_RMSD_coords(fitted.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
+                    rmsd.append(rmsd_i)
+            fitted.save_pdb(fit_directory + '/final.pdb')
+        if rmsd == []:
+            pass
+        else:
+            rmsd = np.array(rmsd)
+            # objId has the number of volumes
+            rmsd = rmsd.reshape((objId,-1))
+            np.savetxt(self._getExtraPath('rmsd.txt'), rmsd)
+        print(rmsd)
 
-
-        # args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
-        # args += "--odir %(odir)s --centerPDB "
-        # args += "--trustradius_scale %(trustRegionScale)d --resume "
-        #
-        # if self.getInputPdb().getPseudoAtoms():
-        #     args += "--fixed_Gaussian "
-        #
-        # args += "--alignVolumes %(frm_freq)f %(frm_maxshift)d "
-        #
-        # args += "--condor_params %(rhoStartBase)f %(rhoEndBase)f %(niter)d "
-
-        # if self.WedgeMode == WEDGE_MASK_THRE:
-        #     tilt0 = self.tiltLow.get()
-        #     tiltF = self.tiltHigh.get()
-        #     args += "--tilt_values %(tilt0)d %(tiltF)d "
-
-        # print(args % locals())
-        # runProgram("xmipp_nma_alignment_vol", args % locals())
-        # self.runJob("xmipp_nma_alignment_vol", args % locals(),
-        #             env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
-
-        # cleanPath(self._getPath('nmaTodo.xmd'))
-        #
-        # inputSet = self.inputVolumes.get()
-        # mdImgs = md.MetaData(self.imgsFn)
-        #
-        # for objId in mdImgs:
-        #     imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-        #     index, fn = xmippToLocation(imgPath)
-        #     if(index): # case the input is a stack
-        #         # Conside the index is the id in the input set
-        #         particle = inputSet[index]
-        #     else: # input is not a stack
-        #         # convert the inputSet to metadata:
-        #         mdtemp = md.MetaData(self.imgsFn_backup)
-        #         # Loop and find the index based on the basename:
-        #         bn_retrieved = basename(imgPath)
-        #         for searched_index in mdtemp:
-        #             imgPath_temp = mdtemp.getValue(md.MDL_IMAGE,searched_index)
-        #             bn_searched = basename(imgPath_temp)
-        #             if bn_searched == bn_retrieved:
-        #                 index = searched_index
-        #                 particle = inputSet[index]
-        #                 break
-        #     mdImgs.setValue(md.MDL_IMAGE, getImageLocation(particle), objId)
-        #     mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        # mdImgs.sort(md.MDL_ITEM_ID)
-        # mdImgs.write(self.imgsFn)
-        #
-        # mdImgs.write(self.imgsFn)
-        # cleanPath(self._getExtraPath('copy.xmd'))
 
     def createOutputStep(self):
         pass
@@ -505,3 +474,12 @@ class FlexProtNMOF(ProtAnalysis3D):
         """ Return the Pdb object associated with the normal modes. """
 
         return self.inputModes.get().getPdb()
+
+def readModes(fnIn):
+    modesMD = md.MetaData(fnIn)
+    vectors = []
+    for objId in modesMD:
+        vecFn = modesMD.getValue(md.MDL_NMA_MODEFILE, objId)
+        vec = np.loadtxt(vecFn)
+        vectors.append(vec)
+    return vectors

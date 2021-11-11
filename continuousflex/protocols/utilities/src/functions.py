@@ -149,7 +149,7 @@ def select_idx(param, idx):
     return new_param, new_param_idx
 
 def get_mol_conv(mol1,mol2, ca_only=False):
-    print("> Converting molecule coordinates ...")
+    # print("> Converting molecule coordinates ...")
     id1 = []
     id2 = []
     id1_idx = []
@@ -188,7 +188,7 @@ def get_mol_conv(mol1,mol2, ca_only=False):
 
     if len(idx)==0:
         print("\t Warning : No matching coordinates")
-    print("\t Done")
+    # print("\t Done")
 
     return np.array(idx)
 

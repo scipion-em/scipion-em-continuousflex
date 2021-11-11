@@ -37,10 +37,17 @@ import pyworkflow.protocol.params as params
 from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
 from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt
+from pyworkflow.utils import removeBaseExt
 from pwem.utils import runProgram
 from pwem import Domain
-
+import glob
+import time
+from joblib import load, dump
+import farneback3d
+from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
+from continuousflex.protocols.utilities.src import Molecule
+from continuousflex.protocols.utilities.src import get_mol_conv, get_RMSD_coords
+import numpy as np
 
 class FlexProtNMOF(ProtAnalysis3D):
     """ Protocol for fitting using normal mode analysis and 3D dense optical flow. """
@@ -76,9 +83,18 @@ class FlexProtNMOF(ProtAnalysis3D):
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select a volume or a set of volumes that will be fitted using the method')
-        form.addParam('iterations', params.IntParam, default=1,
+        form.addParam('do_rmsd', params.BooleanParam, label= 'Compare the fitted structure with the groundtruth PDBs?',
+                      expertLevel=params.LEVEL_ADVANCED, default= False)
+        group = form.addGroup('Compare the fitting result with the groundtruth')
+        group.addParam('targetPDBs', params.PathParam, allowsNull=True, condition='do_rmsd',
+                      label='Target PDB(s)', help='This allows to show the accuracy of the method by passing the groundtruth'
+                                                ' atomic structure that correspond to each input volume')
+        form.addParam('fitIterations', params.IntParam, default=1,
                       label='number of iterations',
                       help = 'To do')
+        # TODO: Histogram equalization
+        # form.addParam('do_HistEqual', params.BooleanParam, default=True,
+        #               label='Perform histogram equalization on the set of volumes?')
         form.addParam('do_rigidbody', params.BooleanParam, default=True,
                       label='Perform rigid-body alignment on the volume(s)?')
         group = form.addGroup('rigid-body alignment settings (Fast rotational matching)',
@@ -93,6 +109,48 @@ class FlexProtNMOF(ProtAnalysis3D):
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x,y and z directions. Keep as default'
                            ' if your target is near the center in your subtomograms')
+        form.addSection(label='3D optical flow parameters')
+        group = form.addGroup('Optical flows')
+        # TODO: allow multi processing of volumes on GPUs
+        # group.addParam('N_GPU', params.IntParam, default=3, important=True, allowsNull=True,
+        #                       label = 'Parallel processes on GPU',
+        #                       help='This parameter indicates the number of volumes that will be processed in parallel'
+        #                            ' (independently). The more powerful your GPU, the higher the number you can choose.')
+        group.addParam('pyr_scale', params.FloatParam, default=0.5,
+                      label='pyr_scale', allowsNull=True,
+                       help='parameter specifying the image scale to build pyramids for each image (scale < 1).'
+                            ' A classic pyramid is of generally 0.5 scale, every new layer added, it is'
+                            ' halved to the previous one.')
+        group.addParam('levels', params.IntParam, default=4, allowsNull=True,
+                      label='levels',
+                      help='evels=1 says, there are no extra layers (only the initial image).'
+                           ' It is the number of pyramid layers including the first image.')
+        group.addParam('winsize', params.IntParam, default=10, allowsNull=True,
+                      label='winsize',
+                      help='It is the average window size, larger the size, the more robust the algorithm is to noise,'
+                           ' and provide smaller conformation detection, though gives blurred motion fields.'
+                           ' You may try smaller window size for larger conformations but the method will be'
+                           ' more sensitive to noise.')
+        group.addParam('num_iterations', params.IntParam, default=10, allowsNull=True,
+                      label='iterations',
+                      help='Number of iterations to be performed at each pyramid level.')
+        group.addParam('poly_n', params.IntParam, default=5, allowsNull=True,
+                      label='poly_n',
+                      help='It is typically 5 or 7, it is the size of the pixel neighbourhood which is used'
+                           ' to find polynomial expansion between the pixels.')
+        group.addParam('poly_sigma', params.FloatParam, default=1.2,
+                      label='poly_sigma',
+                      help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
+                           ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
+        # TODO: histogram equalization should replace the need of two factors (one would be enough, and hidden)
+        group.addParam('factor1', params.IntParam, default=100,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='gray scale factor1',
+                      help='this factor will be multiplied by the gray levels of each subtomogram')
+        group.addParam('factor2', params.IntParam, default=100,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='gray scale factor2',
+                      help='this factor will be multiplied by the gray levels of the reference')
 
         form.addParallelSection(threads=0, mpi=5)
 
@@ -190,7 +248,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         self.runJob("xmipp_volumeset_align", args,
                     env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
         # apply the alignment
-        alignedPath = self._getExtraPath('alinged/')
+        alignedPath = self._getExtraPath('aligned/')
         makePath(alignedPath)
         mdImgs = md.MetaData(imgFnAligned)
         for objId in mdImgs:
@@ -207,28 +265,138 @@ class FlexProtNMOF(ProtAnalysis3D):
 
             params = '-i %(imgPath)s -o %(new_imgPath)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
                      ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
-
             runProgram('xmipp_transform_geometry', params)
+
+        # Sorting after alignment is importatnt if target PDBs are passed
+        mdImgs.sort()
         mdImgs.write(imgFnAligned)
+        # Point to the aligned volumes as input
         self.imgsFn = imgFnAligned
 
 
     def performNMOF(self):
-        reference = self._getExtraPath('ref.vol')
-        if(exists(reference)): # if rigid-body alignment was done
-            pass
-        else:
-            atomFn = self.atomsFn
-            reference = self._getExtraPath('ref')
-            sampling = self.inputVolumes.get().getSamplingRate()
+        # reference = self._getExtraPath('ref.vol')
+        # if(exists(reference)): # if rigid-body alignment was done
+        #     pass
+        # else:
+        #     atomFn = self.atomsFn
+        #     reference = self._getExtraPath('ref')
+        #     sampling = self.inputVolumes.get().getSamplingRate()
+        #     size = self.inputVolumes.get().getXDim()
+        #     args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
+        #     # print('xmipp_volume_from_pdb ', args)
+        #     runProgram('xmipp_volume_from_pdb', args)
+        #     reference = self._getExtraPath('ref.vol')
+
+        # if target PDBs are passed, get them and sort them
+
+        pdbs_list = []
+        if(self.do_rmsd.get()):
+            pdbs_list = [f for f in glob.glob(self.targetPDBs.get())]
+            pdbs_list.sort()
+        # Loop over the volumes:
+        mdImgs = md.MetaData(self.imgsFn)
+        for objId in mdImgs:
+            print(objId)
+            if(self.do_rmsd.get()):
+                print(pdbs_list[objId-1])
+            # Wrapping the method
+            path_reference = self.atomsFn
+            path_target = mdImgs.getValue(md.MDL_IMAGE, objId)
+            if(self.do_rmsd.get()):
+                path_target_pdb = pdbs_list[objId-1]
+            voxel_size = self.inputVolumes.get().getSamplingRate()
             size = self.inputVolumes.get().getXDim()
-            args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s" % locals()
-            # print('xmipp_volume_from_pdb ', args)
-            runProgram('xmipp_volume_from_pdb', args)
-            reference = self._getExtraPath('ref.vol')
+            n_loop = self.fitIterations.get()
+            # Todo: make a directory for each input volume to place the fitting results
+            fit_directory = self._getExtraPath(removeBaseExt(basename(path_target)))
+            makePath(fit_directory)
+            copyFile(path_reference, fit_directory + '/ref0.pdb' )
+
+            for n in range(n_loop):
+                print("Loop #%i" % n)
+                # Transform to vol
+                structure_i = fit_directory + '/ref%i.pdb' %n
+                volume_i = fit_directory + '/ref%i' %n
+                args = '-i %(structure_i)s -o %(volume_i)s --sampling %(voxel_size)s --size %(size)s' %locals()
+                runProgram('xmipp_volume_from_pdb', args)
+
+                # stupid xmipp program adds .vol to any volume name
+                volume_i = fit_directory + '/ref%i.vol' % n
+                vol0 = open_volume(volume_i)
+                vol1 = open_volume(path_target)
+
+                # numerical gray-level adjustments
+                # TODO: replace with one factor if histogram equalization is done
+                vol0 = vol0 * self.factor1.get()
+                vol1 = vol1 * self.factor2.get()
+
+                # optical flow calculation
+                optflow = farneback3d.Farneback(
+                    pyr_scale=self.pyr_scale.get(), # Scaling between multi-scale pyramid levels
+                    levels=self.levels.get(),  # Number of multi-scale levels
+                    winsize=self.winsize.get(),  # Window size for Gaussian filtering of polynomial coefficients
+                    num_iterations=self.num_iterations.get(),  # Iterations on each multi-scale level
+                    poly_n=self.poly_n.get(),  # Size of window for weighted least-square estimation of polynomial coefficients
+                    poly_sigma=self.poly_sigma.get(),  # Sigma for Gaussian weighting of least-square estimation of polynomial coefficients
+                )
+
+                t0 = time.time()
+                # perform OF:
+                optFlow = optflow.calc_flow(vol0, vol1)
+                t_end = time.time()
+                print("spent on calculating 3D optical flow", np.floor((t_end - t0) / 60), "minutes and",
+                      np.round(t_end - t0 - np.floor((t_end - t0) / 60) * 60), "seconds")
+
+                # Using the optical-flow to warp the reference to estimate the volumes:
+                volume_i = fit_directory + '/ref%i.vol' % n
+                warped_i = fit_directory + '/warped.vol'
+                vol0 = open_volume(volume_i)
+                warped = farneback3d.warp_by_flow(vol0, optFlow)
+                save_volume(warped, warped_i)
+
+                # Pickiling the optical flow
+                dump(optFlow, fit_directory + '/optical_flow.pkl')
+
+                print("> Apply optical flow to PDB ...")
+                # Reading Molecule
+                init = Molecule(structure_i)
+
+                # preparing variables
+                optFlow = np.transpose(optFlow, (0, 3, 2, 1))
+                optFlowAtom = np.zeros((init.n_atoms, 3))
+                target = init.copy()
+                origin = -np.ones(3) * size // 2
+
+                for i in range(init.n_atoms):
+                    # interpolate optFlow for all atoms
+                    coord = init.coords[i] / voxel_size - origin
+                    floor = np.ndarray.astype(np.floor(coord), dtype=int)
+                    comb = np.array(
+                        [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]])
+                    optFlows = []
+                    for j in floor + comb:
+                        if any(j < 0) or any(j >= optFlow.shape[1:]):
+                            print("error volume and PDB not aligned :%s" % j)
+                        optFlows.append(optFlow[:, j[0], j[1], j[2]])
+                    optFlowAtom[i] = np.mean(optFlows, axis=0)
+
+                    # Apply transformation to atoms
+                    target.coords[i] = init.coords[i] + -optFlowAtom[i]
+
+                # Save the new PDB
+                target.save_pdb(fit_directory + '/ref%i.pdb' % (n + 1))
+
+                # COmpute RMSD (optional)
+                target_pdb = Molecule(path_target_pdb)
+                idx = get_mol_conv(target, target_pdb)
+                rmsd = get_RMSD_coords(target.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
+                print("RMSD = %f" % rmsd)
+
+            target.save_pdb(fit_directory + '/final.pdb')
 
 
-            
+
 
         # args = "-i %(imgFn)s --pdb %(atomsFn)s --modes %(modesFn)s --sampling_rate %(sampling)f "
         # args += "--odir %(odir)s --centerPDB "

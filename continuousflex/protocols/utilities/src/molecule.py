@@ -18,7 +18,7 @@ class Molecule:
     Atomic structure of a molecule
     """
 
-    def __init__(self, pdb_file, hetatm=False):
+    def __init__(self, pdb_file, hetatm=True):
         """
         Contructor
         :param pdb_file: PDB file

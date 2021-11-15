@@ -48,6 +48,9 @@ from continuousflex.protocols.utilities.spider_files3 import open_volume, save_v
 from continuousflex.protocols.utilities.src import Molecule
 from continuousflex.protocols.utilities.src import get_mol_conv, get_RMSD_coords
 import numpy as np
+from pwem.objects import SetOfAtomStructs, AtomStruct
+
+
 
 class FlexProtNMOF(ProtAnalysis3D):
     """ Protocol for fitting using normal mode analysis and 3D dense optical flow. """
@@ -92,6 +95,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         form.addParam('fitIterations', params.IntParam, default=1,
                       label='number of iterations',
                       help = 'To do')
+        # TODO: add mask
         # TODO: Histogram equalization
         # form.addParam('do_HistEqual', params.BooleanParam, default=True,
         #               label='Perform histogram equalization on the set of volumes?')
@@ -230,8 +234,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         reference = self._getExtraPath('ref')
         sampling = self.inputVolumes.get().getSamplingRate()
         size = self.inputVolumes.get().getXDim()
-        args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s -v 0" % locals()
-        # print('xmipp_volume_from_pdb ', args)
+        args = "-i %(atomFn)s -o %(reference)s --sampling %(sampling)s --size %(size)s --centerPDB -v 0" % locals()
         runProgram('xmipp_volume_from_pdb', args)
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
@@ -283,8 +286,10 @@ class FlexProtNMOF(ProtAnalysis3D):
         # Loop over the volumes:
         mdImgs = md.MetaData(self.imgsFn)
         rmsd = []
+        cc = []
+        nma_amplitudes_all = []
+        mdPDBs = md.MetaData()
         for objId in mdImgs:
-            # Wrapping the method
             path_reference = self.atomsFn
             path_target = mdImgs.getValue(md.MDL_IMAGE, objId)
             if(self.do_rmsd.get()):
@@ -297,19 +302,24 @@ class FlexProtNMOF(ProtAnalysis3D):
             makePath(fit_directory)
             copyFile(path_reference, fit_directory + '/ref0.pdb' )
             # Loop for each volume and iteratively approach its conformation
+            nma_amplitudes = []
             for n in range(n_loop):
                 print("Loop #%i" % n)
                 # Transform to vol
                 structure_i = fit_directory + '/ref%i.pdb' %n
                 volume_i = fit_directory + '/ref%i' %n
-                args = '-i %(structure_i)s -o %(volume_i)s --sampling %(voxel_size)s --size %(size)s -v 0' %locals()
+                args = '-i %(structure_i)s -o %(volume_i)s --sampling %(voxel_size)s --centerPDB' \
+                       ' --size %(size)s -v 0' %locals()
                 runProgram('xmipp_volume_from_pdb', args)
+                # Find and store the cross correlation at each iteration:
+
+
 
                 # stupid xmipp program adds .vol to any volume name
                 volume_i = fit_directory + '/ref%i.vol' % n
                 vol0 = open_volume(volume_i)
                 vol1 = open_volume(path_target)
-
+                cc.append(CC(vol0, vol1))
                 # numerical gray-level adjustments
                 # TODO: replace with one factor if histogram equalization is done
                 vol0 = vol0 * self.factor1.get()
@@ -345,6 +355,7 @@ class FlexProtNMOF(ProtAnalysis3D):
                 # print("> Apply optical flow to PDB ...")
                 # Reading Molecule
                 init = Molecule(structure_i)
+                init.center()
 
                 # preparing variables
                 optFlow = np.transpose(optFlow, (0, 3, 2, 1))
@@ -381,10 +392,13 @@ class FlexProtNMOF(ProtAnalysis3D):
                     fitted_path = fit_directory + '/ref%i.pdb' % (n + 1)
                     fit_directory + '/ref%i.pdb' % (n + 1)
                     ref_nma = Molecule(ref_path)
+                    ref_nma.center()
                     diff = np.array(fitted.coords - ref_nma.coords)
                     modes = readModes(self.modesFn)
                     for mode in modes:
                         amplitudes.append(np.dot(diff.flatten(), mode.flatten()))
+                    # Save the amplitudes for comparing later
+                    nma_amplitudes.append(amplitudes)
                     amplitudes = ' '.join(map(str, amplitudes))
                     modesFn = self.modesFn
                     args = '--pdb %(ref_path)s --nma %(modesFn)s --deformations' \
@@ -392,12 +406,15 @@ class FlexProtNMOF(ProtAnalysis3D):
                     runProgram('xmipp_pdb_nma_deform', args)
                     # Read the updated fitted structure (in case rmsd will be found)
                     fitted = Molecule(fitted_path)
+                    fitted.center()
+
 
 
                 if(n == 0):
                     if(self.do_rmsd.get()):
                         # Add the rmsd with the initial structure
                         target_pdb = Molecule(path_target_pdb)
+                        target_pdb.center()
                         idx = get_mol_conv(init, target_pdb)
                         rmsd_i = get_RMSD_coords(init.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
                         rmsd.append(rmsd_i)
@@ -405,10 +422,25 @@ class FlexProtNMOF(ProtAnalysis3D):
                 if (self.do_rmsd.get()):
                     # Compute RMSD
                     target_pdb = Molecule(path_target_pdb)
+                    target_pdb.center()
                     idx = get_mol_conv(fitted, target_pdb)
                     rmsd_i = get_RMSD_coords(fitted.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
                     rmsd.append(rmsd_i)
+
+                if(self.NMA.get()):
+                    nma_amplitudes_all.append(nma_amplitudes)
+
             fitted.save_pdb(fit_directory + '/final.pdb')
+            mdPDBs.setValue(md.MDL_IMAGE, fit_directory + '/final.pdb', mdPDBs.addObject())
+        mdPDBs.write(self._getExtraPath('PDBs.xmd'))
+
+
+        #  Saving the cc, rmsd and normal mode amplitudes
+        # objId has the number of volumes
+        cc = np.array(cc)
+        cc = cc.reshape(objId, -1)
+        np.savetxt(self._getExtraPath('cc.txt'), cc)
+
         if rmsd == []:
             pass
         else:
@@ -418,23 +450,23 @@ class FlexProtNMOF(ProtAnalysis3D):
             np.savetxt(self._getExtraPath('rmsd.txt'), rmsd)
         print(rmsd)
 
+        if nma_amplitudes == []:
+            pass
+        else:
+            nma_amplitudes_all = np.array(nma_amplitudes_all)
+            dump(nma_amplitudes_all,self._getExtraPath('nma_amplitudes_all.pkl'))
+
 
     def createOutputStep(self):
-        pass
-        # inputSet = self.inputVolumes.get()
-        # # partSet = self._createSetOfParticles()
-        # partSet = self._createSetOfVolumes()
-        # pdbPointer = self.inputModes.get()._pdbPointer
-        #
-        # partSet.copyInfo(inputSet)
-        # partSet.setAlignmentProj()
-        # partSet.copyItems(inputSet,
-        #                   updateItemCallback=self._updateParticle,
-        #                   itemDataIterator=md.iterRows(self.imgsFn, sortByLabel=md.MDL_ITEM_ID))
-        #
-        # self._defineOutputs(outputParticles=partSet)
-        # self._defineSourceRelation(pdbPointer, partSet)
-        # self._defineTransformRelation(self.inputVolumes, partSet)
+        fnSqlite = self._getPath('atomic_structures.sqlite')
+        PDBs = SetOfAtomStructs(filename=fnSqlite)
+        md_PDBs =  md.MetaData(self._getExtraPath('PDBs.xmd'))
+        for objId in md_PDBs:
+            fn_pdb = md_PDBs.getValue(md.MDL_IMAGE, objId)
+            pdb_item = AtomStruct(filename=fn_pdb)
+            PDBs.append(pdb_item)
+        PDBs.write()
+        self._defineOutputs(alignedPDBs=PDBs)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -483,3 +515,6 @@ def readModes(fnIn):
         vec = np.loadtxt(vecFn)
         vectors.append(vec)
     return vectors
+
+def CC(map1, map2):
+    return np.sum(map1*map2)/np.sqrt(np.sum(np.square(map1))*np.sum(np.square(map2)))

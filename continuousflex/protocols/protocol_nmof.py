@@ -49,7 +49,7 @@ from continuousflex.protocols.utilities.src import Molecule
 from continuousflex.protocols.utilities.src import get_mol_conv, get_RMSD_coords
 import numpy as np
 from pwem.objects import SetOfAtomStructs, AtomStruct
-
+import itertools
 
 
 class FlexProtNMOF(ProtAnalysis3D):
@@ -95,6 +95,9 @@ class FlexProtNMOF(ProtAnalysis3D):
         form.addParam('fitIterations', params.IntParam, default=1,
                       label='number of iterations',
                       help = 'To do')
+        form.addParam('regionSize', params.IntParam, default=3,
+                      label='Region size (odd number)',
+                      help = 'The optical flow region (voxels) around each atom that will be averaged')
         # TODO: add mask
         # TODO: Histogram equalization
         # form.addParam('do_HistEqual', params.BooleanParam, default=True,
@@ -164,6 +167,9 @@ class FlexProtNMOF(ProtAnalysis3D):
         self.imgsFn = self._getExtraPath('volumes.xmd')
         self.imgsFn_backup = self._getExtraPath('volumes_backup.xmd')
         self.modesFn = self._getExtraPath('modes.xmd')
+
+        # Make sure the region is an odd number:
+        assert self.regionSize.get() % 2 == 1 , 'Only odd number for regions are allowed'
         # Copy the input PDB to self.atomsFn
         if(self.NMA.get()):
             atomsFn = self.getInputPdb().getFileName()
@@ -297,7 +303,6 @@ class FlexProtNMOF(ProtAnalysis3D):
             voxel_size = self.inputVolumes.get().getSamplingRate()
             size = self.inputVolumes.get().getXDim()
             n_loop = self.fitIterations.get()
-            # Todo: make a directory for each input volume to place the fitting results
             fit_directory = self._getExtraPath(removeBaseExt(basename(path_target)))
             makePath(fit_directory)
             copyFile(path_reference, fit_directory + '/ref0.pdb' )
@@ -359,20 +364,32 @@ class FlexProtNMOF(ProtAnalysis3D):
 
                 # preparing variables
                 optFlow = np.transpose(optFlow, (0, 3, 2, 1))
+                # optFlow shape is now (3, N, N, N) where N is the size of the volume
                 optFlowAtom = np.zeros((init.n_atoms, 3))
                 fitted = init.copy()
                 origin = -np.ones(3) * size // 2
 
+                # Combination of surrounding voxels
+                set = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10, 11, -11, 12, -12]
+                region_size = self.regionSize.get()
+                set = set[:region_size]
+                # Comment: [0, 1, -1] corresponds to region of size 3*3, [0 , 1, -1, 2, -2]  corresponds to region 5*5
+                # region of 1 is also okay, max region
+                comb = list(itertools.product(set, repeat=3))
                 for i in range(init.n_atoms):
                     # interpolate optFlow for all atoms
                     coord = init.coords[i] / voxel_size - origin
                     floor = np.ndarray.astype(np.floor(coord), dtype=int)
-                    comb = np.array(
-                        [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]])
+                    # comb = np.array(
+                    #     [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]])
+
                     optFlows = []
                     for j in floor + comb:
                         if any(j < 0) or any(j >= optFlow.shape[1:]):
                             print("error volume and PDB not aligned :%s" % j)
+                            print(" If the volume and PDB are aligned, this error could mean that either your volume is"
+                                  " close to the boundaries and might need padding with zeros, or your region size"
+                                  " is too big.")
                         optFlows.append(optFlow[:, j[0], j[1], j[2]])
                     optFlowAtom[i] = np.mean(optFlows, axis=0)
 
@@ -439,6 +456,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         # objId has the number of volumes
         cc = np.array(cc)
         cc = cc.reshape(objId, -1)
+        # TODO: save at each iteration so that the viewer can display the file
         np.savetxt(self._getExtraPath('cc.txt'), cc)
 
         if rmsd == []:
@@ -447,6 +465,7 @@ class FlexProtNMOF(ProtAnalysis3D):
             rmsd = np.array(rmsd)
             # objId has the number of volumes
             rmsd = rmsd.reshape((objId,-1))
+            # TODO: save at each iteration so that the viewer can display the file
             np.savetxt(self._getExtraPath('rmsd.txt'), rmsd)
         print(rmsd)
 
@@ -454,6 +473,7 @@ class FlexProtNMOF(ProtAnalysis3D):
             pass
         else:
             nma_amplitudes_all = np.array(nma_amplitudes_all)
+            # TODO: save at each iteration so that the viewer can display the file
             dump(nma_amplitudes_all,self._getExtraPath('nma_amplitudes_all.pkl'))
 
 

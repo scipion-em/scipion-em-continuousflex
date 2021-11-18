@@ -289,6 +289,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         if(self.do_rmsd.get()):
             pdbs_list = [f for f in glob.glob(self.targetPDBs.get())]
             pdbs_list.sort()
+            # Todo: save the names of the PDBs to use later in the viewer
         # Loop over the volumes:
         mdImgs = md.MetaData(self.imgsFn)
         rmsd = []
@@ -317,14 +318,20 @@ class FlexProtNMOF(ProtAnalysis3D):
                        ' --size %(size)s -v 0' %locals()
                 runProgram('xmipp_volume_from_pdb', args)
                 # Find and store the cross correlation at each iteration:
-
-
-
                 # stupid xmipp program adds .vol to any volume name
                 volume_i = fit_directory + '/ref%i.vol' % n
                 vol0 = open_volume(volume_i)
                 vol1 = open_volume(path_target)
                 cc.append(CC(vol0, vol1))
+
+                #  Saving the cc, rmsd and normal mode amplitudes
+                # objId has the number of volumes processed so far
+                cc_a = np.array(cc)
+                cc_a.resize(objId * n_loop)
+                cc_a = cc_a.reshape(objId, -1)
+                np.savetxt(self._getExtraPath('cc.txt'), cc_a)
+
+
                 # numerical gray-level adjustments
                 # TODO: replace with one factor if histogram equalization is done
                 vol0 = vol0 * self.factor1.get()
@@ -348,6 +355,7 @@ class FlexProtNMOF(ProtAnalysis3D):
                       np.round(t_end - t0 - np.floor((t_end - t0) / 60) * 60), "seconds")
 
                 # Using the optical-flow to warp the reference to estimate the volumes:
+                # TODO: save the optical flow of each iteration and the warped volume
                 volume_i = fit_directory + '/ref%i.vol' % n
                 warped_i = fit_directory + '/warped.vol'
                 vol0 = open_volume(volume_i)
@@ -425,8 +433,6 @@ class FlexProtNMOF(ProtAnalysis3D):
                     fitted = Molecule(fitted_path)
                     fitted.center()
 
-
-
                 if(n == 0):
                     if(self.do_rmsd.get()):
                         # Add the rmsd with the initial structure
@@ -444,30 +450,20 @@ class FlexProtNMOF(ProtAnalysis3D):
                     rmsd_i = get_RMSD_coords(fitted.coords[idx[:, 0]], target_pdb.coords[idx[:, 1]])
                     rmsd.append(rmsd_i)
 
+                    rmsd_a = np.array(rmsd)
+                    rmsd_a.resize(objId * n_loop)
+                    # objId has the number of volumes
+                    rmsd_a = rmsd_a.reshape((objId, -1))
+                    np.savetxt(self._getExtraPath('rmsd.txt'), rmsd_a)
+
                 if(self.NMA.get()):
                     nma_amplitudes_all.append(nma_amplitudes)
 
+            # TODO: instead of saving the last PDB, save the one that has the highest CC
             fitted.save_pdb(fit_directory + '/final.pdb')
             mdPDBs.setValue(md.MDL_IMAGE, fit_directory + '/final.pdb', mdPDBs.addObject())
         mdPDBs.write(self._getExtraPath('PDBs.xmd'))
 
-
-        #  Saving the cc, rmsd and normal mode amplitudes
-        # objId has the number of volumes
-        cc = np.array(cc)
-        cc = cc.reshape(objId, -1)
-        # TODO: save at each iteration so that the viewer can display the file
-        np.savetxt(self._getExtraPath('cc.txt'), cc)
-
-        if rmsd == []:
-            pass
-        else:
-            rmsd = np.array(rmsd)
-            # objId has the number of volumes
-            rmsd = rmsd.reshape((objId,-1))
-            # TODO: save at each iteration so that the viewer can display the file
-            np.savetxt(self._getExtraPath('rmsd.txt'), rmsd)
-        print(rmsd)
 
         if nma_amplitudes == []:
             pass

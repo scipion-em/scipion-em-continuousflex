@@ -34,3 +34,4 @@ from .viewer_nma_dimred_vol import FlexDimredNMAVolViewer
 from .viewer_image_synthesize import FlexProtSynthesizeImageViewer
 from .viewer_heteroflow_dimred import FlexDimredHeteroFlowViewer
 from .viewer_heteroflow import FlexHeteroFlowViewer
+from .viewer_nmof import FlexProtNMOFViewer

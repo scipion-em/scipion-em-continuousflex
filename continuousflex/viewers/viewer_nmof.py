@@ -74,7 +74,7 @@ class FlexProtNMOFViewer(ProtocolViewer):
                       label='Display cross-correlation overlay plot for all volumes',
                            )
         form.addParam('displayRMSD_all', LabelParam,
-                      label='Display cross-correlation overlay plot for all volumes',
+                      label='Display RMSD overlay plot for all volumes',
                            )
         form.addParam('displayFit', IntParam, default=1,
                       label='Display the Fitting result of volume number',

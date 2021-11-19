@@ -23,21 +23,16 @@
 # *
 # **************************************************************************
 
-from os.path import basename, exists
+from os.path import basename
 import os
-from pyworkflow.utils import getListFromRangeString
+from pyworkflow.utils import getListFromRangeString, removeBaseExt
 from pwem.protocols import ProtAnalysis3D
-from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
-                            setXmippAttributes, setOfParticlesToMd, getImageLocation)
-import pwem as em
+from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 from xmipp3 import XmippMdRow
-from pyworkflow.utils.path import copyFile, cleanPath, makePath
+from pyworkflow.utils.path import copyFile, makePath
 import pyworkflow.protocol.params as params
-from pyworkflow.protocol.params import NumericRangeParam
 from .convert import modeToRow
-from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import removeBaseExt
 from pwem.utils import runProgram
 from pwem import Domain
 import glob
@@ -45,8 +40,7 @@ import time
 from joblib import load, dump
 import farneback3d
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
-from continuousflex.protocols.utilities.src import Molecule
-from continuousflex.protocols.utilities.src import get_mol_conv, get_RMSD_coords
+from continuousflex.protocols.utilities.src import Molecule, get_mol_conv, get_RMSD_coords
 import numpy as np
 from pwem.objects import SetOfAtomStructs, AtomStruct
 import itertools
@@ -66,7 +60,7 @@ class FlexProtNMOF(ProtAnalysis3D):
         group.addParam('inputModes', params.PointerParam, pointerClass='SetOfNormalModes',
                       label="Normal modes", allowsNull=True,
                       help='Set of modes computed by normal mode analysis.')
-        group.addParam('modeList', NumericRangeParam,
+        group.addParam('modeList', params.NumericRangeParam,
                       label="Modes selection (optional)",
                       help='Select the normal modes that will be used for volume analysis. \n'
                            'If you leave this field empty, all computed modes will be selected for image analysis.\n'
@@ -86,6 +80,16 @@ class FlexProtNMOF(ProtAnalysis3D):
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select a volume or a set of volumes that will be fitted using the method')
+        form.addParam('applyMask', params.BooleanParam, label='Use a mask?', default=False,
+                       help='A mask that can be applied to the reference without cropping it.'
+                            ' A loose and smooth mask should be use.'
+                            ' This mask is optional, we recommend to try without a mask and see'
+                            ' if a mask improves the result later.'
+                       )
+        form.addParam('Mask', params.PointerParam,
+                       condition='applyMask',
+                       pointerClass='Volume', allowsNull=True,
+                       label="Select mask")
         form.addParam('do_rmsd', params.BooleanParam, label= 'Compare the fitted structure with the groundtruth PDBs?',
                       expertLevel=params.LEVEL_ADVANCED, default= False)
         group = form.addGroup('Compare the fitting result with the groundtruth')
@@ -98,10 +102,12 @@ class FlexProtNMOF(ProtAnalysis3D):
         form.addParam('regionSize', params.IntParam, default=3,
                       label='Region size (odd number)',
                       help = 'The optical flow region (voxels) around each atom that will be averaged')
-        # TODO: add mask
-        # TODO: Histogram equalization
-        # form.addParam('do_HistEqual', params.BooleanParam, default=True,
-        #               label='Perform histogram equalization on the set of volumes?')
+        form.addParam('step_size', params.FloatParam, default=0.5,
+                      label='Step size',
+                      help='TO do... this will multiply the optical flow at each step to have smoother transition')
+        form.addParam('do_HistEqual', params.BooleanParam, default=False,
+                      label='Perform histogram matching?',
+                      help='Histogram matching will be applied to the reference to match the gray level values of input volumes')
         form.addParam('do_rigidbody', params.BooleanParam, default=True,
                       label='Perform rigid-body alignment on the volume(s)?')
         group = form.addGroup('rigid-body alignment settings (Fast rotational matching)',
@@ -149,12 +155,11 @@ class FlexProtNMOF(ProtAnalysis3D):
                       label='poly_sigma',
                       help='standard deviation of the gaussian that is for derivatives to be smooth as the basis of'
                            ' the polynomial expansion. It can be 1.2 for poly= 5 and 1.5 for poly= 7.')
-        # TODO: histogram equalization should replace the need of two factors (one would be enough, and hidden)
-        group.addParam('factor1', params.IntParam, default=100,
+        group.addHidden('factor1', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='gray scale factor1',
                       help='this factor will be multiplied by the gray levels of each subtomogram')
-        group.addParam('factor2', params.IntParam, default=100,
+        group.addHidden('factor2', params.IntParam, default=100,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='gray scale factor2',
                       help='this factor will be multiplied by the gray levels of the reference')
@@ -289,7 +294,8 @@ class FlexProtNMOF(ProtAnalysis3D):
         if(self.do_rmsd.get()):
             pdbs_list = [f for f in glob.glob(self.targetPDBs.get())]
             pdbs_list.sort()
-            # Todo: save the names of the PDBs to use later in the viewer
+            dump(pdbs_list, self._getExtraPath('target_pdblist.pkl'))
+
         # Loop over the volumes:
         mdImgs = md.MetaData(self.imgsFn)
         rmsd = []
@@ -323,6 +329,14 @@ class FlexProtNMOF(ProtAnalysis3D):
                 vol0 = open_volume(volume_i)
                 vol1 = open_volume(path_target)
                 cc.append(CC(vol0, vol1))
+                # Apply the mask on vol1
+                if(self.applyMask.get()):
+                    mask = open_volume(self.Mask.get().getFileName())
+                    vol1 *= mask
+                    save_volume(vol1, self._getExtraPath('masked_vol.vol'))
+                # Apply histogram matching on vol0
+                if(self.do_HistEqual.get()):
+                    vol0 = match_histograms(vol0, vol1)
 
                 #  Saving the cc, rmsd and normal mode amplitudes
                 # objId has the number of volumes processed so far
@@ -350,6 +364,8 @@ class FlexProtNMOF(ProtAnalysis3D):
                 t0 = time.time()
                 # perform OF:
                 optFlow = optflow.calc_flow(vol0, vol1)
+                # multiply the optical flow by the step size:
+                optFlow *= self.step_size.get()
                 t_end = time.time()
                 print("spent on calculating 3D optical flow", np.floor((t_end - t0) / 60), "minutes and",
                       np.round(t_end - t0 - np.floor((t_end - t0) / 60) * 60), "seconds")
@@ -380,18 +396,16 @@ class FlexProtNMOF(ProtAnalysis3D):
                 # Combination of surrounding voxels
                 set = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10, 11, -11, 12, -12]
                 region_size = self.regionSize.get()
-                set = set[:region_size]
-                # Comment: [0, 1, -1] corresponds to region of size 3*3, [0 , 1, -1, 2, -2]  corresponds to region 5*5
-                # region of 1 is also okay, max region
+                set = set[:region_size+1]
+                # The region is shifted one step to the positive since we do floor division for the coordinates
                 comb = list(itertools.product(set, repeat=3))
                 for i in range(init.n_atoms):
                     # interpolate optFlow for all atoms
                     coord = init.coords[i] / voxel_size - origin
                     floor = np.ndarray.astype(np.floor(coord), dtype=int)
-                    # comb = np.array(
-                    #     [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]])
 
                     optFlows = []
+                    # TODO: make it faster using broadcasting instead of loop
                     for j in floor + comb:
                         if any(j < 0) or any(j >= optFlow.shape[1:]):
                             print("error volume and PDB not aligned :%s" % j)
@@ -459,8 +473,10 @@ class FlexProtNMOF(ProtAnalysis3D):
                 if(self.NMA.get()):
                     nma_amplitudes_all.append(nma_amplitudes)
 
-            # TODO: instead of saving the last PDB, save the one that has the highest CC
-            fitted.save_pdb(fit_directory + '/final.pdb')
+            # Saving the PDB with the highest cross correlation as final.pdb
+            id = np.argmax(cc_a[objId-1,:])
+            # print(id)
+            copyFile(fit_directory + '/ref%i.pdb' % (id),fit_directory + '/final.pdb')
             mdPDBs.setValue(md.MDL_IMAGE, fit_directory + '/final.pdb', mdPDBs.addObject())
         mdPDBs.write(self._getExtraPath('PDBs.xmd'))
 
@@ -469,7 +485,6 @@ class FlexProtNMOF(ProtAnalysis3D):
             pass
         else:
             nma_amplitudes_all = np.array(nma_amplitudes_all)
-            # TODO: save at each iteration so that the viewer can display the file
             dump(nma_amplitudes_all,self._getExtraPath('nma_amplitudes_all.pkl'))
 
 
@@ -512,15 +527,9 @@ class FlexProtNMOF(ProtAnalysis3D):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
 
-    def _updateParticle(self, item, row):
-        setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
-                           md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST, md.MDL_MAXCC,
-                           md.MDL_ANGLE_Y)
-        createItemMatrix(item, row, align=em.ALIGN_PROJ)
 
     def getInputPdb(self):
         """ Return the Pdb object associated with the normal modes. """
-
         return self.inputModes.get().getPdb()
 
 def readModes(fnIn):

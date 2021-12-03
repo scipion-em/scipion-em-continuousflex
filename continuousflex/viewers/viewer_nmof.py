@@ -112,7 +112,7 @@ class FlexProtNMOFViewer(ProtocolViewer):
         if rmsd_mat.ndim == 1:
             pass
         else:
-            rmsd_mat = rmsd_mat[self.displayCC.get()-1,:]
+            rmsd_mat = rmsd_mat[self.displayRMSD.get()-1,:]
         ax = plt.figure().gca()
         ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=np.size(rmsd_mat)))
         plt.plot(rmsd_mat)

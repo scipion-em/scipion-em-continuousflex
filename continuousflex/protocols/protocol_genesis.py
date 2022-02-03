@@ -237,29 +237,6 @@ class ProtGenesis(EMProtocol):
                       help="Origin of the first voxel in X direction (in Angstrom) ",
                       condition="EMfitChoice==1 and not centerOrigin")
 
-        # Images
-        group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
-        group.addParam('inputImage', params.PointerParam, pointerClass="Particle, SetOfParticles",
-                      label="Input image (s)", help='Select the target EM density map',
-                      condition="EMfitChoice==2", important=True)
-        group.addParam('image_size', params.IntParam, default=64, label='Image Size',
-                      help="TODO", condition="EMfitChoice==2")
-        group.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
-                      default=False,  condition="EMfitChoice==2", help="If set, the GUI will perform rigid body alignement. "
-                            "Otherwise, you must provide a set of alignement parameters for each image")
-        group.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
-                      help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
-                           "will be performed once at the begining of the simulation",
-                      condition="EMfitChoice==2 and estimateAngleShift")
-        group.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=1,
-                      choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
-                                                                       "Wavelet method is recommended",
-                      condition="EMfitChoice==2 and estimateAngleShift")
-        group.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
-                      condition="EMfitChoice==2 and not estimateAngleShift",
-                      help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
-        group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
-                      help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
         # Constraints =================================================================================================
         form.addSection(label='Constraints')
         form.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
@@ -343,26 +320,12 @@ class ProtGenesis(EMProtocol):
         Convert EM data step
         :return None:
         """
-
         inputEMfn = self.getInputEMfn()
         n_em = self.getNumberOfInputEM()
 
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(n_em):
                 self.convertInputVol(fnInput=inputEMfn[i], volPrefix = self.getInputEMprefix(i))
-
-        elif self.EMfitChoice.get() == EMFIT_IMAGES:
-            for i in range(n_em):
-                runCommand("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
-                if self.estimateAngleShift.get():
-                    currentAngles = md.MetaData()
-                    currentAngles.setValue(md.MDL_IMAGE, self.getInputEMprefix(i), currentAngles.addObject())
-                    currentAngles.setValue(md.MDL_ANGLE_ROT, 0.0, 1)
-                    currentAngles.setValue(md.MDL_ANGLE_TILT, 0.0, 1)
-                    currentAngles.setValue(md.MDL_ANGLE_PSI, 0.0, 1)
-                    currentAngles.setValue(md.MDL_SHIFT_X, 0.0, 1)
-                    currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
-                    currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
 
     def convertInputVol(self,fnInput,volPrefix):
         """
@@ -408,16 +371,8 @@ class ProtGenesis(EMProtocol):
         Run GENESIS simulations step
         :return None:
         """
+        self.runParallelGenesis()
 
-        rb_condition = self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()
-
-        # Parallel Genesis simulation
-        if not(rb_condition):
-            self.runParallelGenesis()
-
-        # Parallel rigid body fitting for EMFIT images
-        else:
-            self.runParallelGenesisRBFitting()
 
     def runParallelGenesis(self):
         """
@@ -446,147 +401,6 @@ class ProtGenesis(EMProtocol):
             # Run Genesis
             runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
                             numberOfThreads=self.numberOfThreads.get())
-
-    def runParallelGenesisRBFitting(self):
-
-        # SETUP MPI parameters
-        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
-
-        for i1 in range(numLinearFit + 1):
-            n_parallel = numParallelFit if i1 < numLinearFit else numLastIter
-
-            initrst = self.inputRST.get()
-
-            # Loop rigidbody align / GENESIS fitting
-            for iterFit in range(self.rb_n_iter.get()):
-
-                # ------   ALIGN PDBs---------
-                # Transform PDBs to volume
-                cmds_pdb2vol = []
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    inputPDB = self.getInputPDBprefix(indexFit) + ".pdb" if iterFit == 0 \
-                        else self.getOutputPrefix(indexFit) + ".pdb"
-
-                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
-                                                sampling_rate=self.pixel_size.get(),
-                                                image_size=self.image_size.get()))
-                runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv())
-
-                # Loop 4 times to refine the angles
-                # sampling_rate = [10.0, 5.0, 3.0, 2.0]
-                # angular_distance = [-1, 20, 10, 5]
-                sampling_rate = [10.0]
-                angular_distance = [-1]
-                for i_align in range(len(sampling_rate)):
-                    cmds_projectVol = []
-                    cmds_alignement = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        inputImage = self.getInputEMprefix(indexFit) + ".spi"
-                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-
-                        # get commands
-                        if self.rb_method.get() == RB_PROJMATCH:
-                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                              outputProj=tmpPrefix, expImage=inputImage,
-                                                              sampling_rate=sampling_rate[i_align],
-                                                              angular_distance=angular_distance[i_align]))
-                            cmds_alignement.append(projectMatch(inputImage=inputImage,
-                                                                inputProj=tmpPrefix, outputMeta=tmpMeta))
-                        else:
-                            cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                              outputProj=tmpPrefix, expImage=inputImage,
-                                                              sampling_rate=sampling_rate[i_align],
-                                                              angular_distance=angular_distance[i_align],
-                                                              compute_neighbors=False))
-                            cmds_alignement.append(waveletAssignement(inputImage=inputImage,
-                                                                      inputProj=tmpPrefix, outputMeta=tmpMeta))
-                    # run parallel jobs
-                    runParallelJobs(cmds_projectVol, env=self.getGenesisEnv())
-                    runParallelJobs(cmds_alignement, env=self.getGenesisEnv())
-
-                    cmds_continuousAssign = []
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                        currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                        if self.rb_method.get() == RB_PROJMATCH:
-                            flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
-                        cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
-                                                                      inputVol=tmpPrefix,
-                                                                      outputMeta=currentAngles))
-                    runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv())
-
-
-                # Cleaning volumes and projections
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    runCommand("rm -f %s*" % tmpPrefix)
-
-                # ------   Run Genesis ---------
-                cmds = []
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    if iterFit == 0:
-                        prefix = self.getOutputPrefix(indexFit)
-                        inputPDB = self.getInputPDBprefix(indexFit) + ".pdb"
-                    else:
-                        prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
-
-                    # Create INP file
-                    self.createINP(inputPDB=inputPDB,
-                                   outputPrefix=prefix, indexFit=indexFit)
-
-                    # run GENESIS
-                    cmds.append(self.getGenesisCmd(prefix=prefix, n_mpi=numMpiPerFit))
-                runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                                numberOfThreads=self.numberOfThreads.get())
-
-                # append files
-                if iterFit != 0:
-                    for i2 in range(n_parallel):
-                        indexFit = i2 + i1 * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        newPrefix = self.getOutputPrefix(indexFit)
-
-                        cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
-                        tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
-                        tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
-                        tcl_cmd += "animate write dcd %s.dcd \nexit \n" % newPrefix
-                        with open("%s.tcl" % tmpPrefix, "w") as f:
-                            f.write(tcl_cmd)
-                        cp_cmd = "cp %s.pdb %s.pdb" % (tmpPrefix, newPrefix)
-                        runCommand(cat_cmd)
-                        runCommand(cp_cmd)
-                        runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
-
-                rstfile = ""
-                for i2 in range(n_parallel):
-                    indexFit = i2 + i1 * numParallelFit
-                    newPrefix = self.getOutputPrefix(indexFit)
-                    if iterFit != 0:
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    else:
-                        tmpPrefix = self.getOutputPrefix(indexFit)
-
-                    runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
-                    rstfile += "%s.tmp.rst "%newPrefix
-                    #save angles
-                    angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                    saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
-                    runCommand("cp %s %s" % (angles, saved_angles))
-
-                    #cleaning
-                    runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
-                self.inputRST.set(rstfile)
-            self.inputRST.set(initrst)
 
     def createINP(self,inputPDB, outputPrefix, indexFit):
         """
@@ -717,7 +531,7 @@ class ProtGenesis(EMProtocol):
         if self.ensemble.get() == ENSEMBLE_NPT:
             s += "pressure = %.2f \n" % self.pressure.get()
 
-        if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
+        if (self.EMfitChoice.get()==EMFIT_VOLUMES)\
                 and self.simulationType.get() != SIMULATION_MIN:
             s += "\n[SELECTION] \n" #-----------------------------------------------------------
             s += "group1 = all and not hydrogen\n"
@@ -735,16 +549,6 @@ class ProtGenesis(EMProtocol):
             s += "emfit_period = 1  \n"
             if self.EMfitChoice.get() == EMFIT_VOLUMES:
                 s += "emfit_target = %s.mrc \n" % inputEMprefix
-            elif self.EMfitChoice.get()==EMFIT_IMAGES :
-                s += "emfit_type = IMAGE \n"
-                s += "emfit_target = %s.spi \n" % inputEMprefix
-                s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
-                rigid_body_params = self.getRigidBodyParams(indexFit)
-                s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
-                s += "emfit_tilt_angle = %f\n" % rigid_body_params[1]
-                s += "emfit_yaw_angle =  %f\n" % rigid_body_params[2]
-                s += "emfit_shift_x = %f\n" % rigid_body_params[3]
-                s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
             if self.simulationType.get() == SIMULATION_REMD:
                 s += "\n[REMD] \n" #-----------------------------------------------------------
@@ -826,9 +630,6 @@ class ProtGenesis(EMProtocol):
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), SetOfVolumes): return self.inputVolume.get().getSize()
             else: return 1
-        elif self.EMfitChoice.get() == EMFIT_IMAGES:
-            if isinstance(self.inputImage.get(), SetOfParticles): return self.inputImage.get().getSize()
-            else: return 1
         else: return 0
 
     def getNumberOfFitting(self):
@@ -839,7 +640,7 @@ class ProtGenesis(EMProtocol):
         numberOfInputPDB = self.getNumberOfInputPDB()
         numberOfInputEM = self.getNumberOfInputEM()
 
-        # Check input volumes/images correspond to input PDBs
+        # Check input volumes correspond to input PDBs
         if numberOfInputPDB != numberOfInputEM and \
                 numberOfInputEM != 1 and numberOfInputPDB != 1:
             raise RuntimeError("Number of input volumes and PDBs must be the same.")
@@ -872,12 +673,6 @@ class ProtGenesis(EMProtocol):
                     inputEMfn.append(i.getFileName())
             else:
                 inputEMfn.append(self.inputVolume.get().getFileName())
-        elif self.EMfitChoice.get() == EMFIT_IMAGES:
-            if isinstance(self.inputImage.get(), SetOfParticles) :
-                for i in self.inputImage.get():
-                    inputEMfn.append(i.getFileName())
-            else:
-                inputEMfn.append(self.inputImage.get().getFileName())
         return inputEMfn
 
     def getInputPDBprefix(self, index=0):
@@ -956,26 +751,6 @@ class ProtGenesis(EMProtocol):
             numberOflastIter    = n_fit % self.numberOfMpi.get()
 
         return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
-
-    def getRigidBodyParams(self, index=0):
-        """
-        Get the current rigid body parameters for the specified index in case of EMFIT with iamges
-        :param int index: Index of the simulation
-        :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
-        """
-        if not self.estimateAngleShift.get():
-            mdImg = md.MetaData(self.imageAngleShift.get())
-            idx = int(index + 1)
-        else:
-            mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(index + 1).zfill(5)))
-            idx=1
-        return [
-            mdImg.getValue(md.MDL_ANGLE_ROT, idx),
-            mdImg.getValue(md.MDL_ANGLE_TILT, idx),
-            mdImg.getValue(md.MDL_ANGLE_PSI, idx),
-            mdImg.getValue(md.MDL_SHIFT_X, idx),
-            mdImg.getValue(md.MDL_SHIFT_Y, idx),
-        ]
 
     def getGenesisEnv(self):
         """

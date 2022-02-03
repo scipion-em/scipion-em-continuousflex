@@ -84,18 +84,6 @@ class GenesisViewer(ProtocolViewer):
             group.addParam('displayCC', params.LabelParam,
                           label='Display Correlation Coefficient',
                           help='Show C.C. time series during the simulation')
-            if self.protocol.EMfitChoice.get() == EMFIT_IMAGES and \
-                    self.protocol.estimateAngleShift.get():
-                group.addParam('rigidBodyParams', params.FileParam, default=None,
-                              label="Target Rigid Body Parameters",
-                              help='Target parameter to compare')
-                group.addParam('displayAngularDistance', params.LabelParam,
-                              label='Display Angular distance',
-                              help='Show angular distance in degrees to the target rigid body params')
-                group.addParam('displayAngularDistanceTs', params.LabelParam,
-                              label='Display Angular distance Time series',
-                              help='Show angular distance time series'
-                                   'in degrees to the target rigid body params')
 
         group = form.addGroup('PCA analysis')
         group.addParam('displayPCA', params.LabelParam,
@@ -113,8 +101,6 @@ class GenesisViewer(ProtocolViewer):
             'displayCC': self._plotCC,
             'displayRMSDts': self._plotRMSDts,
             'displayRMSD': self._plotRMSD,
-            'displayAngularDistance': self._plotAngularDistance,
-            'displayAngularDistanceTs': self._plotAngularDistanceTs,
             'displayPCA': self._plotPCA,
             'displayTrajVMD': self._plotTrajVMD,
                 }
@@ -295,58 +281,6 @@ class GenesisViewer(ProtocolViewer):
 
         plotter.legend()
         plotter.show()
-
-    def _plotAngularDistance(self, paramName):
-        angular_dist = []
-        shift_dist = []
-        mdImgGT = md.MetaData(self.rigidBodyParams.get())
-        fitlist = self.getFitlist()
-        for i in fitlist:
-            imgfn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i).zfill(5)))
-            if os.path.exists(imgfn):
-                mdImgFn = md.MetaData(imgfn)
-
-                angular_dist.append(getAngularDist(md1=mdImgGT, md2=mdImgFn, idx1=i,idx2=1))
-                shift_dist.append(getShiftDist(md1=mdImgGT, md2=mdImgFn, idx1=i,idx2=1))
-
-        plotter1 = FlexPlotter()
-        ax1 = plotter1.createSubPlot("Angular Distance (°)", "# Image", "Angular Distance (°)")
-        ax1.plot(angular_dist, "o")
-        plotter1.show()
-
-        print("Angular distance mean %f:"%np.mean(angular_dist))
-        print("Angular distance std %f:"%np.std(angular_dist))
-
-        plotter2 = FlexPlotter()
-        ax2 = plotter2.createSubPlot("Shift Distance ($\AA$)", "# Image", "Shift Distance ($\AA$)")
-        ax2.plot(shift_dist, "o")
-        plotter2.show()
-
-        print("Shift distance mean %f:"%np.mean(shift_dist))
-        print("Shift distance std %f:"%np.std(shift_dist))
-
-    def _plotAngularDistanceTs(self, paramName):
-        mdImgGT = md.MetaData(self.rigidBodyParams.get())
-        fitlist = self.getFitlist()
-        niter= self.protocol.rb_n_iter.get()
-        angular_dist = np.zeros((len(fitlist),niter))
-
-        for i in range(len(fitlist)):
-            for j in range(niter):
-                imgfn = self.protocol._getExtraPath("%s_iter%i_angles.xmd" % (str(fitlist[i]).zfill(5), j))
-                if os.path.exists(imgfn):
-                    mdImgFn = md.MetaData(imgfn)
-                    angular_dist[i,j] = getAngularDist(md1=mdImgGT, md2=mdImgFn, idx1=fitlist[i], idx2=1)
-
-                else:
-                    print("%s not found" %imgfn)
-
-        plotter1 = FlexPlotter()
-        ax1 = plotter1.createSubPlot("Angular Distance (°)", "Number of iterations", "Angular Distance (°)")
-        for i in range(len(fitlist)):
-            ax1.plot(angular_dist[i,:])
-        plotter1.show()
-
 
     def _plotPCA(self, paramName):
 

@@ -124,18 +124,17 @@ class Plugin(pwem.Plugin):
             os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
 
         env.addPackage('genesis', version='1.4.0', deps=[lapack],
-                       url='https://github.com/mms29/nmmd/archive/master.tar.gz',
+                       url='https://github.com/mms29/nmmd/archive/nmmd.tar.gz',
                        tar='genesis.tgz',
                        createBuildDir=True,
                        buildDir='genesis',
                        commands=[('tar -xf ../genesis.tgz -C .;'
-                                  'mv nmmd-master/* .;'
-                                  'rm -r nmmd-master;'
+                                  'mv nmmd-nmmd/* .;'
+                                  'rm -r nmmd-nmmd;'
                                   './configure;'
                                   'make install;', "bin/atdyn")],
                        neededProgs=['mpif90'],
                        target="genesis", default=True)
-
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',
                     'precomputed_atomic': 'gold/images_WS_atoms.xmd',

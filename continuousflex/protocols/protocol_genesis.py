@@ -128,7 +128,7 @@ class ProtGenesis(EMProtocol):
                       help="Mass value of Normal modes for NMMD", condition="integrator==2 and simulationType!=1",
                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_limit', params.FloatParam, default=1000.0, label='NM amplitude threshold',
-                      help="Threshold of normal mode amplitude above which the normal modes are updated",
+                      help="Threshold of normal mode amplitude above/below which the normal modes are updated",
                       condition="integrator==2 and simulationType!=1",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('elnemo_cutoff', params.FloatParam, default=8.0, label='NMA cutoff (A)',
                       help="Cutoff distance for elastic network model", condition="integrator==2 and simulationType!=1",
@@ -142,6 +142,8 @@ class ProtGenesis(EMProtocol):
                       help="Number of MD steps between replica exchanges", condition="simulationType==2")
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
                       help="Number of replicas for REMD", condition="simulationType==2")
+
+
         # ENERGY =================================================================================================
         form.addSection(label='Energy')
         form.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,

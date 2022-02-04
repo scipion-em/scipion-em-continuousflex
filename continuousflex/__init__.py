@@ -44,7 +44,6 @@ class Plugin(pwem.Plugin):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
         cls._defineEmVar(GENESIS_HOME, 'genesis-1.4.0')
-        cls._defineEmVar(SITUS_HOME, 'situs-3.1')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod

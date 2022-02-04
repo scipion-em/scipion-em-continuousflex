@@ -30,6 +30,7 @@ from continuousflex.viewers.viewer_genesis import *
 import os
 import multiprocessing
 
+NUMBER_OF_CPU = multiprocessing.cpu_count()//2
 
 class testGENESIS(TestWorkflow):
     """ Test Class for GENESIS. """
@@ -73,7 +74,7 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = multiprocessing.cpu_count(),
+            numberOfThreads = NUMBER_OF_CPU,
 
        )
 
@@ -111,7 +112,7 @@ class testGENESIS(TestWorkflow):
             simulationType = SIMULATION_MD,
             integrator = INTEGRATOR_VVERLET,
             time_step = 0.002,
-            n_steps = 100, # 5000
+            n_steps = 5000, # 5000
             eneout_period = 100,
             crdout_period = 100,
             nbupdate_period = 10,
@@ -135,7 +136,7 @@ class testGENESIS(TestWorkflow):
             voxel_size = 2.0,
             centerOrigin = True,
 
-            numberOfThreads = multiprocessing.cpu_count(),
+            numberOfThreads = NUMBER_OF_CPU,
         )
         protGenesisFit.setObjLabel('[GENESIS]\n MD cryo-EM fitting with CHARMM implicit solvent')
 
@@ -170,7 +171,7 @@ class testGENESIS(TestWorkflow):
 
         assert(cc[0] < cc[-1])
         assert(rmsd[0] > rmsd[-1])
-        # assert(rmsd[-1] < 3.0)
+        assert(rmsd[-1] < 3.0)
 
         protGenesisFitNMMD = self.newProtocol(ProtGenesis,
 
@@ -186,7 +187,7 @@ class testGENESIS(TestWorkflow):
           simulationType=SIMULATION_MD,
           integrator=INTEGRATOR_NMMD,
           time_step=0.002,
-          n_steps=100, # 3000
+          n_steps=3000, # 3000
           eneout_period=100,
           crdout_period=100,
           nbupdate_period=10,
@@ -212,7 +213,7 @@ class testGENESIS(TestWorkflow):
           voxel_size=2.0,
           centerOrigin=True,
 
-          numberOfThreads=multiprocessing.cpu_count(),
+          numberOfThreads=NUMBER_OF_CPU,
           )
         protGenesisFitNMMD.setObjLabel('[GENESIS]\n NMMD cryo-EM fitting with CHARMM implicit solvent')
 
@@ -245,11 +246,11 @@ class testGENESIS(TestWorkflow):
 
         assert(cc[0] < cc[-1])
         assert(rmsd[0] > rmsd[-1])
-        # assert(rmsd[-1] < 3.0)
+        assert(rmsd[-1] < 3.0)
 
 
         # Need at least 2 cores
-        if multiprocessing.cpu_count() >= 2:
+        if NUMBER_OF_CPU >= 2:
             protGenesisFitREUS = self.newProtocol(ProtGenesis,
 
                                               inputPDB=protGenesisMin.outputPDBs,
@@ -264,11 +265,11 @@ class testGENESIS(TestWorkflow):
                                               simulationType=SIMULATION_REMD,
                                               integrator=INTEGRATOR_VVERLET,
                                               time_step=0.002,
-                                              n_steps=100, # 5000
-                                              eneout_period=10, # 100
-                                              crdout_period=10, # 100
+                                              n_steps=5000, # 5000
+                                              eneout_period=100, # 100
+                                              crdout_period=100, # 100
                                               nbupdate_period=10,
-                                              exchange_period=10, # 100
+                                              exchange_period=100, # 100
                                               nreplica = 2,
 
                                               implicitSolvent=IMPLICIT_SOLVENT_NONE,
@@ -290,7 +291,7 @@ class testGENESIS(TestWorkflow):
                                               voxel_size=2.0,
                                               centerOrigin=True,
 
-                                              numberOfThreads=multiprocessing.cpu_count()//2,
+                                              numberOfThreads=NUMBER_OF_CPU//2,
                                               numberOfMpi=2,
                                               )
             protGenesisFitREUS.setObjLabel('[GENESIS]\n REUS (2 replicas) cryo-EM fitting with CHARMM no solvent')
@@ -332,9 +333,9 @@ class testGENESIS(TestWorkflow):
             assert (cc1[0] < cc1[-1])
             assert (cc2[0] < cc2[-1])
             assert (rmsd1[0] > rmsd1[-1])
-            # assert (rmsd1[-1] < 3.0)
+            assert (rmsd1[-1] < 3.0)
             assert (rmsd2[0] > rmsd2[-1])
-            # assert (rmsd2[-1] < 3.0)
+            assert (rmsd2[-1] < 3.0)
 
     def testEmfitVolumeCAGO(self):
         # Import PDB to fit
@@ -368,7 +369,7 @@ class testGENESIS(TestWorkflow):
             cutoff_dist = 12.0,
             pairlist_dist = 15.0,
 
-            numberOfThreads = multiprocessing.cpu_count(),
+            numberOfThreads = NUMBER_OF_CPU,
 
        )
         protGenesisMin.setObjLabel('[GENESIS]\n Energy Minimization C-Alpha Go model')
@@ -387,7 +388,7 @@ class testGENESIS(TestWorkflow):
             simulationType = SIMULATION_MD,
             integrator = INTEGRATOR_VVERLET,
             time_step = 0.0005,
-            n_steps = 1000, # 20000
+            n_steps = 20000,
             eneout_period = 1000,
             crdout_period = 1000,
             nbupdate_period = 10,
@@ -411,7 +412,7 @@ class testGENESIS(TestWorkflow):
             voxel_size = 2.0,
             centerOrigin = True,
 
-            numberOfThreads = multiprocessing.cpu_count(),
+            numberOfThreads = NUMBER_OF_CPU,
         )
         protGenesisFit.setObjLabel('[GENESIS]\n MD cryo-EM fitting with C-Alpha Go model')
 
@@ -444,7 +445,7 @@ class testGENESIS(TestWorkflow):
         print("//////////////////////////////////////////////\n\n")
         assert(cc[0] < cc[-1])
         assert(rmsd[0] > rmsd[-1])
-        # assert(rmsd[-1] < 3.0)
+        assert(rmsd[-1] < 3.0)
 
     def testMDCHARMM(self):
         # Import PDB
@@ -484,7 +485,7 @@ class testGENESIS(TestWorkflow):
               fast_water = True,
               water_model = "TIP3",
 
-              numberOfThreads=multiprocessing.cpu_count(),
+              numberOfThreads=NUMBER_OF_CPU,
           )
         protGenesisMin.setObjLabel("[GENESIS]\n Energy Minimization CHARMM Explicit solvent")
         # Launch minimisation
@@ -543,77 +544,9 @@ class testGENESIS(TestWorkflow):
                     fast_water=True,
                     water_model="TIP3",
 
-                    numberOfThreads=multiprocessing.cpu_count(),
+                    numberOfThreads=NUMBER_OF_CPU,
                                           )
         protGenesisMDRun.setObjLabel("[GENESIS]\n MD simulation with CHARMM explicit solvent")
         # Launch Simulation
         self.launchProtocol(protGenesisMDRun)
 
-        #     inputPDB = protImportPdb.outputPdb.get(),
-        #     forcefield = FORCEFIELD_CHARMM,
-        #     generateTop = True,
-        #     # smog_dir = ,
-        #     # inputTOP = ,
-        #     inputPRM = "/home/guest/toppar/",
-        #     inputRTF = "/home/guest/toppar/",
-        #     nucleicChoice = NUCLEIC_NO,
-        #     # inputPSF = ,
-        #     restartchoice = False,
-        #     # inputRST = ,
-        #
-        #     simulationType = SIMULATION_MIN,
-        #     # integrator = ,
-        #     time_step = 0.002,
-        #     n_steps = 1000,
-        #
-        #     eneout_period = 100,
-        #     crdout_period = 100,
-        #     nbupdate_period = 10,
-        #     # nm_number = ,
-        #     # nm_mass = ,
-        #     # nm_limit = ,
-        #     # elnemo_cutoff = ,
-        #     # elnemo_rtb_block = ,
-        #     # elnemo_path = ,
-        #
-        #     implicitSolvent = IMPLICIT_SOLVENT_NONE,
-        #     electrostatics = ELECTROSTATICS_CUTOFF,
-        #     switch_dist = 10.0,
-        #     cutoff_dist = 12.0,
-        #     pairlist_dist = 15.0,
-        #
-        #     ensemble = ENSEMBLE_NVT,
-        #     tpcontrol = TPCONTROL_LANGEVIN,
-        #     temperature = 300.0,
-        #     # pressure = ,
-        #
-        #     boundary = BOUNDARY_NOBC,
-        #     # box_size_x = ,
-        #     # box_size_y = ,
-        #     # box_size_z = ,
-        #
-        #     EMfitChoice = EMFIT_NONE,
-        #     # constantK = ,
-        #     # emfit_sigma = ,
-        #     # emfit_tolerance = ,
-        #     # inputVolume = ,
-        #     # voxel_size = ,
-        #     # situs_dir = ,
-        #     # centerOrigin = ,
-        #     # inputImage = ,
-        #     # image_size = ,
-        #     # estimateAngleShift = ,
-        #     # rb_n_iter = ,
-        #     # rb_method = ,
-        #     # imageAngleShift = ,
-        #     # pixel_size = ,
-        #
-        #     rigid_bond = False,
-        #     fast_water = False,
-        #     # water_model = ,
-        #
-        #     replica_exchange = False,
-        #     # exchange_period = ,
-        #     # nreplica = ,
-        #     # constantKREMD =
-        #     numberOfThreads = multiprocessing.cpu_count(),

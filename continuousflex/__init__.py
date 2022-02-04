@@ -130,8 +130,8 @@ class Plugin(pwem.Plugin):
                        commands=[('tar -xf ../genesis.tgz -C .;'
                                   'mv nmmd-nmmd/* .;'
                                   'rm -r nmmd-nmmd;'
-                                  './configure;'
-                                  'make install;', "bin/atdyn")],
+                                  './configure LDFLAGS=-L%s ;'
+                                  'make install;' % env.getLibFolder(), "bin/atdyn")],
                        neededProgs=['mpif90'],
                        target="genesis", default=True)
 

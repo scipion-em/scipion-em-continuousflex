@@ -1,4 +1,4 @@
 matplotlib
-farneback3d
-pycuda==2020.1
+#farneback3d
+#pycuda==2020.1
 #scikit-image

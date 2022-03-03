@@ -5,8 +5,8 @@
 # *
 # **************************************************************************
 
-import autograd.numpy as npg
-from autograd import elementwise_grad
+#import autograd.numpy as npg
+#from autograd import elementwise_grad
 import numpy as np
 import sys
 import time

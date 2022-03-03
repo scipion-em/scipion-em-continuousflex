@@ -12,7 +12,7 @@ import numpy as np
 import continuousflex.protocols.utilities.src as src
 from continuousflex.protocols.utilities.src.constants import FIT_VAR_LOCAL,FIT_VAR_GLOBAL,\
     FIT_VAR_ROTATION, FIT_VAR_SHIFT
-from skimage.exposure import match_histograms
+#from skimage.exposure import match_histograms
 
 
 
@@ -60,8 +60,8 @@ class Density:
             max1 = density.data.max()
             max2 = self.data.max()
             self.data = ((self.data - (min2 + min1))*(max1 - min1) )/ (max2 - min2)
-        elif method == "match":
-            self.data = match_histograms(self.data, density.data)
+#        elif method == "match":
+#            self.data = match_histograms(self.data, density.data)
         else:
             print("Undefined type")
 

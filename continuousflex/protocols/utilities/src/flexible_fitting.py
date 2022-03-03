@@ -16,8 +16,8 @@ import numpy as np
 import continuousflex.protocols.utilities.src as src
 from continuousflex.protocols.utilities.src.constants import FIT_VAR_LOCAL,FIT_VAR_GLOBAL, FIT_VAR_ROTATION, FIT_VAR_SHIFT, \
                                 KCAL_TO_JOULE, AVOGADRO_CONST, ATOMIC_MASS_UNIT,K_BOLTZMANN, ANGSTROM_TO_METER
-from continuousflex.protocols.utilities.src.viewers import fit_viewer, chimera_fit_viewer, fit_potentials_viewer,\
-    ramachandran_viewer
+from continuousflex.protocols.utilities.src.viewers import fit_viewer, chimera_fit_viewer, fit_potentials_viewer
+#,ramachandran_viewer
 
 #################################################################################################################
 #                          Flexible Fitting
@@ -543,7 +543,7 @@ class FlexibleFitting:
             self.show_forcefield(save=self.prefix+"_chain"+str(self.chain_id)+"_forcefield.png")
             src.io.append_dcd(pdb_file=self.prefix+"_chain"+str(self.chain_id)+".pdb",
                               dcd_file=self.prefix+"_chain"+str(self.chain_id)+".dcd")
-            ramachandran_viewer(self.prefix+"_chain"+str(self.chain_id)+".pdb", save=self.prefix+"_chain"+str(self.chain_id)+"_rama.png")
+            #ramachandran_viewer(self.prefix+"_chain"+str(self.chain_id)+".pdb", save=self.prefix+"_chain"+str(self.chain_id)+"_rama.png")
 
     # ==========================================   HMC Others       ===============================================
 

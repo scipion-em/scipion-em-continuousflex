@@ -9,7 +9,7 @@ import os
 import matplotlib.pyplot as plt
 plt.style.use("bmh")
 import numpy as np
-import RamachanDraw
+#import RamachanDraw
 import continuousflex.protocols.utilities.src as src
 import warnings
 
@@ -159,14 +159,14 @@ def chimera_fit_viewer(mol, target):
     cmd = "~/scipion3/software/em/chimerax-1.1/bin/ChimeraX --cmd \"open mol.pdb ; open vol.mrc ; volume #2 level 0.7 ; volume #2 transparency 0.7 ; hide atoms ; show cartoons\""
     os.system(cmd)
 
-def ramachandran_viewer(file, save=None):
-
-    if save is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            RamachanDraw.plot(file, show=False, save=True, out=save)
-            plt.close("all")
-    else:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            RamachanDraw.plot(file)
+#def ramachandran_viewer(file, save=None):
+#
+#    if save is not None:
+#        with warnings.catch_warnings():
+#           warnings.simplefilter("ignore")
+#            RamachanDraw.plot(file, show=False, save=True, out=save)
+#            plt.close("all")
+#    else:
+#        with warnings.catch_warnings():
+#            warnings.simplefilter("ignore")
+#            RamachanDraw.plot(file)

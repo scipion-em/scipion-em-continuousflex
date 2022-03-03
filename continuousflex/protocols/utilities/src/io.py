@@ -7,7 +7,7 @@
 
 import os
 
-import mrcfile
+#import mrcfile
 import numpy as np
 
 from continuousflex.protocols.utilities.src.constants import TOPOLOGY_FILE

@@ -44,6 +44,7 @@ from continuousflex.protocols.utilities.src import Molecule, get_mol_conv, get_R
 import numpy as np
 from pwem.objects import SetOfAtomStructs, AtomStruct
 import itertools
+from pwem.convert.atom_struct import cifToPdb
 
 
 class FlexProtNMOF(ProtAnalysis3D):
@@ -312,7 +313,11 @@ class FlexProtNMOF(ProtAnalysis3D):
             n_loop = self.fitIterations.get()
             fit_directory = self._getExtraPath(removeBaseExt(basename(path_target)))
             makePath(fit_directory)
-            copyFile(path_reference, fit_directory + '/ref0.pdb' )
+            if path_reference.endswith(".cif") or path_reference.endswith(".mmcif"):
+                cifToPdb(path_reference, fit_directory + '/ref0.pdb')
+            else:
+                copyFile(path_reference, fit_directory + '/ref0.pdb' )
+
             # Loop for each volume and iteratively approach its conformation
             nma_amplitudes = []
             for n in range(n_loop):

@@ -43,7 +43,7 @@ class Plugin(pwem.Plugin):
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
-        cls._defineEmVar(GENESIS_HOME, 'genesis-1.4.0')
+        cls._defineEmVar(GENESIS_HOME, 'genesis/nmmd')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
 
     #   @classmethod
@@ -123,16 +123,13 @@ class Plugin(pwem.Plugin):
             os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
 
         target_branch = "nmmd_image_merge"
-        env.addPackage('genesis', version='1.4.0', deps=[lapack],
-                       url='https://github.com/mms29/nmmd/archive/%s.tar.gz' %target_branch,
-                       tar='genesis.tgz',
+        env.addPackage('genesis', version='1.7.1', deps=[lapack],
                        createBuildDir=True,
                        buildDir='genesis',
-                       commands=[('tar -xf ../genesis.tgz -C .;'
-                                  'mv nmmd-%s/* .;'
-                                  'rm -r nmmd-%s;'
+                       commands=[('git clone -b %s https://github.com/mms29/nmmd.git ; '
+                                  'cd nmmd ; '
                                   './configure LDFLAGS=-L%s ;'
-                                  'make install;' % (target_branch,target_branch,env.getLibFolder()), "bin/atdyn")],
+                                  'make install;' % (target_branch,env.getLibFolder()), "nmmd/bin/atdyn")],
                        neededProgs=['mpif90'],
                        target="genesis", default=False)
 

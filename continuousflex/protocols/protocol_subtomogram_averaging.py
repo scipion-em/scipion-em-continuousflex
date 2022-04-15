@@ -24,6 +24,8 @@
 # **************************************************************************
 
 import os
+
+import numpy as np
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import writeSetOfVolumes, xmippToLocation, createItemMatrix, setXmippAttributes
 import pwem as em
@@ -32,6 +34,7 @@ import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pwem.utils import runProgram
 from pwem import Domain
+import math
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -46,6 +49,7 @@ COPY_STA = 1
 IMPORT_XMIPP_MD = 0
 IMPORT_DYNAMO_TBL = 1
 IMPORT_TOMBOX_MTV = 2
+IMPORT_NOVASTA_STAR = 3
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
     """ Protocol for subtomogram averaging. """
@@ -73,7 +77,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                        label='From which software?',
                        choices=['Import Scipion/Xmipp metadata',
                                 'Import Dynamo table',
-                                'Import TOM-ToolBox motive list'],
+                                'Import TOM-ToolBox motive list',
+                                'Import NovaSta star file'],
                        default=IMPORT_XMIPP_MD,
                        help='You have to provide a pervious table of rigid-body alignment parameters in one of the list'
                             'of supported formats. The software will evaluate the average based on the provided file. '
@@ -84,6 +89,13 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                        condition='import_choice==%d' %IMPORT_XMIPP_MD,
                       label='Import Scipion/Xmipp metadata file',
                       help='import a the metadata file that contains the StA parameters. This option will evaluate '
+                           'the average and allows you to perform post-StA processes (refinement and heterogeneity analysis).')
+        group.addParam('novaStaStar', params.PathParam, allowsNull=True,
+                       condition='import_choice==%d' %IMPORT_NOVASTA_STAR,
+                      label='Import NovaSta star file',
+                      help='import th star file that contains the StA parameters. The file should contains the columns '
+                           'image, angleRot, angleTilt, anglePsi, shiftX, shiftY, shiftZ which corresponds '
+                           'to the image path, psi/theta/phi angles and shift x/y/z respectively.This option will evaluate '
                            'the average and allows you to perform post-StA processes (refinement and heterogeneity analysis).')
         group.addParam('dynamoTable', params.PathParam, allowsNull=True,
                        condition='import_choice==%d' % IMPORT_DYNAMO_TBL,
@@ -167,6 +179,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
         elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_TOMBOX_MTV:
             self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_NOVASTA_STAR:
+            self._insertFunctionStep('adaptNovaStaStep', self.novaStaStar.get())
         else:
             self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
         self._insertFunctionStep('createOutputStep')
@@ -426,6 +440,57 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
          # Averaging is done
         pass
 
+    def adaptNovaStaStep(self, Table):
+
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        mdImgs = md.MetaData(Table)
+        mdOut = md.MetaData()
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+            x_shift = x_shift / 2
+            y_shift = y_shift / 2
+            z_shift = z_shift / 2
+
+            mat = NovaSTARotationMatrix(psi=-psi, theta=-tilt, phi=-rot, shiftx=x_shift, shifty=y_shift, shiftz=z_shift)
+            rot, tilt, psi, x_shift,y_shift,z_shift= matrix2eulerAngles(mat)
+
+            idx = mdOut.addObject()
+            mdOut.setValue(md.MDL_IMAGE ,imgPath,   idx)
+            mdOut.setValue(md.MDL_ANGLE_ROT ,rot,   idx)
+            mdOut.setValue(md.MDL_ANGLE_TILT,tilt,  idx)
+            mdOut.setValue(md.MDL_ANGLE_PSI ,psi,   idx)
+            mdOut.setValue(md.MDL_SHIFT_X, x_shift, idx)
+            mdOut.setValue(md.MDL_SHIFT_Y, y_shift, idx)
+            mdOut.setValue(md.MDL_SHIFT_Z, z_shift, idx)
+
+            tempVol = self._getExtraPath('temp.mrc')
+            params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+            runProgram('xmipp_transform_geometry', params)
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+        mdOut.write(self._getExtraPath("final_md.xmd"))
+
+
     def adaptXmippStep(self, Table):
         volumes_in = self.imgsFn
         volume_out = self.outputVolume
@@ -518,3 +583,81 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
                            md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_MAXCC, md.MDL_ANGLE_Y)
         createItemMatrix(item, row, align=em.ALIGN_PROJ)
+
+
+def dynamo_mat(tdrot, tilt, narot, shiftx, shifty, shiftz):
+    tdrot = np.deg2rad(tdrot)
+    tilt = np.deg2rad(tilt)
+    narot = np.deg2rad(narot)
+    cotd = np.cos(tdrot)
+    sitd = np.sin(tdrot)
+    coti = np.cos(tilt)
+    siti = np.sin(tilt)
+    cona = np.cos(narot)
+    sina = np.sin(narot)
+    m = np.zeros([4, 4])
+    m[0, 0] = cotd * cona - sitd * coti * sina
+    m[1, 0] = - cona * sitd - cotd * coti * sina
+    m[2, 0] = sina * siti
+    m[0, 1] = cotd * sina + cona * sitd * coti
+    m[1, 1] = cotd * cona * coti - sitd * sina
+    m[2, 1] = -cona * siti
+    m[0, 2] = sitd * siti
+    m[1, 2] = cotd * siti
+    m[2, 2] = coti
+    # The 4th column
+    m[0, 3] = shiftx
+    m[1, 3] = shifty
+    m[2, 3] = shiftz
+    m[3, 3] = 1
+
+    return m
+
+def matrix2eulerAngles(A):
+    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
+    if (abs_sb > 16 * np.exp(-5)):
+        gamma = math.atan2(A[1, 2], -A[0, 2])
+        alpha = math.atan2(A[2, 1], A[2, 0])
+        if (abs(np.sin(gamma)) < np.exp(-5)):
+            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
+        else:
+            if np.sin(gamma) > 0:
+                sign_sb = np.sign(A[1, 2])
+            else:
+                sign_sb = -np.sign(A[1, 2])
+        beta = math.atan2(sign_sb * abs_sb, A[2, 2])
+    else:
+        if (np.sign(A[2, 2]) > 0):
+            alpha = 0
+            beta = 0
+            gamma = math.atan2(-A[1, 0], A[0, 0])
+        else:
+            alpha = 0
+            beta = np.pi
+            gamma = math.atan2(A[1, 0], -A[0, 0])
+    gamma = np.rad2deg(gamma)
+    beta = np.rad2deg(beta)
+    alpha = np.rad2deg(alpha)
+    return alpha, beta, gamma, A[0, 3], A[1, 3], A[2, 3]
+
+
+def NovaSTARotationMatrix(phi, psi, theta, shiftx, shifty, shiftz):
+    cos = np.cos
+    sin = np.sin
+    rotMat = np.zeros([4, 4])
+    phi = np.deg2rad(phi)
+    psi = np.deg2rad(psi)
+    theta = np.deg2rad(theta)
+
+    rotMat[0,0] = cos(psi) * cos(phi) - cos(theta) * sin(psi) * sin(phi)
+    rotMat[1,0] = sin(psi) * cos(phi) + cos(theta) * cos(psi) * sin(phi)
+    rotMat[2,0] = sin(theta) * sin(phi)
+    rotMat[0,1] = -cos(psi) * sin(phi) - cos(theta) * sin(psi) * cos(phi)
+    rotMat[1,1] = -sin(psi) * sin(phi) + cos(theta) * cos(psi) * cos(phi)
+    rotMat[2,1] = sin(theta) * cos(phi)
+    rotMat[0,2] = sin(theta) * sin(psi)
+    rotMat[1,2] = -sin(theta) * cos(psi)
+    rotMat[2,2] = cos(theta)
+    rotMat[:3,3] = np.dot(rotMat[:3,:3], np.array([shiftx, shifty, shiftz]).T)
+    rotMat[3,3] = 1
+    return rotMat

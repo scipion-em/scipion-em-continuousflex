@@ -612,7 +612,7 @@ def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostCo
     :param list commands: list of commands to run in parallel
     :param dict env: Running environement of subprocesses
     :param numberOfThreads: Number of openMP threads
-    :param numberOfMpi: Number of MPI cores
+    :param numberOfMpi: Number of MPI cores per job
     :return None:
     """
 

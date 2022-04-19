@@ -42,7 +42,8 @@ from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
-from continuousflex.protocols.utilities.genesis_utilities import PDBMol,save_dcd
+from continuousflex.protocols.utilities.genesis_utilities import save_dcd
+from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
 
 import os
@@ -70,19 +71,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayRawDeformation', StringParam, default='1 2',
-                      label='Display the principal axes',
-                      help='Type 1 to see the histogram of PCA axis 1; \n'
-                           'type 2 to to see the histogram of PCA axis 2, etc.\n'
-                           'Type 1 2 to see the 2D plot of amplitudes for PCA axes 1 2.\n'
-                           'Type 1 2 3 to see the 3D plot of amplitudes for PCA axes 1 2 3; etc.'
-                           )
-        form.addParam('displayPcaSingularValues', LabelParam,
-                      label="Display PCA singular values",
-                      help="The values should help you see how many dimensions are in the data ")
         form.addParam('displayTrajectories', LabelParam,
-                      label='Open trajectories tool?',
-                      help='Open a GUI to visualize the volumes as points'
+                      label='Display PCA trajectories',
+                      help='Open a GUI to visualize the PCA space'
                            ' to draw and adjust trajectories.')
         form.addParam('xlimits_mode', EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually x-axis limits'],
@@ -121,12 +112,16 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       label='Radius')
         form.addParam('alpha', FloatParam, default=None, allowsNull=True,
                         label='Transparancy')
+        form.addParam("dataSet", StringParam, default= "", label="Data set label")
+        form.addParam('displayPcaSingularValues', LabelParam,
+                      label="Display PCA singular values",
+                      help="The values should help you see how many dimensions are in the data ")
 
 
     def _getVisualizeDict(self):
-        return {'displayRawDeformation': self._viewRawDeformation,
-                'displayPcaSingularValues': self.viewPcaSinglularValues,
+        return {
                 'displayTrajectories': self._displayTrajectories,
+                'displayPcaSingularValues': self.viewPcaSinglularValues,
                 }
 
 
@@ -151,57 +146,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                                 alpha=self.alpha)
         return [self.trajectoriesWindow]
 
-    def _viewRawDeformation(self, paramName):
-        components = self.displayRawDeformation.get()
-        return self._doViewRawDeformation(components)
-        
-    def _doViewRawDeformation(self, components):
-        components = list(map(int, components.split()))
-        # print(components)
-        dim = len(components)
-        if self.xlimits_mode.get() == X_LIMITS:
-            x_low = self.xlim_low.get()
-            x_high = self.xlim_high.get()
-        if self.ylimits_mode.get() == Y_LIMITS:
-            y_low = self.ylim_low.get()
-            y_high = self.ylim_high.get()
-        if self.zlimits_mode.get() == Z_LIMITS:
-            z_low = self.zlim_low.get()
-            z_high = self.zlim_high.get()
-
-        # print(self.protocol.getOutputMatrixFile())
-        X = np.loadtxt(fname=self.protocol.getOutputMatrixFile())
-        if dim == 1:
-            plt.hist(X[:,components[0]-1])
-            plt.title('Histogram of principal axis %d values' %components[0])
-        if dim == 2:
-            plt.scatter(X[:,components[0]-1],X[:,components[1]-1])
-            if self.xlimits_mode.get() == X_LIMITS:
-                plt.xlim([x_low,x_high])
-            if self.ylimits_mode.get() == Y_LIMITS:
-                plt.ylim([y_low,y_high])
-            plt.xlabel('Principal Component Axis %d' %components[0])
-            plt.ylabel('Principal Component Axis %d' %components[1])
-            modeNameList = 'Principal Axes %d vs %d' %(components[0], components[1])
-            plt.title(modeNameList)
-
-        if dim == 3:
-            fig = plt.figure()
-            ax = fig.gca(projection='3d')
-            ax.scatter(X[:,components[0]-1],X[:,components[1]-1],X[:,components[2]-1])
-            if self.xlimits_mode.get() == X_LIMITS:
-                ax.set_xlim([x_low,x_high])
-            if self.ylimits_mode.get() == Y_LIMITS:
-                ax.set_ylim([y_low,y_high])
-            if self.zlimits_mode.get() == Z_LIMITS:
-                ax.set_zlim([z_low,z_high])
-            ax.set_xlabel('Principal Component Axis %d' %components[0])
-            ax.set_ylabel('Principal Component Axis %d' %components[1])
-            ax.set_zlabel('Principal Component Axis %d' %components[2])
-            modeNameList = 'Principal Axes %d vs %d vs %d' %(components[0], components[1], components[2])
-            ax.set_title(modeNameList)
-        plt.show()
-
     def viewPcaSinglularValues(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
         fig = plt.figure('PCA singlular values')
@@ -211,6 +155,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         pass
 
     def getData(self):
+
+        dataSet = self.dataSet.get().split(";")
+        n_data = len(dataSet)
         data = Data()
         pdb_matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
         for i in range(pdb_matrix.shape[0]):
@@ -248,14 +195,14 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
 
         # Generate DCD trajectory
-        initPDB = PDBMol(prot.getPDBRef())
+        initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
         initdcdcp = initPDB.copy()
         coords_list = []
         for i in range(NUM_POINTS_TRAJECTORY):
             coords_list.append(deformations[i].reshape((initdcdcp.n_atoms, 3)))
         save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=animationRoot)
         initdcdcp.coords = coords_list[0]
-        initdcdcp.save(animationRoot+".pdb")
+        initdcdcp.write_pdb(animationRoot+".pdb")
 
         # Generate the vmd script
         vmdFn = animationRoot + '.vmd'

@@ -347,11 +347,11 @@ class GenesisViewer(ProtocolViewer):
 
         # Get matching atoms
         if self.referencePDB.get() != "":
-            ref_pdb = PDBMol(self.referencePDB.get())
+            ref_pdb = ContinuousFlexPDBHandler(self.referencePDB.get())
         else:
-            ref_pdb = PDBMol(self.protocol.getInputPDBprefix()+".pdb")
-        target_pdb = PDBMol(self.getTargetPDB())
-        idx = matchPDBatoms([ref_pdb, target_pdb], ca_only=True)
+            ref_pdb = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix()+".pdb")
+        target_pdb = ContinuousFlexPDBHandler(self.getTargetPDB())
+        idx_matchin_atoms = ref_pdb.matchPDBatoms(reference_pdb=target_pdb, ca_only=True)
 
         # Get RMSD list
         rmsd = []
@@ -365,8 +365,17 @@ class GenesisViewer(ProtocolViewer):
                 labels.append("RMSD %s"%str(i+1))
             rmsd_rep=[]
             for j in outputPrefix:
-                rmsd_rep.append(rmsdFromDCD(outputPrefix=j, inputPDB=self.protocol.getInputPDBprefix(i)+".pdb",
-                    targetPDB=self.getTargetPDB(i),idx=idx, align = self.alignTarget.get()))
+                rmsd_curr = []
+
+                inputPDB = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix(i)+".pdb")
+                targetPDB = ContinuousFlexPDBHandler(self.getTargetPDB(i))
+                rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
+                coord_arr = dcd2numpyArr(outputPrefix + ".dcd")
+                for i in range(len(coord_arr)):
+                    inputPDB.coords[:, :] = coord_arr[i]
+                    rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
+
+                rmsd_rep.append(rmsd_curr)
             rmsd.append(rmsd_rep)
 
         self.genesisPlotter(title="RMSD ($\AA$)", data=rmsd, ndata=len(simlist),
@@ -385,24 +394,26 @@ class GenesisViewer(ProtocolViewer):
             inputPDB = self.protocol.getInputPDBprefix(i)+".pdb"
             targetPDB = self.getTargetPDB(i)
             outputPrefs = self.getOutputPrefixAll(i)
-            target_mols.append(PDBMol(targetPDB))
-            initial_mols.append(PDBMol(inputPDB))
+            target_mols.append(ContinuousFlexPDBHandler(targetPDB))
+            initial_mols.append(ContinuousFlexPDBHandler(inputPDB))
             for outputPrefix in outputPrefs:
                 outputPDB = outputPrefix +".pdb"
-                final_mols.append(PDBMol(outputPDB))
+                final_mols.append(ContinuousFlexPDBHandler(outputPDB))
 
         if self.referencePDB.get() != "":
-            ref_mol = PDBMol(self.referencePDB.get())
+            ref_mol = ContinuousFlexPDBHandler(self.referencePDB.get())
         else:
             ref_mol = initial_mols[0]
-        idx = matchPDBatoms(mols=[ref_mol, target_mols[0]],ca_only=True)
+        idx_match = ref_mol.matchPDBatoms(reference_pdb=target_mols[0],ca_only=True)
         rmsdi=[]
         rmsdf=[]
         for i in range(len(self.getSimulationList())):
             for j in range(len(outputPrefs)):
-                rmsdi.append(getRMSD(mol1=initial_mols[i],mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
-                rmsdf.append(getRMSD(mol1=final_mols[i*len(outputPrefs) + j]  ,
-                                     mol2=target_mols[i], idx=idx, align=self.alignTarget.get()))
+                rmsdi.append(initial_mols[i].getRMSD(reference_pdb=target_mols[i],
+                                                     idx_matching_atoms=idx_match,
+                                                     align=self.alignTarget.get()))
+                rmsdf.append(final_mols[i*len(outputPrefs) + j].getRMSD(reference_pdb=target_mols[i],
+                                                    idx_matching_atoms=idx_match, align=self.alignTarget.get()))
 
         ax.plot(rmsdf, "o", color="tab:blue", label="Final RMSD", markeredgecolor='black')
         ax.plot(rmsdi, "o", color="tab:green", label="Initial RMSD", markeredgecolor='black')
@@ -464,110 +475,6 @@ class GenesisViewer(ProtocolViewer):
         for i in range(len(SimulationList)):
             ax1.plot(angular_dist[i,:])
         plotter1.show()
-
-
-    def _plotPCA(self, paramName):
-
-        initPDB = PDBMol(self.protocol.getInputPDBprefix()+".pdb")
-
-        # MAtch atoms with target
-        if self.compareToPDB.get():
-            targetPDB = PDBMol(self.getTargetPDB())
-            if self.referencePDB.get() != "":
-                refPDB = PDBMol(self.referencePDB.get())
-            else:
-                refPDB = initPDB
-            matchingAtoms = matchPDBatoms([refPDB,targetPDB], ca_only=False)
-        else:
-            matchingAtoms = np.array([np.arange(initPDB.n_atoms)]).T
-
-        # Get Init PDB coords
-        initPDBs = []
-        for i in range(self.protocol.getNumberOfInputPDB()):
-            mol = PDBMol(self.protocol.getInputPDBprefix(i)+".pdb")
-            initPDBs.append(mol.coords[matchingAtoms[:,0]].flatten())
-
-        # Get fitted PDBs coords
-        fitPDBs = []
-        fitMols = []
-        for i in self.getSimulationList():
-            outputPrefix = self.getOutputPrefixAll(i)
-            for j in outputPrefix:
-                mol = PDBMol(j+".pdb")
-                fitPDBs.append(mol.coords[matchingAtoms[:,0]].flatten())
-            fitMols.append(mol)
-
-        data = fitPDBs + initPDBs
-        length=[len(fitPDBs), len(initPDBs)]
-        labels=["Fitted PDBs", "Init. PDBs"]
-
-        # Get TargetPDBs coords
-        if self.compareToPDB.get():
-            targetPDBs=[]
-            for i in self.getSimulationList():
-                targetMol = PDBMol(self.getTargetPDB(i))
-                if self.alignTarget.get():
-                    alignMol(fitMols[i], targetMol, idx=matchingAtoms)
-                targetPDBs.append(targetMol.coords[matchingAtoms[:,1]].flatten())
-            data = data+targetPDBs
-            length.append(len(targetPDBs))
-            labels.append("Target PDBs")
-
-        # Compute PCA
-        pca = PCA(n_components=2)
-        pca_components = pca.fit_transform(np.array(data)).T
-
-        # Plot PCA data
-        idx_cumsum = np.concatenate((np.array([0]), np.cumsum(length))).astype(int)
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("PCA", "PCA component 1", "PCA component 2")
-        for i in range(len(length)):
-            plotter.plot(pca_components[0, idx_cumsum[i]:idx_cumsum[i + 1]],
-                         pca_components[1, idx_cumsum[i]:idx_cumsum[i + 1]],
-                         "o", label=labels[i],
-                         markeredgecolor='black')
-        plotter.legend()
-        plotter.show()
-        fig = plotter.getFigure()
-
-        # Prepare onclick event
-        click_coord = []
-        inv_pca = []
-        n_inv_pca = 10
-        initPDB.select_atoms(matchingAtoms[:,0])
-
-        def onclick(event):
-            if len(click_coord) < 2:
-                click_coord.append((event.xdata, event.ydata))
-                x = event.xdata
-                y = event.ydata
-
-            if len(click_coord) == 2:
-                click_sel = np.array([np.linspace(click_coord[0][0], click_coord[1][0], n_inv_pca),
-                                      np.linspace(click_coord[0][1], click_coord[1][1], n_inv_pca)
-                                      ])
-                ax.plot(click_sel[0], click_sel[1], "-o", color="black")
-                inv_pca.insert(0, pca.inverse_transform(click_sel.T))
-                click_coord.clear()
-                fig.canvas.draw()
-
-                initdcdcp = initPDB.copy()
-                coords_list = []
-                for i in range(n_inv_pca):
-                    coords_list.append(inv_pca[0][i].reshape((initdcdcp.n_atoms, 3)))
-                tmpPath = self.protocol._getExtraPath("traj")
-                save_dcd(mol=initdcdcp, coords_list=coords_list, prefix=tmpPath)
-                initdcdcp.coords = coords_list[0]
-                initdcdcp.save(tmpPath+".pdb")
-                vmdviewer = VmdView("%s.pdb %s.dcd"%(tmpPath, tmpPath))
-                vmdviewer.show()
-
-        fig.canvas.mpl_connect('button_press_event', onclick)
-
-        np.save(file = self.protocol._getExtraPath("PCA_data.npy"), arr= data)
-        np.save(file = self.protocol._getExtraPath("PCA_length.npy"), arr= length)
-        np.save(file = self.protocol._getExtraPath("PCA_labels.npy"), arr= labels)
-
 
     def getSimulationList(self):
         if self.protocol.getNumberOfSimulation() > 1:

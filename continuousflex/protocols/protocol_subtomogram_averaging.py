@@ -24,6 +24,8 @@
 # **************************************************************************
 
 import os
+
+import numpy as np
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import writeSetOfVolumes, xmippToLocation, createItemMatrix, setXmippAttributes
 import pwem as em
@@ -32,6 +34,7 @@ import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pwem.utils import runProgram
 from pwem import Domain
+import math
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -518,3 +521,107 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
                            md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_MAXCC, md.MDL_ANGLE_Y)
         createItemMatrix(item, row, align=em.ALIGN_PROJ)
+
+
+def dynamo_mat(tdrot, tilt, narot, shiftx, shifty, shiftz):
+    tdrot = np.deg2rad(tdrot)
+    tilt = np.deg2rad(tilt)
+    narot = np.deg2rad(narot)
+    cotd = np.cos(tdrot)
+    sitd = np.sin(tdrot)
+    coti = np.cos(tilt)
+    siti = np.sin(tilt)
+    cona = np.cos(narot)
+    sina = np.sin(narot)
+    m = np.zeros([4, 4])
+    m[0, 0] = cotd * cona - sitd * coti * sina
+    m[1, 0] = - cona * sitd - cotd * coti * sina
+    m[2, 0] = sina * siti
+    m[0, 1] = cotd * sina + cona * sitd * coti
+    m[1, 1] = cotd * cona * coti - sitd * sina
+    m[2, 1] = -cona * siti
+    m[0, 2] = sitd * siti
+    m[1, 2] = cotd * siti
+    m[2, 2] = coti
+    # The 4th column
+    m[0, 3] = shiftx
+    m[1, 3] = shifty
+    m[2, 3] = shiftz
+    m[3, 3] = 1
+
+    return m
+
+
+def matrix2eulerAngles(A):
+    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
+    if (abs_sb > 16 * np.exp(-5)):
+        gamma = math.atan2(A[1, 2], -A[0, 2])
+        alpha = math.atan2(A[2, 1], A[2, 0])
+        if (abs(np.sin(gamma)) < np.exp(-5)):
+            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
+        else:
+            if np.sin(gamma) > 0:
+                sign_sb = np.sign(A[1, 2])
+            else:
+                sign_sb = -np.sign(A[1, 2])
+        beta = math.atan2(sign_sb * abs_sb, A[2, 2])
+    else:
+        if (np.sign(A[2, 2]) > 0):
+            alpha = 0
+            beta = 0
+            gamma = math.atan2(-A[1, 0], A[0, 0])
+        else:
+            alpha = 0
+            beta = np.pi
+            gamma = math.atan2(A[1, 0], -A[0, 0])
+    gamma = np.rad2deg(gamma)
+    beta = np.rad2deg(beta)
+    alpha = np.rad2deg(alpha)
+    return alpha, beta, gamma
+
+
+def rx(ang): # Xmipp
+    return  np.array([
+        [   1,  0,  0],
+        [   0,  np.cos(ang),  -np.sin(ang)],
+        [   0,  np.sin(ang),   np.cos(ang)]])
+
+def ry(ang): # Xmipp
+    return np.array([
+        [   np.cos(ang),  0,  np.sin(ang)],
+        [   0,  1,  0],
+        [   -np.sin(ang),  0,   np.cos(ang)]])
+
+def rz(ang): # Xmipp
+    return np.array([
+        [   np.cos(ang),  -np.sin(ang), 0],
+        [   np.sin(ang),   np.cos(ang), 0],
+        [0, 0, 1]])
+
+def zyz2mat(ang1, ang2, ang3):
+    return np.dot(rz(ang3) ,np.dot(ry(ang2),rz(ang1) ))
+
+def zxz2mat(ang1, ang2, ang3):
+    return np.dot(rz(ang3) ,np.dot(rx(ang2),rz(ang1) ))
+
+def zyz2matXmp(ang1, ang2, ang3):
+    return np.dot(rz(ang3).T ,np.dot(ry(ang2).T,rz(ang1).T ))
+
+def zxz2matXmp(ang1, ang2, ang3):
+    return np.dot(rz(ang3).T ,np.dot(rx(ang2).T,rz(ang1).T ))
+
+def zyz2ang(R):
+    return [np.rad2deg(np.arctan(-R[2,1]/ R[2,0])),
+    np.rad2deg(np.arccos(R[2,2])),
+    np.rad2deg(np.arctan(R[1,2]/ R[0,2]))]
+
+def zxz2ang(R):
+    return [
+    np.rad2deg(np.arctan(R[2,0]/ R[2,1])),
+    np.rad2deg(np.arccos(R[2,2])),
+    np.rad2deg(np.arctan(-R[0,2]/ R[1,2]))]
+
+def zyz2angXmp(R):
+    return [-np.rad2deg(np.arctan(-R[2,1]/ R[2,0])),
+    np.rad2deg(np.arccos(R[2,2])),
+    -np.rad2deg(np.arctan(R[1,2]/ R[0,2]))]

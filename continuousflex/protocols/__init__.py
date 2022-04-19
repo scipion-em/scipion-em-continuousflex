@@ -49,4 +49,3 @@ from .protocol_image_synthesize import FlexProtSynthesizeImages
 #from .protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign
 #from .protocol_histogram_matching import FlexProtHistogramMatch
 from .protocol_genesis import ProtGenesis
-from .protocol_pca_from_pdb import ProtPCAFromPDB

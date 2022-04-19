@@ -34,7 +34,8 @@ import glob
 from sklearn import decomposition
 from joblib import dump
 
-from .utilities.genesis_utilities import PDBMol, alignMol, matchPDBatoms, dcd2numpyArr
+from .utilities.genesis_utilities import dcd2numpyArr
+from .utilities.pdb_handler import ContinuousFlexPDBHandler
 
 DIMRED_PCA = 0
 DIMRED_LTSA = 1
@@ -103,55 +104,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       label="trajectory Reference PDB",
                       help='Reference PDB of the trajectory')
 
-        form.addSection(label='Dimensionality Reduction')
-        form.addParam('dimredMethod', EnumParam, default=DIMRED_SKLEAN_PCA,
-                      choices=['Principal Component Analysis (PCA)',
-                               'Local Tangent Space Alignment',
-                               'Diffusion map',
-                               'Linear Local Tangent Space Alignment',
-                               'Linearity Preserving Projection',
-                               'Kernel PCA',
-                               'Probabilistic PCA',
-                               'Laplacian Eigenmap',
-                               'Hessian Locally Linear Embedding',
-                               'Stochastic Proximity Embedding',
-                               'Neighborhood Preserving Embedding',
-                               'Scikit-Learn PCA',
-                               "Don't reduce dimensions"],
-                      label='Dimensionality reduction method',
-                      help=""" Choose among the following dimensionality reduction methods:
-            PCA
-               Principal Component Analysis 
-            LTSA <k=12>
-               Local Tangent Space Alignment, k=number of nearest neighbours 
-            DM <s=1> <t=1>
-               Diffusion map, t=Markov random walk, s=kernel sigma 
-            LLTSA <k=12>
-               Linear Local Tangent Space Alignment, k=number of nearest neighbours 
-            LPP <k=12> <s=1>
-               Linearity Preserving Projection, k=number of nearest neighbours, s=kernel sigma 
-            kPCA <s=1>
-               Kernel PCA, s=kernel sigma 
-            pPCA <n=200>
-               Probabilistic PCA, n=number of iterations 
-            LE <k=7> <s=1>
-               Laplacian Eigenmap, k=number of nearest neighbours, s=kernel sigma 
-            HLLE <k=12>
-               Hessian Locally Linear Embedding, k=number of nearest neighbours 
-            SPE <k=12> <global=1>
-               Stochastic Proximity Embedding, k=number of nearest neighbours, global embedding or not 
-            NPE <k=12>
-               Neighborhood Preserving Embedding, k=number of nearest neighbours 
-        """)
-        form.addParam('extraParams', params.StringParam, default=None,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='Extra params',
-                      help='These parameters are there to change the default parameters of a dimensionality reduction'
-                           ' method. Check xmipp_matrix_dimred for full details.')
-
+        form.addSection(label='Principal Component Analysis')
         form.addParam('reducedDim', IntParam, default=2,
-                      label='Reduced dimension')
-
+                      label='Number of Principal Components')
         form.addParam('alignPDBs', params.BooleanParam, default=False,
                       label="Align PDBs ?",
                       help='Perform rigid body alignement on the set of PDBs to a reference PDB')
@@ -159,10 +114,10 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='alignPDBs',
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
-
-        form.addParam('generatePDBs', params.BooleanParam, default=False,
-                      label="Generate PDBs ?", help="TODO")
-        # form.addParallelSection(threads=0, mpi=8)
+        form.addParam('matchingType', params.EnumParam, label="Match structures ?", default=0,
+                      choices=['Both structures are the same', 'Match chain name/residue num/atom name',
+                               'Match segment name/residue num/atom name'],
+                      help="Method to match atoms in the current and the reference structures")
 
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
@@ -177,9 +132,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         # Align PDBS if needed
         if self.pdbSource.get() != PDB_SOURCE_TRAJECT:
             if self.alignPDBs.get():
-                ref = PDBMol(self.alignRefPDB.get().getFileName())
-                mol = PDBMol(inputFiles[0])
-                idx = matchPDBatoms([ref, mol])
+                ref = ContinuousFlexPDBHandler(self.alignRefPDB.get().getFileName())
+                mol = ContinuousFlexPDBHandler(inputFiles[0])
+                if self.matchingType.get() == 1:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=0)
+                elif self.matchingType.get() == 2:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=1)
+                else:
+                    idx_matching_atoms = None
 
         # Get pdbs coordinates
         pdbs_matrix = []
@@ -194,50 +154,26 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             else:
                 try :
                     # Read PDBs
-                    mol = PDBMol(pdbfn)
-                    pdbs_matrix.append(mol.coords.flatten())
+                    mol = ContinuousFlexPDBHandler(pdbfn)
 
                     # Align PDBs
                     if self.alignPDBs.get():
-                        alignMol(mol1=ref, mol2=mol, idx=idx)
+                        mol= mol.alignMol(reference_pdb=ref, idx_matching_atoms=idx_matching_atoms)
+
+                    pdbs_matrix.append(mol.coords.flatten())
+
                 except RuntimeError:
                     print("Warning : Can not read PDB file %s "%pdbfn)
 
         self.pdbs_matrix = np.array(pdbs_matrix)
 
 
-
     def performDimred(self):
 
-        # Perform DIMRED
-        methodName = self.getMethodName()
-        if methodName == 'None':
-            copyFile(self.getDeformationFile(),self.getOutputMatrixFile())
-
-        if methodName == 'sklearn_PCA':
-            pca = decomposition.PCA(n_components=self.reducedDim.get())
-            Y = pca.fit_transform(self.pdbs_matrix)
-            np.savetxt(self.getOutputMatrixFile(),Y)
-            dump(pca,self._getExtraPath('pca_pickled.joblib'))
-
-            # if self.generatePDBs.get():
-            #     ref = PDBMol(self.getPDBRef())
-            #     for i in range():
-
-
-        else:
-            np.savetxt(self._getExtraPath('pdbs_mat.txt'), self.pdbs_matrix, fmt="%s")
-            rows, columns = np.shape(self.pdbs_matrix)
-            args = "-i %s -o %s -m %s " %\
-                   (self.getDeformationFile(), self.getOutputMatrixFile(), methodName)
-            args += "--din %d --samples %d --dout %d " %\
-                    (columns, rows,self.reducedDim.get())
-            if self.extraParams.get() is not None:
-                args += self.extraParams.get()
-            if self.dimredMethod.get() in DIMRED_MAPPINGS:
-                mappingFile = self._getExtraPath('projector.txt')
-                args += " --saveMapping %(mappingFile)s"
-            runProgram("xmipp_matrix_dimred", args % locals())
+        pca = decomposition.PCA(n_components=self.reducedDim.get())
+        Y = pca.fit_transform(self.pdbs_matrix)
+        np.savetxt(self.getOutputMatrixFile(),Y)
+        dump(pca,self._getExtraPath('pca_pickled.joblib'))
 
     def createOutputStep(self):
         pass
@@ -289,6 +225,3 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
     def getDeformationFile(self):
         return self._getExtraPath('pdbs_mat.txt')
-
-    def getMethodName(self):
-        return DIMRED_VALUES[self.dimredMethod.get()]

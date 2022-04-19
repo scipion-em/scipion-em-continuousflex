@@ -21,7 +21,7 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
-
+import os.path
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
@@ -29,11 +29,14 @@ from pwem.objects.data import AtomStruct, SetOfAtomStructs, SetOfPDBs, SetOfVolu
 
 import numpy as np
 import mrcfile
+from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
 
 
 from .utilities.genesis_utilities import *
+from .utilities.pdb_handler import ContinuousFlexPDBHandler
+
 from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
 from pyworkflow.utils import runCommand
@@ -827,13 +830,15 @@ class ProtGenesis(EMProtocol):
 
 
         if self.getForceField() == FORCEFIELD_CAGO:
-            input = PDBMol(self.getInputPDBprefix() + ".pdb")
+            input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
             for i in range(self.getNumberOfSimulation()):
                 outputPrefix = self.getOutputPrefixAll(i)
                 for j in outputPrefix:
-                    output = PDBMol(j + ".pdb")
-                    input.coords = output.coords
-                    input.save(j + ".pdb")
+                    fn_output = j + ".pdb"
+                    if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
+                        output = ContinuousFlexPDBHandler(fn_output)
+                        input.coords = output.coords
+                        input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\

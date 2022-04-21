@@ -84,6 +84,28 @@ def motivelist2metadata(mtlist, mdfi, mdfo):
     md_motlist.write(mdfo)
 
 
+def NovaSTARotationMatrix(phi, psi, theta, shiftx, shifty, shiftz):
+    cos = np.cos
+    sin = np.sin
+    rotMat = np.zeros([4, 4])
+    phi = np.deg2rad(phi)
+    psi = np.deg2rad(psi)
+    theta = np.deg2rad(theta)
+
+    rotMat[0,0] = cos(psi) * cos(phi) - cos(theta) * sin(psi) * sin(phi)
+    rotMat[1,0] = sin(psi) * cos(phi) + cos(theta) * cos(psi) * sin(phi)
+    rotMat[2,0] = sin(theta) * sin(phi)
+    rotMat[0,1] = -cos(psi) * sin(phi) - cos(theta) * sin(psi) * cos(phi)
+    rotMat[1,1] = -sin(psi) * sin(phi) + cos(theta) * cos(psi) * cos(phi)
+    rotMat[2,1] = sin(theta) * cos(phi)
+    rotMat[0,2] = sin(theta) * sin(psi)
+    rotMat[1,2] = -sin(theta) * cos(psi)
+    rotMat[2,2] = cos(theta)
+    rotMat[:3,3] = np.dot(rotMat[:3,:3], np.array([shiftx, shifty, shiftz]).T)
+    rotMat[3,3] = 1
+    return rotMat
+
+
 # a test here:
 # mtlist = '/home/guest/Downloads/motl1.csv'
 # mdfni = '/home/guest/ScipionUserData/projects/TestXmipp2Mltomo/Runs/000172_FlexProtSubtomogramAveraging/extra/volumes.xmd'

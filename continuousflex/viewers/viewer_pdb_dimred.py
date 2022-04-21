@@ -156,12 +156,23 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def getData(self):
 
-        dataSet = self.dataSet.get().split(";")
-        n_data = len(dataSet)
         data = Data()
         pdb_matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
+
+        dataSet = self.dataSet.get().split(";")
+        n_data = len(dataSet)
+        if n_data >1:
+            weights = []
+            for i in range(n_data):
+                if dataSet[i] != '':
+                    for j in range(int(dataSet[i])):
+                        weights.append(i/n_data)
+
+        else:
+            weights = [1.0 for i in range(pdb_matrix.shape[0])]
+
         for i in range(pdb_matrix.shape[0]):
-            data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=1.0))
+            data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=weights[i]))
         return data
 
     def _generateAnimation(self):
@@ -177,22 +188,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # get trajectory coordinates
         trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
         np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
-        if prot.getMethodName() == 'sklearn_PCA':
-            pca = load(prot._getExtraPath('pca_pickled.joblib'))
-            deformations = pca.inverse_transform(trajectoryPoints)
-        else:
-            projectorFile = prot._getExtraPath() + '/projector.txt'
-            if os.path.isfile(projectorFile):
-                M = np.loadtxt(projectorFile)
-                deformations = np.dot(trajectoryPoints, np.linalg.pinv(M))
-                temp = np.loadtxt(prot._getExtraPath('deformations.txt'))  # the original matrix file
-                deformations += np.outer(np.ones(deformations.shape[0]), np.mean(temp, axis=0))
-
-            else:
-                Y = np.loadtxt(prot.getOutputMatrixFile())
-                X = np.loadtxt(prot.getDeformationFile())
-                # Find closest points in deformations
-                deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
+        pca = load(prot._getExtraPath('pca_pickled.joblib'))
+        deformations = pca.inverse_transform(trajectoryPoints)
 
         # Generate DCD trajectory
         initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())

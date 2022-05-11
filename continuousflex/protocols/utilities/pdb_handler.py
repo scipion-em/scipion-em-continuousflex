@@ -214,8 +214,8 @@ class ContinuousFlexPDBHandler:
             lst = list(set(self.chainID))
         lst.sort()
         return lst
-
-    def get_chain_coord(self, chainName):
+    
+    def get_chain(self, chainName):
         if not isinstance(chainName, list):
             chainName=[chainName]
         chainidx =[]

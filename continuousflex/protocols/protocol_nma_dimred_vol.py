@@ -222,7 +222,6 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
 
         if methodName == 'sklearn_PCA':
             X = np.loadtxt(fname=deformationsFile)
-            # TODO: check an option to add an average pdb in clustering
             pca = decomposition.PCA(n_components=reducedDim)
             pca.fit(X)
             Y = pca.transform(X)
@@ -314,5 +313,3 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
                 except:
                     pass
         return newlines
-
-

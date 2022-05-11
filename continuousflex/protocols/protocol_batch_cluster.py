@@ -3,6 +3,7 @@
 # * Authors:
 # * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # * Slavica Jonic (slavica.jonic@upmc.fr)
+# * Mohamad Harastani (mohamad.harastani@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -24,14 +25,14 @@
 # *
 # **************************************************************************
 
-
+from os.path import isfile
 from pyworkflow.protocol.params import PointerParam, FileParam
 from pwem.protocols import BatchProtocol
-from pwem.objects import SetOfParticles, Volume
-
+from pwem.objects import SetOfParticles, Volume, AtomStruct
 from xmipp3.convert import writeSetOfParticles
 from pwem.utils import runProgram
 import pwem.emlib.metadata as md
+import numpy as np
 
 
 class FlexBatchProtNMACluster(BatchProtocol):
@@ -53,6 +54,7 @@ class FlexBatchProtNMACluster(BatchProtocol):
         self._insertFunctionStep('convertInputStep', imagesMd)
         params = '-i %(imagesMd)s -o %(outputVol)s --fast' % locals()
         self._insertFunctionStep('reconstructStep', params)
+        self._insertFunctionStep('centroidPdbStep')
         self._insertFunctionStep('createOutputStep', outputVol)
         
     #--------------------------- STEPS functions --------------------------------------------   
@@ -91,13 +93,52 @@ class FlexBatchProtNMACluster(BatchProtocol):
 
     def reconstructStep(self, params):
         runProgram('xmipp_reconstruct_fourier_accel', params)
+
+
+    def centroidPdbStep(self):
+        imagesMd = self._getExtraPath('images.xmd')
+        md_file = md.MetaData(imagesMd)
+        deformations = []
+        for j in md_file:
+            deformations.append(md_file.getValue(md.MDL_NMA, j))
+        ampl = np.mean(np.array(deformations), axis= 0)
+        print(self.getFnPDB())
+
+        fnPDB, pseudo = self.getFnPDB()
+        fnModeList = self.getFnModes()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        params = " --pdb " + fnPDB
+        params += " --nma " + fnModeList
+        params += " -o " + fnOutPDB
+        params += " --deformations " + ' '.join(str(i) for i in ampl)
+        runProgram('xmipp_pdb_nma_deform', params)
     
     def createOutputStep(self, outputVol):
         vol = Volume()
         vol.setFileName(outputVol)
         vol.setSamplingRate(self.outputParticles.getSamplingRate())
+        atm = AtomStruct()
+        fnPDB, pseudo = self.getFnPDB()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        atm.setPseudoAtoms(pseudo)
+        atm.setFileName(fnOutPDB)
+        atm.setVolume(vol)
+        self._defineOutputs(centroidPDB=atm)
         self._defineOutputs(outputVol=vol)
-        
+
+    #--------------------------- Utility functions -----------------------------------------
+    def getFnPDB(self):
+        # This functions returns the path of the structure, false if is atomic, true if pseudoatomic
+        path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('atoms.pdb')
+        if isfile(path):
+            return path, False
+        else:
+            path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('pseudoatoms.pdb')
+            return path, True
+
+    def getFnModes(self):
+        return self.inputNmaDimred.get().inputNMA.get()._getExtraPath('modes.xmd')
+
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):
         summary = []

@@ -1,18 +1,23 @@
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
-import farneback3d
 import time
 import numpy as np
 import sys
+import os
 
 
 def opflow_vols(path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, factor1=100,
-                factor2=100, path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol'):
+                factor2=100, path_volx='x_OF_3D.vol', path_voly='y_OF_3D.vol', path_volz='z_OF_3D.vol', gpu_id=0):
     # Convention here is in reverse order
     vol0 = open_volume(path_vol0)
     vol1 = open_volume(path_vol1)
 
     vol0 = vol0 * factor1
     vol1 = vol1 * factor2
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    import pycuda.autoinit
+    import farneback3d
+
     optflow = farneback3d.Farneback(
         pyr_scale=pyr_scale,  # Scaling between multi-scale pyramid levels
         levels=levels,  # Number of multi-scale levels
@@ -39,7 +44,7 @@ def opflow_vols(path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, po
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 9 or len(sys.argv) > 14:
+    if len(sys.argv) < 9 or len(sys.argv) > 15:
         print('optical flow will not be calculated due to wrong arguments')
     else:
         opflow_vols(sys.argv[1],
@@ -54,6 +59,7 @@ if __name__ == '__main__':
                     int(sys.argv[10]),
                     sys.argv[11],
                     sys.argv[12],
-                    sys.argv[13]
+                    sys.argv[13],
+                    int(sys.argv[14])
                     )
     sys.exit()

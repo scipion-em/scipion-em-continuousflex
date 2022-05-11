@@ -220,20 +220,17 @@ class testGENESIS(TestWorkflow):
         protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
 
-        protGenesisFitNMMD = self.newProtocol(ProtGenesis,
+        protGenesisFitMD = self.newProtocol(ProtGenesis,
 
                                               restartChoice=True,
                                               restartProt=protGenesisMin,
 
-                                              simulationType=SIMULATION_NMMD,
+                                              simulationType=SIMULATION_MD,
                                               time_step=0.0005,
                                               n_steps=1000,
                                               eneout_period=100,
                                               crdout_period=100,
                                               nbupdate_period=10,
-                                              nm_number=6,
-                                              nm_mass=1.0,
-                                              inputModes=protNMA.outputModes,
 
                                               implicitSolvent=IMPLICIT_SOLVENT_NONE,
                                               electrostatics=ELECTROSTATICS_CUTOFF,
@@ -257,28 +254,28 @@ class testGENESIS(TestWorkflow):
                                               numberOfThreads=NUMBER_OF_CPU,
                                               numberOfMpi=1,
                                               )
-        protGenesisFitNMMD.setObjLabel('NMMD Flexible Fitting CAGO')
+        protGenesisFitMD.setObjLabel('MD Flexible Fitting CAGO')
 
         # Launch Fitting
-        self.launchProtocol(protGenesisFitNMMD)
+        self.launchProtocol(protGenesisFitMD)
 
         # Get GENESIS log file
-        log_file = protGenesisFitNMMD.getOutputPrefix()+".log"
+        log_file = protGenesisFitMD.getOutputPrefix()+".log"
 
         # Get the CC from the log file
         cc = readLogFile(log_file)["RESTR_CVS001"]
 
         # Get the RMSD
-        inp = ContinuousFlexPDBHandler(protGenesisFitNMMD.getInputPDBprefix() + ".pdb")
+        inp = ContinuousFlexPDBHandler(protGenesisFitMD.getInputPDBprefix() + ".pdb")
         ref = ContinuousFlexPDBHandler(self.ds.getFile('1ake_pdb'))
-        out = ContinuousFlexPDBHandler(protGenesisFitNMMD.getOutputPrefix()+".pdb")
+        out = ContinuousFlexPDBHandler(protGenesisFitMD.getOutputPrefix()+".pdb")
         matchingAtoms = inp.matchPDBatoms(reference_pdb=ref)
         rmsd_inp = inp.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
         rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
         print("\n\n//////////////////////////////////////////////")
-        print(protGenesisFitNMMD.getObjLabel())
+        print(protGenesisFitMD.getObjLabel())
         print("Initial CC : %.2f"%cc[0])
         print("Final CC : %.2f"%cc[-1])
         print("Initial rmsd : %.2f Ang"%rmsd_inp)

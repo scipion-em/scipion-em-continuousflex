@@ -121,7 +121,7 @@ def generatePSF(inputPDB, inputTopo, outputPrefix, nucleicChoice):
 
 
 def generateGROTOP(inputPDB, outputPrefix, forcefield, smog_dir, nucleicChoice):
-    mol = Con(inputPDB)
+    mol = ContinuousFlexPDBHandler(inputPDB)
     # mol.remove_alter_atom()
     mol.remove_hydrogens()
     mol.check_res_order()

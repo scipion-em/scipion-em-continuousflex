@@ -31,7 +31,8 @@ NMA_HOME = 'NMA_HOME'
 VMD_HOME = 'VMD_HOME'
 GENESIS_HOME = 'GENESIS_HOME'
 SITUS_HOME = 'SITUS_HOME'
-
+MATLAB_HOME = 'MATLAB_HOME'
+CONTINUOUSFLEX_URL = 'https://github.com/scipion-em/scipion-em-continuousflex'
 # Supported versions
 VV = '0.6'
 

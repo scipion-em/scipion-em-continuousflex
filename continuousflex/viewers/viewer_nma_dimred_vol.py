@@ -31,10 +31,8 @@ visualization program.
 
 from os.path import basename, join, exists, isfile
 import numpy as np
-
-from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
+from pyworkflow.utils.path import cleanPath, makePath
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
 from pwem.viewers import VmdView
@@ -272,14 +270,10 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
         cleanPath(fnSqlite)
         partSet = SetOfParticles(filename=fnSqlite)
         partSet.copyInfo(inputSet)
-        first = True
         for point in self.getData():
             if point.getState() == Point.SELECTED:
                 particle = inputSet[point.getId()]
                 partSet.append(particle)
-                if first:
-                    flag = particle._xmipp_angleY.get()
-                    first = False
         partSet.write()
         partSet.close()
 
@@ -291,7 +285,6 @@ class FlexDimredNMAVolViewer(ProtocolViewer):
             newProt.setObjLabel(clusterName)
         newProt.inputNmaDimred.set(prot)
         newProt.sqliteFile.set(fnSqlite)
-        newProt.angleYflag.set(flag)
         project.launchProtocol(newProt)
         project.getRunsGraph()
 

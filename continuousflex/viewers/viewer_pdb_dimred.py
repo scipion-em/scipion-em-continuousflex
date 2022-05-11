@@ -38,15 +38,6 @@ from pwem.viewers import ObjectView
 import matplotlib.pyplot as plt
 
 from joblib import load
-from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVol
-from continuousflex.protocols.data import Point, Data, PathData
-from pwem.viewers import VmdView
-from pyworkflow.utils.path import cleanPath, makePath
-from continuousflex.protocols.utilities.genesis_utilities import save_dcd
-from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
-from pyworkflow.gui.browser import FileBrowserWindow
-
-import os
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -54,8 +45,6 @@ Y_LIMITS_NONE = 0
 Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
-
-NUM_POINTS_TRAJECTORY=10
 
 
 class FlexProtPdbDimredViewer(ProtocolViewer):
@@ -71,10 +60,16 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
     def _defineParams(self, form):
         form.addSection(label='Visualization')
-        form.addParam('displayTrajectories', LabelParam,
-                      label='Display PCA trajectories',
-                      help='Open a GUI to visualize the PCA space'
-                           ' to draw and adjust trajectories.')
+        form.addParam('displayRawDeformation', StringParam, default='1 2',
+                      label='Display the principal axes',
+                      help='Type 1 to see the histogram of PCA axis 1; \n'
+                           'type 2 to to see the histogram of PCA axis 2, etc.\n'
+                           'Type 1 2 to see the 2D plot of amplitudes for PCA axes 1 2.\n'
+                           'Type 1 2 3 to see the 3D plot of amplitudes for PCA axes 1 2 3; etc.'
+                           )
+        form.addParam('displayPcaSingularValues', LabelParam,
+                      label="Display PCA singular values",
+                      help="The values should help you see how many dimensions are in the data ")
         form.addParam('xlimits_mode', EnumParam,
                       choices=['Automatic (Recommended)', 'Set manually x-axis limits'],
                       default=X_LIMITS_NONE,
@@ -108,52 +103,70 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         form.addParam('zlim_high', FloatParam, default=None,
                       condition='zlimits_mode==%d' % Z_LIMITS,
                       label='Upper z-axis limit')
-        form.addParam('s', FloatParam, default=None, allowsNull=True,
-                      label='Radius')
-        form.addParam('alpha', FloatParam, default=None, allowsNull=True,
-                        label='Transparancy')
-        form.addParam("dataSet", StringParam, default= "", label="Data set label")
-        form.addParam('displayPcaSingularValues', LabelParam,
-                      label="Display PCA singular values",
-                      help="The values should help you see how many dimensions are in the data ")
-
 
     def _getVisualizeDict(self):
-        return {
-                'displayTrajectories': self._displayTrajectories,
-                'displayPcaSingularValues': self.viewPcaSinglularValues,
-                }
+        return {'displayRawDeformation': self._viewRawDeformation,
+                'displayPcaSingularValues': self.viewPcaSinglularValues}
 
+    def _viewRawDeformation(self, paramName):
+        components = self.displayRawDeformation.get()
+        return self._doViewRawDeformation(components)
+        
+    def _doViewRawDeformation(self, components):
+        components = list(map(int, components.split()))
+        # print(components)
+        dim = len(components)
+        if self.xlimits_mode.get() == X_LIMITS:
+            x_low = self.xlim_low.get()
+            x_high = self.xlim_high.get()
+        if self.ylimits_mode.get() == Y_LIMITS:
+            y_low = self.ylim_low.get()
+            y_high = self.ylim_high.get()
+        if self.zlimits_mode.get() == Z_LIMITS:
+            z_low = self.zlim_low.get()
+            z_high = self.zlim_high.get()
 
-    def _displayTrajectories(self, paramName):
-        self.trajectoriesWindow = self.tkWindow(TrajectoriesWindowVol,
-                                                title='Trajectories Tool',
-                                                dim=self.protocol.reducedDim.get(),
-                                                data=self.getData(),
-                                                callback=self._generateAnimation,
-                                                loadCallback=self._loadAnimation,
-                                                numberOfPoints=NUM_POINTS_TRAJECTORY,
-                                                limits_mode=0,
-                                                LimitL=None,
-                                                LimitH=None,
-                                                xlim_low=self.xlim_low.get(),
-                                                xlim_high=self.xlim_high.get(),
-                                                ylim_low=self.ylim_low.get(),
-                                                ylim_high=self.ylim_high.get(),
-                                                zlim_low=self.zlim_low.get(),
-                                                zlim_high=self.zlim_high.get(),
-                                                s=self.s,
-                                                alpha=self.alpha)
-        return [self.trajectoriesWindow]
+        # print(self.protocol.getOutputMatrixFile())
+        X = np.loadtxt(fname=self.protocol.getOutputMatrixFile())
+        if dim == 1:
+            plt.hist(X[:,components[0]-1])
+            plt.title('Histogram of principal axis %d values' %components[0])
+        if dim == 2:
+            plt.scatter(X[:,components[0]-1],X[:,components[1]-1])
+            if self.xlimits_mode.get() == X_LIMITS:
+                plt.xlim([x_low,x_high])
+            if self.ylimits_mode.get() == Y_LIMITS:
+                plt.ylim([y_low,y_high])
+            plt.xlabel('Principal Component Axis %d' %components[0])
+            plt.ylabel('Principal Component Axis %d' %components[1])
+            modeNameList = 'Principal Axes %d vs %d' %(components[0], components[1])
+            plt.title(modeNameList)
+
+        if dim == 3:
+            fig = plt.figure()
+            ax = fig.gca(projection='3d')
+            ax.scatter(X[:,components[0]-1],X[:,components[1]-1],X[:,components[2]-1])
+            if self.xlimits_mode.get() == X_LIMITS:
+                ax.set_xlim([x_low,x_high])
+            if self.ylimits_mode.get() == Y_LIMITS:
+                ax.set_ylim([y_low,y_high])
+            if self.zlimits_mode.get() == Z_LIMITS:
+                ax.set_zlim([z_low,z_high])
+            ax.set_xlabel('Principal Component Axis %d' %components[0])
+            ax.set_ylabel('Principal Component Axis %d' %components[1])
+            ax.set_zlabel('Principal Component Axis %d' %components[2])
+            modeNameList = 'Principal Axes %d vs %d vs %d' %(components[0], components[1], components[2])
+            ax.set_title(modeNameList)
+        plt.show()
 
     def viewPcaSinglularValues(self, paramName):
-        pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
+        pca = load(self.protocol._getExtraPath('pca_pickled.txt'))
         fig = plt.figure('PCA singlular values')
         plt.stem(pca.singular_values_)
         plt.xticks(np.arange(0, len(pca.singular_values_), 1))
         plt.show()
         pass
-
+    
     def getData(self):
 
         data = Data()

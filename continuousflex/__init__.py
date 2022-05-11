@@ -38,13 +38,15 @@ class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
     _supportedVersions = [VV]
+    _url = CONTINUOUSFLEX_URL
 
     @classmethod
     def _defineVariables(cls):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'xmipp')
         cls._defineEmVar(NMA_HOME,'nma')
-        cls._defineEmVar(GENESIS_HOME, 'genesis/nmmd')
+        cls._defineEmVar(GENESIS_HOME, 'MD-NMMD-Genesis-1.0')
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
+        cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
     #   @classmethod
     #   def getEnviron(cls):
@@ -119,19 +121,13 @@ class Plugin(pwem.Plugin):
                                   % env.getLibFolder(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        if os.path.exists(env.getEmFolder() + '/genesis.tgz'):
-            os.system('rm ' + env.getEmFolder() + '/genesis.tgz')
-
-        target_branch = "nmmd_image_merge"
-        env.addPackage('genesis', version='1.7.1', deps=[lapack],
-                       createBuildDir=True,
-                       buildDir='genesis',
-                       commands=[('git clone -b %s https://github.com/mms29/nmmd.git ; '
-                                  'cd nmmd ; '
+        target_branch = "merge_genesis_1.4"
+        env.addPackage('MD-NMMD-Genesis', version='1.0', deps=[lapack],
+                       buildDir='MD-NMMD-Genesis', tar="void.tgz",
+                       commands=[('git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; '
                                   './configure LDFLAGS=-L%s ;'
-                                  'make install;' % (target_branch,env.getLibFolder()), "nmmd/bin/atdyn")],
-                       neededProgs=['mpif90'],
-                       target="genesis", default=False)
+                                  'make install;' % (target_branch,env.getLibFolder()), "bin/atdyn")],
+                       neededProgs=['mpif90'],default=True)
 
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',

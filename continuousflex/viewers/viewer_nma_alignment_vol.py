@@ -29,12 +29,19 @@ visualization program.
 
 from os.path import basename
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-from pyworkflow.protocol.params import StringParam
+from pyworkflow.protocol.params import StringParam, LEVEL_ADVANCED
 from pyworkflow.protocol import params
 from continuousflex.protocols.protocol_nma_alignment_vol import FlexProtAlignmentNMAVol
+from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
 from continuousflex.protocols.data import Point, Data
-from pwem.emlib import MetaData, MDL_ORDER
+from pwem.emlib import MetaData, MDL_ORDER, MDL_ANGLE_ROT, MDL_ANGLE_TILT, MDL_ANGLE_PSI, MDL_SHIFT_X, MDL_SHIFT_Y, \
+    MDL_SHIFT_Z, MDL_NMA
 from .plotter_vol import FlexNmaVolPlotter
+from continuousflex.protocols.convert import l2
+from xmippLib import SymList
+import numpy as np
+import tkinter.messagebox as mb
+import matplotlib.pyplot as plt
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
@@ -46,6 +53,8 @@ Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
 
+METADATA_PROJECT = 0
+METADATA_FILE = 1
 
 class FlexAlignmentNMAVolViewer(ProtocolViewer):
     """ Visualization of results from the NMA protocol
@@ -118,9 +127,29 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
         form.addParam('zlim_high', params.FloatParam, default=None,
                       condition='zlimits_mode==%d' % Z_LIMITS,
                       label='Upper z-axis limit')
+        group = form.addGroup('Comparing with ground-truth', expertLevel=LEVEL_ADVANCED)
+        group.addParam('GroundTruth', params.EnumParam,
+                       choices=['From volume synthesis protocol', 'From an external metadata file'],
+                       default=METADATA_PROJECT,
+                       label='Ground-Truth parameters', display=params.EnumParam.DISPLAY_COMBO,
+                       help='Use this is only when testing the method with synthetic data')
+        group.addParam('SynthesisProject', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
+                       condition='GroundTruth==%d' % METADATA_PROJECT,
+                       allowsNull=True,
+                       label="Project for volume synthesize",
+                       help='Select a previous run for subtomogram synthesize.')
+        group.addParam('MetadataFile', params.FileParam,
+                       pointerClass='params.FileParam', allowsNull=True,
+                       condition='GroundTruth==%d' % METADATA_FILE,
+                       label="Metadata file (xmd)",
+                       help='Choose a metadata file containing angles, shifts and NM amplitudes, typically a metadata'
+                            ' file from synthesizing volumes')
+        group.addParam('displayStatistics', params.LabelParam,
+                       label="Display error statistics and plots?")
 
     def _getVisualizeDict(self):
         return {'displayRawDeformation': self._viewRawDeformation,
+                'displayStatistics': self._viewErrorStatistics,
                 }
 
 
@@ -187,6 +216,102 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
             views.append(plotter)
 
         return views
+
+    def _viewErrorStatistics(self, paramName):
+        if self.GroundTruth.get() == METADATA_PROJECT:
+            metadata_file = self.SynthesisProject.get()._getExtraPath('GroundTruth.xmd')
+        else:
+            metadata_file = self.MetadataFile.get()
+        return self._doViewErrorStatistics(metadata_file)
+
+    def _doViewErrorStatistics(self, metadata_file):
+        md_gt = MetaData(metadata_file)
+        md_protocol = MetaData(self.protocol._getExtraPath('volumes.xmd'))
+        md_protocol.sort()
+        # Get the matching modes:
+        md_modes = MetaData(self.protocol._getExtraPath('modes.xmd'))
+        modeIds = []
+        for i, objId in enumerate(md_modes):
+            modeIds.append(md_modes.getValue(MDL_ORDER, objId))
+        # print(modeIds)
+        # Get the parameters from both lists:
+        rtp_protocol = []
+        xyz_protocol = []
+        mode_ampl_protocol = []
+        rtp_gt = []
+        xyz_gt = []
+        mode_ampl_gt = []
+        for objId in md_protocol:
+            rtp_protocol.append([md_protocol.getValue(MDL_ANGLE_ROT, objId),
+                                 md_protocol.getValue(MDL_ANGLE_TILT, objId),
+                                 md_protocol.getValue(MDL_ANGLE_PSI, objId)])
+            xyz_protocol.append([md_protocol.getValue(MDL_SHIFT_X, objId),
+                                 md_protocol.getValue(MDL_SHIFT_Y, objId),
+                                 md_protocol.getValue(MDL_SHIFT_Z, objId)])
+            mode_ampl_protocol.append(md_protocol.getValue(MDL_NMA, objId))
+
+            rtp_gt.append([md_gt.getValue(MDL_ANGLE_ROT, objId),
+                           md_gt.getValue(MDL_ANGLE_TILT, objId),
+                           md_gt.getValue(MDL_ANGLE_PSI, objId)])
+            xyz_gt.append([md_gt.getValue(MDL_SHIFT_X, objId),
+                           md_gt.getValue(MDL_SHIFT_Y, objId),
+                           md_gt.getValue(MDL_SHIFT_Z, objId)])
+            mode_ampl_gt.append(md_gt.getValue(MDL_NMA, objId))
+
+        # Angular and shift distances
+        shift_distance = []
+        angular_distance = []
+        # The full description of computeDistanceAngles function is:
+        # A = SymList.computeDistanceAngles(SymList(), rot1, tilt1, psi1, rot2, tilt2, psi2, projdir_mode, check_mirrors, object_rotation)
+        # By default, they are all set to False. However, check_mirrors should be true in general.
+        for i in range(len(rtp_protocol)):
+            shift_distance.append(l2(xyz_gt[i], xyz_protocol[i]))
+            angular_distance.append(SymList.computeDistanceAngles(SymList(),
+                                                                  rtp_protocol[i][0], rtp_protocol[i][1], rtp_protocol[i][2],
+                                                                  rtp_gt[i][0], rtp_gt[i][1], rtp_gt[i][2],
+                                                                  False, True, False))
+        # Normal mode amplitudes distances: we need to find the subset of normal modes used in alignment in the groundtruth
+        mode_distances = []
+        counter = 0
+        plt.figure()
+        mean_amplitudes = []
+        std_amplitudes = []
+        label = []
+        dist = []
+        for i in modeIds:
+            # mode 7 corresponds to zero in the ground truth, so we need to subtract 7
+            A = np.array(mode_ampl_gt)[:,i - 7]
+            B = np.array(mode_ampl_protocol)[:, counter]
+            mean_amplitudes.append(np.mean(np.array(A - B)))
+            std_amplitudes.append(np.std(np.array(A - B)))
+            label.append('mode ' + str(i))
+            dist.append(np.array(A - B))
+            counter +=1
+        plt.title('histogram of normal mode amplitude distances')
+        plt.hist(dist, bins=100, label=label)
+        plt.legend(loc='upper right')
+
+        plt.figure()
+        plt.hist(np.array(angular_distance), bins=100)
+        plt.title('histogram of angular distance')
+        plt.figure()
+        plt.hist(np.array(shift_distance), bins=100)
+        plt.title('histogram of shift distance')
+
+        message = 'mean and standard deviation angular distance: ' + str(np.mean(np.array(angular_distance)))[:7]
+        message += ' and ' + str(np.std(np.array(angular_distance)))[:7]
+        message += '\nmean and standard deviation shift distance: ' + str(np.mean(np.array(shift_distance)))[:7]
+        message += ' and ' + str(np.std(np.array(shift_distance)))[:7]
+
+        counter = 0
+        for i in modeIds:
+            message += '\nmean and standard deviation for mode ' + str(i) + ': ' + str(mean_amplitudes[counter])[:7] + \
+                       ' ' + str(std_amplitudes[counter])[:7]
+            counter +=1
+
+        mb.showinfo('Distances compared to the ground truth', message)
+        plt.show()
+        pass
 
     def loadData(self):
         """ Iterate over the images and their deformations 

@@ -28,26 +28,29 @@ import os
 from pyworkflow.utils import getListFromRangeString
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import (writeSetOfVolumes, xmippToLocation, createItemMatrix,
-                            setXmippAttributes, setOfParticlesToMd, getImageLocation)
-
+                            setXmippAttributes, getImageLocation)
 import pwem as em
 import pwem.emlib.metadata as md
 from xmipp3 import XmippMdRow
 from pyworkflow.utils.path import copyFile, cleanPath
 import pyworkflow.protocol.params as params
 from pyworkflow.protocol.params import NumericRangeParam
-from .convert import modeToRow
-from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt
-from pwem.utils import runProgram
+from .convert import modeToRow, eulerAngles2matrix, matrix2eulerAngles
 from pwem import Domain
+import numpy as np
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
 
 
 class FlexProtAlignmentNMAVol(ProtAnalysis3D):
-    """ Protocol for flexible angular alignment. """
+    """ Protocol for rigid-body and elastic alignment for volumes using NMA. This protocol is the code module of HEMNMA-3D.
+     It will take as input a set of normal modes calculated for an input atomic or pseudoatomic structure, and a set of volumes (subtomograms) to analyze.
+     It fits the input structure using its modes (a subset of the modes need to be selected) into each one of the input volumes while simultaneously looking for rigid-body alignment, with
+     compensation for missing wedge artefacts.
+     The result of this protocol are rigid-body and elastic parameters for each input volume.
+     Those results will be fed for a dimensionality reduction method (nma dimred vol) for further processing.
+     """
     _label = 'nma alignment vol'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -85,12 +88,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                            ' You can also choose not to compensate if your data is not subtomograms but EM-maps.'
                            ' The missing wedge is assumed to be in the Y-axis direction.')
         form.addParam('tiltLow', params.IntParam, default=-60,
-                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Lower tilt value',
                       help='The lower tilt angle used in obtaining the tilt series')
         form.addParam('tiltHigh', params.IntParam, default=60,
-                      # expertLevel=params.LEVEL_ADVANCED,
                       condition='WedgeMode==%d' % WEDGE_MASK_THRE,
                       label='Upper tilt value',
                       help='The upper tilt angle used in obtaining the tilt series')
@@ -105,21 +106,21 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                            'This value should not be changed except by expert users. '
                            'Larger values (e.g., between 1 and 2) can be tried '
                            'for larger expected amplitudes of conformational change.')
-        # form.addParam('rhoStartBase', params.FloatParam, default=250.0,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter rhoStartBase',
-        #               help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
-        #                    ' yet the slower')
-        # form.addParam('rhoEndBase', params.FloatParam, default=50.0,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter rhoEndBase ',
-        #               help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
-        #                    'however it is better to keep it < 1000 if set very high we risk distortions')
-        # form.addParam('niter', params.IntParam, default=10000,
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               label='CONDOR optimiser parameter niter',
-        #               help='niter should be big enough to guarantee that the search converges to the '
-        #                    'right set of nma deformation amplitudes')
+        form.addHidden('rhoStartBase', params.FloatParam, default=250.0,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter rhoStartBase',
+                      help='rhoStartBase > 0  : (rhoStart = rhoStartBase*trustRegionScale) the lower the better,'
+                           ' yet the slower')
+        form.addHidden('rhoEndBase', params.FloatParam, default=50.0,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter rhoEndBase ',
+                      help='rhoEndBase > 250  : (rhoEnd = rhoEndBase*trustRegionScale) no specific rule, '
+                           'however it is better to keep it < 1000 if set very high we risk distortions')
+        form.addHidden('niter', params.IntParam, default=10000,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label='CONDOR optimiser parameter niter',
+                      help='niter should be big enough to guarantee that the search converges to the '
+                           'right set of nma deformation amplitudes')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum cross correlation frequency',
@@ -156,9 +157,9 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
 
         self._insertFunctionStep('convertInputStep', atomsFn)
 
-        if self.copyDeformations.empty():  # SERVES_FOR_DEBUGGING AND COMPUTING ON CLUSTERS
+        if self.copyDeformations.empty():
             self._insertFunctionStep("performNmaStep", self.atomsFn, self.modesFn)
-        else:
+        else:  # SERVES FOR DEBUGGING AND COMPUTING ON CLUSTERS
             self._insertFunctionStep('copyDeformationsStep', self.copyDeformations.get())
 
         self._insertFunctionStep('createOutputStep')
@@ -171,8 +172,6 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         # to launch the nma alignment programs
         writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn)
         writeSetOfVolumes(self.inputVolumes.get(), self.imgsFn_backup)
-        # Copy the atoms file to current working dir
-        # copyFile(atomsFn, self.atomsFn)
 
     def writeModesMetaData(self):
         """ Iterate over the input SetOfNormalModes and write
@@ -226,6 +225,37 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
+        # if the volumes were aligned with angle_y=90 degrees, then rotate by 90 and inverse, then set angle y to 0
+        mdImgs = md.MetaData(self.imgsFn)
+
+        flag = None
+        try:
+            flag = mdImgs.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            pass
+
+        if flag == 90:
+            mdImgs = md.MetaData(self.imgsFn)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+            mdImgs.write(self.imgsFn)
 
 
 
@@ -236,9 +266,9 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         imgFn = self.imgsFn
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-        # rhoStartBase = self.rhoStartBase.get()
-        # rhoEndBase = self.rhoEndBase.get()
-        # niter = self.niter.get()
+        rhoStartBase = self.rhoStartBase.get()
+        rhoEndBase = self.rhoEndBase.get()
+        niter = self.niter.get()
         rhoStartBase = 250.0
         rhoEndBase = 50.0
         niter = 10000
@@ -259,8 +289,6 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
             tiltF = self.tiltHigh.get()
             args += "--tilt_values %(tilt0)d %(tiltF)d "
 
-        # print(args % locals())
-        # runProgram("xmipp_nma_alignment_vol", args % locals())
         self.runJob("xmipp_nma_alignment_vol", args % locals(),
                     env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
 
@@ -292,7 +320,31 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         mdImgs.sort(md.MDL_ITEM_ID)
         mdImgs.write(self.imgsFn)
 
-        mdImgs.write(self.imgsFn)
+        # if WedgeMode was Mask, then update the metadata angles and shifts to be in the same convention of the
+        # ground truth (rotate 90 degrees) then set angle y to 0
+        if self.WedgeMode == WEDGE_MASK_THRE:
+            mdImgs = md.MetaData(self.imgsFn)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+            mdImgs.write(self.imgsFn)
+
         cleanPath(self._getExtraPath('copy.xmd'))
 
     def createOutputStep(self):
@@ -327,20 +379,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         pass
 
     # --------------------------- UTILS functions --------------------------------------------
-    def _printWarnings(self, *lines):
-        """ Print some warning lines to 'warnings.xmd',
-        the function should be called inside the working dir."""
-        fWarn = open("warnings.xmd", 'w')
-        for l in lines:
-            print >> fWarn, l
-        fWarn.close()
-
-    def _getLocalModesFn(self):
-        modesFn = self.inputModes.get().getFileName()
-        return self._getBasePath(modesFn)
-
     def _updateParticle(self, item, row):
         setXmippAttributes(item, row, md.MDL_ANGLE_ROT, md.MDL_ANGLE_TILT, md.MDL_ANGLE_PSI, md.MDL_SHIFT_X,
-                           md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST, md.MDL_MAXCC,
-                           md.MDL_ANGLE_Y)
+                           md.MDL_SHIFT_Y, md.MDL_SHIFT_Z, md.MDL_FLIP, md.MDL_NMA, md.MDL_COST, md.MDL_MAXCC)
         createItemMatrix(item, row, align=em.ALIGN_PROJ)

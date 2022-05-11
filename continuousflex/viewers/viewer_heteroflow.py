@@ -147,6 +147,7 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
 
     def _viewFlow2(self, paramName):
         number = str(self.FlowNumber).zfill(6)
+        flow3D = self.read_optical_flow_by_number(number)
         op_path = self.protocol._getExtraPath() + '/optical_flows/'
         path_flowx = op_path + str(number).zfill(6) + '_opflowx.spi'
         path_flowy = op_path + str(number).zfill(6) + '_opflowy.spi'
@@ -190,6 +191,16 @@ class FlexHeteroFlowViewer(EmProtocolViewer):
         flow2D = np.zeros([np.shape(px)[0], np.shape(px)[1], 2])
         flow2D[:,:,0] = pn[0,:,:]
         flow2D[:,:,1] = pn[1,:,:]
+
+        # We need to scale flow2D by the magnitude of flow3D
+        mag_3D = np.sqrt(flow3D[0, :, :, :] * flow3D[0, :, :, :] +
+                         flow3D[1, :, :, :] * flow3D[1, :, :, :] +
+                         flow3D[2, :, :, :] * flow3D[2, :, :, :])
+        max_3D = np.max(mag_3D)
+        mag_2D = np.sqrt(flow2D[:, :, 0] * flow2D[:, :, 0] +
+                         flow2D[:, :, 1] * flow2D[:, :, 1])
+        max_2D = np.max(mag_2D)
+        flow2D = (max_3D/max_2D)*flow2D
         plot_quiver_2d(flow2D, title=title)
         pass
 

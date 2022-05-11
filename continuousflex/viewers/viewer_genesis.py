@@ -37,7 +37,6 @@ import glob
 import pwem.emlib.metadata as md
 import re
 
-from sklearn.decomposition import PCA
 from matplotlib.pyplot import cm
 
 class GenesisViewer(ProtocolViewer):
@@ -135,11 +134,6 @@ class GenesisViewer(ProtocolViewer):
                                        ' Cnv, Cnh, Sn, Dn, Dnv, Dnh, T, Td, Th, O, Oh '
                                        ' I, I1, I2, I3, I4, I5, Ih, helical, dihedral, helicalDihedral ')
 
-        group = form.addGroup('PCA analysis')
-        group.addParam('displayPCA', params.LabelParam,
-                      label='Display PCA',
-                      help='TODO')
-
     def _getVisualizeDict(self):
         return {
             'displayChimera': self._plotChimera,
@@ -149,7 +143,6 @@ class GenesisViewer(ProtocolViewer):
             'displayRMSD': self._plotRMSD,
             'displayAngularDistance': self._plotAngularDistance,
             'displayAngularDistanceTs': self._plotAngularDistanceTs,
-            'displayPCA': self._plotPCA,
             'displayTrajVMD': self._plotTrajVMD,
                 }
 

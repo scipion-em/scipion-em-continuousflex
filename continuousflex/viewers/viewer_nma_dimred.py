@@ -29,25 +29,18 @@ This module implement the wrappers around Xmipp CL2D protocol
 visualization program.
 """
 
-from os.path import basename, join, exists
+from os.path import basename, join, exists, isfile
 import numpy as np
-
-from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt
-
+from joblib import load
 from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
 from pwem.viewers import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
-
 from continuousflex.protocols.protocol_nma_dimred import FlexProtDimredNMA
-
 from continuousflex.protocols.data import Point, Data
-
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
-
 from continuousflex.viewers.nma_gui import ClusteringWindow, TrajectoriesWindow
 from pwem.utils import runProgram
 from pyworkflow.protocol import params
@@ -335,7 +328,13 @@ class FlexDimredNMAViewer(ProtocolViewer):
 
     def _generateAnimation(self):
         prot = self.protocol
-        projectorFile = prot.getProjectorFile()
+        # This is not getting the file correctly, we are workingaround it:
+        # projectorFile = prot.getProjectorFile()
+        projectorFile = prot._getExtraPath() + '/projector.txt'
+        if isfile(projectorFile):
+            print('Mapping found, the animation is exact inverse of the dimensionality reduction method')
+        else:
+            print('Mapping not found, the animation is an estimation of reversing the dimensionality reduction method')
 
         animation = self.trajectoriesWindow.getAnimationName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
@@ -343,34 +342,53 @@ class FlexDimredNMAViewer(ProtocolViewer):
         cleanPath(animationPath)
         makePath(animationPath)
         animationRoot = join(animationPath, 'animation_%s' % animation)
-
         trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
-        np.savetxt(join(animationPath, 'trajectory.txt'), trajectoryPoints)
 
-        if projectorFile:
+        if isfile(projectorFile):
             M = np.loadtxt(projectorFile)
-            deformations = np.dot(trajectoryPoints, np.linalg.pinv(M))
+            if prot.getMethodName() == 'sklearn_PCA':
+                pca = load(prot._getExtraPath('pca_pickled.txt'))
+                deformations = pca.inverse_transform(trajectoryPoints)
+            else:
+                deformations = np.dot(trajectoryPoints, np.linalg.pinv(M))
+                temp = np.loadtxt(prot._getExtraPath('deformations.txt')) # the original matrix file
+                deformations += np.outer(np.ones(deformations.shape[0]),np.mean(temp, axis=0))
+                temp = None
+            np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
         else:
             Y = np.loadtxt(prot.getOutputMatrixFile())
             X = np.loadtxt(prot.getDeformationFile())
             # Find closest points in deformations
             deformations = [X[np.argmin(np.sum((Y - p) ** 2, axis=1))] for p in trajectoryPoints]
 
-        pdb = prot.getInputPdb()
-        pdbFile = pdb.getFileName()
+        if prot.getDataChoice() == 'NMAs':
+            pdb = prot.getInputPdb()
+            pdbFile = pdb.getFileName()
+            modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
+            for i, d in enumerate(deformations):
+                atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
+                cmd = '-o %s --pdb %s --nma %s --deformations ' % (atomsFn, pdbFile, modesFn)
+                for l in d:
+                    cmd += str(l) + ' '
+                # because it doesn't have an independent protocol we don't use self.runJob
+                runProgram('xmipp_pdb_nma_deform', cmd)
 
-        structureEM = prot.getInputPdb().getPseudoAtoms()
-        if not structureEM:
-            localFn = replaceBaseExt(basename(pdbFile), 'pdb')
-            cifToPdb(pdbFile, localFn)
-            pdbFile = basename(localFn)
-
-        modesFn = prot.inputNMA.get()._getExtraPath('modes.xmd')
-
-        for i, d in enumerate(deformations):
-            atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
-            cmd = '-o %s --pdb %s --nma %s --deformations %s' % (atomsFn, pdbFile, modesFn, str(d)[1:-1])
-            runProgram('xmipp_pdb_nma_deform', cmd)
+        elif prot.getDataChoice() == 'PDBs':
+            # There is incompatibility issue with the rest of the code, we have to use the fahterPDB as one of the
+            # deformed PDBs (the first one)
+            # fatherPDB = prot._getExtraPath('pdb_file.pdb')
+            fatherPDB = prot._getExtraPath('generated_pdbs/000001.pdb')
+            lines_father = self.readPDB(fatherPDB)
+            list_father = self.PDB2List(lines_father)
+            i = 0
+            for line in deformations:
+                # reshaped pdb xyz coordinates
+                list_xyz = np.reshape(line, np.shape(list_father))
+                lines_i = self.list2PDBlines(list_xyz, lines_father)
+                atomsFn = animationRoot + 'atomsDeformed_%02d.pdb' % (i + 1)
+                self.writePDB(lines_i, atomsFn)
+                i += 1
+            pass
 
         # Join all deformations in a single pdb
         # iterating going up and down through all points
@@ -394,7 +412,7 @@ class FlexDimredNMAViewer(ProtocolViewer):
 
         trajFile.close()
         # Delete temporary atom files
-        cleanPattern(animationRoot + 'atomsDeformed_??.pdb')
+        # cleanPattern(animationRoot + 'atomsDeformed_??.pdb')
 
         # Generate the vmd script
         vmdFn = animationRoot + '.vmd'
@@ -426,3 +444,44 @@ class FlexDimredNMAViewer(ProtocolViewer):
                                 weight=particle._xmipp_cost.get()))
 
         return data
+
+    def readPDB(self, fnIn):
+        with open(fnIn) as f:
+            lines = f.readlines()
+        return lines
+
+    def PDB2List(self, lines):
+        newlines = []
+        for line in lines:
+            if line.startswith("ATOM "):
+                try:
+                    x = float(line[30:38])
+                    y = float(line[38:46])
+                    z = float(line[46:54])
+                    newline = [x, y, z]
+                    newlines.append(newline)
+                except:
+                    pass
+        return newlines
+
+    def list2PDBlines(self, list, lines):
+        newLines = []
+        i = 0
+        for line in lines:
+            if line.startswith("ATOM "):
+                try:
+                    x = list[i][0]
+                    y = list[i][1]
+                    z = list[i][2]
+                    newLine = line[0:30] + "%8.3f%8.3f%8.3f" % (x, y, z) + line[54:]
+                    i += 1
+                except:
+                    pass
+            else:
+                newLine = line
+            newLines.append(newLine)
+        return newLines
+
+    def writePDB(self, lines, fnOut):
+        with open(fnOut, mode='w') as f:
+            f.writelines(lines)

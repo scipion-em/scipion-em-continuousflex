@@ -24,8 +24,6 @@
 # *
 # **************************************************************************
 
-from .protocol_convert_pdb import FlexProtConvertPdb
-#from .protocol_combine_pdb import FlexProtCombinePdb
 from .protocol_pseudoatoms import FlexProtConvertToPseudoAtoms
 from .protocol_pseudoatoms_base import FlexProtConvertToPseudoAtomsBase
 

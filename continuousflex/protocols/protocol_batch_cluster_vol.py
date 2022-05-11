@@ -23,15 +23,15 @@
 # *
 # **************************************************************************
 
-
-from pyworkflow.protocol.params import PointerParam, FileParam, IntParam
+from os.path import isfile
+from pyworkflow.protocol.params import PointerParam, FileParam
 from pwem.protocols import BatchProtocol
-from pwem.objects import Volume, SetOfVolumes
+from pwem.objects import Volume, SetOfVolumes, AtomStruct
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
 from pwem.utils import runProgram
-
+import numpy as np
 
 
 class FlexBatchProtNMAClusterVol(BatchProtocol):
@@ -43,7 +43,6 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
     def _defineParams(self, form):
         form.addHidden('inputNmaDimred', PointerParam, pointerClass='EMObject')
         form.addHidden('sqliteFile', FileParam)
-        form.addHidden('angleYflag', IntParam)
 
     #--------------------------- INSERT steps functions --------------------------------------------
 
@@ -53,6 +52,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
         self._insertFunctionStep('convertInputStep', volumesMd)
         self._insertFunctionStep('averagingStep')
+        self._insertFunctionStep('centroidPdbStep')
         self._insertFunctionStep('createOutputStep', outputVol)
 
     #--------------------------- STEPS functions --------------------------------------------
@@ -80,7 +80,6 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             id_org = md_file_org.getValue(md.MDL_ITEM_ID, objID)
             for j in md_file_nma:
                 id_nma = md_file_nma.getValue(md.MDL_ITEM_ID, j)
-                #print(id_nma)
                 if id_org == id_nma:
                     displacements = md_file_nma.getValue(md.MDL_NMA, j)
                     md_file_org.setValue(md.MDL_NMA, displacements, objID)
@@ -90,13 +89,10 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
 
     def averagingStep(self):
-        flag = self.angleYflag.get()
-
         volumesMd = self._getExtraPath('volumes.xmd')
         mdVols = md.MetaData(volumesMd)
 
         counter = 0
-        first = True
         for objId in mdVols:
             counter = counter + 1
             imgPath = mdVols.getValue(md.MDL_IMAGE, objId)
@@ -108,35 +104,15 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             y_shift = mdVols.getValue(md.MDL_SHIFT_Y, objId)
             z_shift = mdVols.getValue(md.MDL_SHIFT_Z, objId)
 
-            # The flip one is used here to determine if we need to use the option --inverse
-            # with xmipp_transform_geometry
-            flip = mdVols.getValue(md.MDL_ANGLE_Y, objId)
-
             outputVol = self._getExtraPath('average.vol')
             tempVol = self._getExtraPath('temp.vol')
             extra = self._getExtraPath()
 
-            if flag == 0 :
-                if first:
-                    print("THERE IS NO COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-
-                params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
-
-            else:
-                if first:
-                    print("THERE IS A COMPENSATION FOR THE MISSING WEDGE")
-                    first = False
-                # First got to rotate each volume 90 degrees about the y axis, align it, then rotate back and sum it
-                params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler 0 90 0' % locals()
-                runProgram('xmipp_transform_geometry', params)
-                params = '-i %(tempVol)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
-                         ' --shift %(x_shift)s %(y_shift)s %(z_shift)s ' % locals()
-
+            params = '-i %(imgPath)s -o %(tempVol)s --inverse --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                     ' --shift %(x_shift)s %(y_shift)s %(z_shift)s -v 0' % locals()
             runProgram('xmipp_transform_geometry', params)
 
-            if counter == 1 :
+            if counter == 1:
                 os.system("mv %(tempVol)s %(outputVol)s" % locals())
 
             else:
@@ -148,12 +124,49 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
         os.system("rm -f %(tempVol)s" % locals())
 
 
+    def centroidPdbStep(self):
+        volumesMd = self._getExtraPath('volumes.xmd')
+        md_file = md.MetaData(volumesMd)
+        deformations = []
+        for j in md_file:
+            deformations.append(md_file.getValue(md.MDL_NMA, j))
+        ampl = np.mean(np.array(deformations), axis= 0)
+        print(self.getFnPDB())
+
+        fnPDB, pseudo = self.getFnPDB()
+        fnModeList = self.getFnModes()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        params = " --pdb " + fnPDB
+        params += " --nma " + fnModeList
+        params += " -o " + fnOutPDB
+        params += " --deformations " + ' '.join(str(i) for i in ampl)
+        runProgram('xmipp_pdb_nma_deform', params)
+
+
     def createOutputStep(self, outputVol):
         vol = Volume()
         vol.setFileName(outputVol)
-        #outputParticles
         vol.setSamplingRate(self.OutputVolumes.getSamplingRate())
+        atm = AtomStruct()
+        fnPDB, pseudo = self.getFnPDB()
+        fnOutPDB = self._getExtraPath('centroid.pdb')
+        atm.setPseudoAtoms(pseudo)
+        atm.setFileName(fnOutPDB)
+        atm.setVolume(vol)
+        self._defineOutputs(centroidPDB=atm)
         self._defineOutputs(outputVol=vol)
+    #--------------------------- Utility functions -----------------------------------------
+    def getFnPDB(self):
+        # This functions returns the path of the structure, false if is atomic, true if pseudoatomic
+        path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('atoms.pdb')
+        if isfile(path):
+            return path, False
+        else:
+            path = self.inputNmaDimred.get().inputNMA.get()._getExtraPath('pseudoatoms.pdb')
+            return path, True
+
+    def getFnModes(self):
+        return self.inputNmaDimred.get().inputNMA.get()._getExtraPath('modes.xmd')
 
     #--------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -169,4 +182,3 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
     def _methods(self):
         return []
-

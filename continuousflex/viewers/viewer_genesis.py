@@ -344,7 +344,7 @@ class GenesisViewer(ProtocolViewer):
         else:
             ref_pdb = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix()+".pdb")
         target_pdb = ContinuousFlexPDBHandler(self.getTargetPDB())
-        idx_matchin_atoms = ref_pdb.matchPDBatoms(reference_pdb=target_pdb, ca_only=True)
+        idx_matching_atoms = ref_pdb.matchPDBatoms(reference_pdb=target_pdb, ca_only=True)
 
         # Get RMSD list
         rmsd = []
@@ -362,11 +362,11 @@ class GenesisViewer(ProtocolViewer):
 
                 inputPDB = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix(i)+".pdb")
                 targetPDB = ContinuousFlexPDBHandler(self.getTargetPDB(i))
-                rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
+                rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=self.alignTarget.get(), idx_matching_atoms=idx_matching_atoms))
                 coord_arr = dcd2numpyArr(outputPrefix + ".dcd")
                 for i in range(len(coord_arr)):
                     inputPDB.coords[:, :] = coord_arr[i]
-                    rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=align, idx_matchin_atoms=idx_matchin_atoms))
+                    rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=self.alignTarget.get(), idx_matching_atoms=idx_matching_atoms))
 
                 rmsd_rep.append(rmsd_curr)
             rmsd.append(rmsd_rep)

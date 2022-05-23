@@ -34,26 +34,13 @@ import glob
 from sklearn import decomposition
 from joblib import dump
 
-DIMRED_PCA = 0
-DIMRED_LTSA = 1
-DIMRED_DM = 2
-DIMRED_LLTSA = 3
-DIMRED_LPP = 4
-DIMRED_KPCA = 5
-DIMRED_PPCA = 6
-DIMRED_LE = 7
-DIMRED_HLLE = 8
-DIMRED_SPE = 9
-DIMRED_NPE = 10
-DIMRED_SKLEAN_PCA = 11
+from .utilities.genesis_utilities import dcd2numpyArr
+from .utilities.pdb_handler import ContinuousFlexPDBHandler
 
-USE_PDBS = 0
-USE_NMA_AMP = 1
-
-# Values to be passed to the program
-DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA','None']
-DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
-
+PDB_SOURCE_SUBTOMO = 0
+PDB_SOURCE_PATTERN = 1
+PDB_SOURCE_OBJECT = 2
+PDB_SOURCE_TRAJECT = 3
 
 class FlexProtDimredPdb(ProtAnalysis3D):
     """ Protocol for applying dimentionality reduction on PDB files. """
@@ -64,7 +51,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         form.addSection(label='Input')
         form.addParam('pdbSource', EnumParam, default=0,
                       label='Source of PDBs',
-                      choices=['Used for subtomogram synthesis', 'File pattern'],
+                      choices=['Used for subtomogram synthesis', 'File pattern', 'Object', 'Trajectory Files'],
                       help='Use the file pattern as file location with /*.pdb')
         form.addParam('pdbs', params.PointerParam, pointerClass='FlexProtSynthesizeSubtomo',
                       condition='pdbSource == 0',
@@ -74,111 +61,104 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       condition='pdbSource == 1',
                       label="List of PDBs",
                       help='Use the file pattern as file location with /*.pdb')
-        form.addParam('dimredMethod', EnumParam, default=DIMRED_SKLEAN_PCA,
-                      choices=['Principal Component Analysis (PCA)',
-                               'Local Tangent Space Alignment',
-                               'Diffusion map',
-                               'Linear Local Tangent Space Alignment',
-                               'Linearity Preserving Projection',
-                               'Kernel PCA',
-                               'Probabilistic PCA',
-                               'Laplacian Eigenmap',
-                               'Hessian Locally Linear Embedding',
-                               'Stochastic Proximity Embedding',
-                               'Neighborhood Preserving Embedding',
-                               'Scikit-Learn PCA',
-                               "Don't reduce dimensions"],
-                      label='Dimensionality reduction method',
-                      help=""" Choose among the following dimensionality reduction methods:
-            PCA
-               Principal Component Analysis 
-            LTSA <k=12>
-               Local Tangent Space Alignment, k=number of nearest neighbours 
-            DM <s=1> <t=1>
-               Diffusion map, t=Markov random walk, s=kernel sigma 
-            LLTSA <k=12>
-               Linear Local Tangent Space Alignment, k=number of nearest neighbours 
-            LPP <k=12> <s=1>
-               Linearity Preserving Projection, k=number of nearest neighbours, s=kernel sigma 
-            kPCA <s=1>
-               Kernel PCA, s=kernel sigma 
-            pPCA <n=200>
-               Probabilistic PCA, n=number of iterations 
-            LE <k=7> <s=1>
-               Laplacian Eigenmap, k=number of nearest neighbours, s=kernel sigma 
-            HLLE <k=12>
-               Hessian Locally Linear Embedding, k=number of nearest neighbours 
-            SPE <k=12> <global=1>
-               Stochastic Proximity Embedding, k=number of nearest neighbours, global embedding or not 
-            NPE <k=12>
-               Neighborhood Preserving Embedding, k=number of nearest neighbours 
-        """)
-        form.addParam('extraParams', params.StringParam, default=None,
-                      expertLevel=params.LEVEL_ADVANCED,
-                      label='Extra params',
-                      help='These parameters are there to change the default parameters of a dimensionality reduction'
-                           ' method. Check xmipp_matrix_dimred for full details.')
+        form.addParam('setOfPDBs', params.PointerParam, pointerClass='SetOfPDBs, SetOfAtomStructs',
+                      condition='pdbSource == 2',
+                      label="Set of PDBs",
+                      help='Use a scipion object SetOfPDBs / SetOfAtomStructs')
+        form.addParam('dcds_file', params.PathParam,
+                      condition='pdbSource == 3',
+                      label="List of trajectory DCD files",
+                      help='Use the file pattern as file location with /*.dcd')
+        form.addParam('dcd_start', params.IntParam, default=0,
+                      condition='pdbSource == 3',
+                      label="Beginning of the trajectory",
+                      help='Index of the desired begining of the trajectory')
+        form.addParam('dcd_end', params.IntParam, default=-1,
+                      condition='pdbSource == 3',
+                      label="Ending of the trajectory",
+                      help='Index of the desired end of the trajectory')
+        form.addParam('dcd_step', params.IntParam, default=1,
+                      condition='pdbSource == 3',
+                      label="Step of the trajectory",
+                      help='Step to skip points in the trajectory')
+        form.addParam('dcd_ref_pdb', params.PointerParam, pointerClass='AtomStruct',
+                      condition='pdbSource == 3',
+                      label="trajectory Reference PDB",
+                      help='Reference PDB of the trajectory')
 
+        form.addSection(label='Principal Component Analysis')
         form.addParam('reducedDim', IntParam, default=2,
-                      label='Reduced dimension')
-
-        # form.addParallelSection(threads=0, mpi=8)
+                      label='Number of Principal Components')
+        form.addParam('alignPDBs', params.BooleanParam, default=False,
+                      label="Align PDBs ?",
+                      help='Perform rigid body alignement on the set of PDBs to a reference PDB')
+        form.addParam('alignRefPDB', params.PointerParam, pointerClass='AtomStruct',
+                      condition='alignPDBs',
+                      label="Alignement Reference PDB",
+                      help='Reference PDB to align the PDBs with')
+        form.addParam('matchingType', params.EnumParam, label="Match structures ?", default=0,
+                      choices=['Both structures are the same', 'Match chain name/residue num/atom name',
+                               'Match segment name/residue num/atom name'],
+                      help="Method to match atoms in the trajectory coordinates and the reference PDB")
 
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
-        pdb_mat = self.getInputPdbs()
-        reducedDim = self.reducedDim.get()
-        method = self.dimredMethod.get()
-        extraParams = self.extraParams.get('')
-        deformationsFile = self.getDeformationFile()
-        self._insertFunctionStep('performPDBdimred',
-                                 pdb_mat,reducedDim,method,extraParams,deformationsFile)
+        self._insertFunctionStep('readInputFiles')
+        self._insertFunctionStep('performDimred')
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
-    def performPDBdimred(self,pdb_mat,reducedDim,method,extraParams,deformationsFile):
-        pdbs_list = [f for f in glob.glob(pdb_mat)]
-        pdbs_list.sort()
+    def readInputFiles(self):
+        inputFiles = self.getInputFiles()
+
+        # Align PDBS if needed
+        if self.pdbSource.get() != PDB_SOURCE_TRAJECT:
+            if self.alignPDBs.get():
+                ref = ContinuousFlexPDBHandler(self.alignRefPDB.get().getFileName())
+                mol = ContinuousFlexPDBHandler(inputFiles[0])
+                if self.matchingType.get() == 1:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=0)
+                elif self.matchingType.get() == 2:
+                    idx_matching_atoms = mol.matchPDBatoms(reference_pdb=ref, matchingType=1)
+                else:
+                    idx_matching_atoms = None
+
+        # Get pdbs coordinates
         pdbs_matrix = []
-        for pdbfn in pdbs_list:
-            pdb_lines = self.readPDB(pdbfn)
-            pdb_coordinates = np.array(self.PDB2List(pdb_lines))
-            pdbs_matrix.append(np.reshape(pdb_coordinates, -1))
-        deformationFile = self._getExtraPath('pdbs_mat.txt')
-        # The deformationFile is for xmipp methods
-        np.savetxt(deformationFile, pdbs_matrix, fmt="%s")
+        for pdbfn in inputFiles:
+            if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
+                traj_arr= dcd2numpyArr(pdbfn)
+                mol = ContinuousFlexPDBHandler(self.getPDBRef())
+                traj_arr.shape
+                for i in range(self.dcd_start.get(),
+                               self.dcd_end.get() if self.dcd_end.get()!= -1 else traj_arr.shape[0],
+                               self.dcd_step.get()):
+                    pdbs_matrix.append(traj_arr[i].flatten())
+                    mol.coords=traj_arr[i]
+                    mol.write_pdb(self._getExtraPath("%s_traj.pdb"%str(i+1).zfill(5)))
+            else:
+                try :
+                    # Read PDBs
+                    mol = ContinuousFlexPDBHandler(pdbfn)
 
-        rows, columns = np.shape(pdbs_matrix)
-        outputMatrix = self.getOutputMatrixFile()
-        methodName = DIMRED_VALUES[method]
-        if methodName == 'None':
-            copyFile(deformationsFile,outputMatrix)
-            return
+                    # Align PDBs
+                    if self.alignPDBs.get():
+                        mol= mol.alignMol(reference_pdb=ref, idx_matching_atoms=idx_matching_atoms)
 
-        if methodName == 'sklearn_PCA':
-            # X = np.loadtxt(fname=deformationsFile)
-            X = pdbs_matrix
-            pca = decomposition.PCA(n_components=reducedDim)
-            pca.fit(X)
-            Y = pca.transform(X)
-            np.savetxt(outputMatrix,Y)
-            M = np.matmul(np.linalg.pinv(X),Y)
-            mappingFile = self._getExtraPath('projector.txt')
-            np.savetxt(mappingFile,M)
-            # save the pca:
-            pca_pickled = self._getExtraPath('pca_pickled.txt')
-            dump(pca,pca_pickled)
-        else:
-            args = "-i %(deformationsFile)s -o %(outputMatrix)s -m %(methodName)s %(extraParams)s"
-            args += "--din %(columns)d --samples %(rows)d --dout %(reducedDim)d"
-            if method in DIMRED_MAPPINGS:
-                mappingFile = self._getExtraPath('projector.txt')
-                args += " --saveMapping %(mappingFile)s"
-            runProgram("xmipp_matrix_dimred", args % locals())
+                    pdbs_matrix.append(mol.coords.flatten())
+
+                except RuntimeError:
+                    print("Warning : Can not read PDB file %s "%pdbfn)
+
+        self.pdbs_matrix = np.array(pdbs_matrix)
 
 
-        print(pdb_mat)
-        pass
+    def performDimred(self):
+
+        pca = decomposition.PCA(n_components=self.reducedDim.get())
+        Y = pca.fit_transform(self.pdbs_matrix)
+        np.savetxt(self.getOutputMatrixFile(),Y)
+        dump(pca,self._getExtraPath('pca_pickled.joblib'))
 
     def createOutputStep(self):
         pass
@@ -207,33 +187,26 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             print >> fWarn, l
         fWarn.close()
 
-    def getInputPdbs(self):
-        if self.pdbSource.get()==0:
-            return self.pdbs.get()._getExtraPath('*.pdb')
+    def getInputFiles(self):
+        if self.pdbSource.get()==PDB_SOURCE_SUBTOMO:
+            l= [f for f in glob.glob(self.pdbs.get()._getExtraPath('*.pdb'))]
+        elif self.pdbSource.get()==PDB_SOURCE_PATTERN:
+            l= [f for f in glob.glob(self.pdbs_file.get())]
+        elif self.pdbSource.get()==PDB_SOURCE_OBJECT:
+            l= [i.getFileName() for i in self.setOfPDBs.get()]
+        elif self.pdbSource.get()==PDB_SOURCE_TRAJECT:
+            l= [f for f in glob.glob(self.dcds_file.get())]
+        l.sort()
+        return l
+
+    def getPDBRef(self):
+        if self.pdbSource.get()==PDB_SOURCE_TRAJECT:
+            return self.dcd_ref_pdb.get().getFileName()
         else:
-            return self.pdbs_file.get()
+            return self.getInputFiles()[0]
 
     def getOutputMatrixFile(self):
         return self._getExtraPath('output_matrix.txt')
 
-    def readPDB(self, fnIn):
-        with open(fnIn) as f:
-            lines = f.readlines()
-        return lines
-
     def getDeformationFile(self):
         return self._getExtraPath('pdbs_mat.txt')
-
-    def PDB2List(self, lines):
-        newlines = []
-        for line in lines:
-            if line.startswith("ATOM "):
-                try:
-                    x = float(line[30:38])
-                    y = float(line[38:46])
-                    z = float(line[46:54])
-                    newline = [x, y, z]
-                    newlines.append(newline)
-                except:
-                    pass
-        return newlines

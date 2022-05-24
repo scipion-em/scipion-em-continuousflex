@@ -50,15 +50,6 @@ class ProtGenesis(EMProtocol):
 
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
-        form.addParam('md_program', params.EnumParam, label="MD program", default=PROGRAM_ATDYN,
-                      choices=['ATDYN', 'SPDYN'],
-                      help="SPDYN (Spatial decomposition dynamics) and ATDYN (Atomic decomposition dynamics)"
-                    " share almost the same data structures, subroutines, and modules, but differ in"
-                    " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
-                    " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
-                    " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
-                    " simple parallelization scheme but contains new methods and features. NMMD is available only for ATDYN.", important=True,
-                      expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('restartChoice', params.BooleanParam, label="Restart GENESIS protocol ?", default=False,
                       help="Restart a previous GENESIS simulation. ")
@@ -72,8 +63,24 @@ class ProtGenesis(EMProtocol):
                       help='Select the input PDB.', important=True, condition="not restartChoice" )
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass", condition="not restartChoice" )
-        form.addParam('raiseError', params.BooleanParam, label="Stop execution if fails ?", default=True,
+
+        group = form.addGroup('Execution Parameters',expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('disableParallelSim', params.BooleanParam, label="Disable parallelisation over the EM data ?", default=False,
+                      help="Disabel parallel processing of simualtions over EM input data. Instead, each simulation is run linearly"
+                           "with internal parallelization with the specified number of MPI. Running parallel simulation is activated by default "
+                           " when using multiple EM data. Running parallel simulation is not available for REUS."
+                           "",expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('raiseError', params.BooleanParam, label="Stop execution if fails ?", default=True,
                       help="Stop execution if GENESIS program fails",expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('md_program', params.EnumParam, label="MD program", default=PROGRAM_ATDYN,
+                      choices=['ATDYN', 'SPDYN'],
+                      help="SPDYN (Spatial decomposition dynamics) and ATDYN (Atomic decomposition dynamics)"
+                    " share almost the same data structures, subroutines, and modules, but differ in"
+                    " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
+                    " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
+                    " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
+                    " simple parallelization scheme but contains new methods and features. NMMD is available only for ATDYN.",
+                      expertLevel=params.LEVEL_ADVANCED)
 
 
         group = form.addGroup('Forcefield Inputs', condition="not restartChoice" )
@@ -277,19 +284,9 @@ class ProtGenesis(EMProtocol):
                       condition="EMfitChoice==2", important=True)
         group.addParam('image_size', params.IntParam, default=64, label='Image Size',
                       help="TODO", condition="EMfitChoice==2")
-        group.addParam('estimateAngleShift', params.BooleanParam, label="Estimate rigid body ?",
-                      default=False,  condition="EMfitChoice==2", help="If set, the GUI will perform rigid body alignement. "
-                            "Otherwise, you must provide a set of alignement parameters for each image")
-        group.addParam('rb_n_iter', params.IntParam, default=1, label='Number of iterations for rigid body fitting',
-                      help="Number of rigid body alignement during the simulation. If 1 is set, the rigid body alignement "
-                           "will be performed once at the begining of the simulation",
-                      condition="EMfitChoice==2 and estimateAngleShift")
-        group.addParam('rb_method', params.EnumParam, label="Rigid body alignement method", default=1,
-                      choices=['Projection Matching', 'Wavelet'], help="Type of rigid body alignement. "
-                                                                       "Wavelet method is recommended",
-                      condition="EMfitChoice==2 and estimateAngleShift")
+
         group.addParam('imageAngleShift', params.FileParam, label="Rigid body parameters (.xmd)",
-                      condition="EMfitChoice==2 and not estimateAngleShift",
+                      condition="EMfitChoice==2",
                       help='Xmipp metadata file of rigid body parameters for each image (3 euler angles, 2 shift)')
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
@@ -306,18 +303,19 @@ class ProtGenesis(EMProtocol):
         if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
 
-        # SETUP MPI parameters
-        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+        # Create INP files
+        self._insertFunctionStep("createINPs")
 
-        # Parallel Genesis simulation
-        if not(self.EMfitChoice.get() == EMFIT_IMAGES and self.estimateAngleShift.get()):
-            for i in range(numLinearFit + 1):
-                self._insertFunctionStep("runParallelGenesis", i)
-
-        # Parallel rigid body fitting for EMFIT images
+        # RUN simulation
+        if not self.disableParallelSim.get() and  \
+            (self.simulationType.get() != SIMULATION_REMD and self.simulationType.get() != SIMULATION_RENMMD) and \
+            self.getNumberOfSimulation() >1 :
+            if not existsCommand("parallel") :
+                raise RuntimeError("GNU parallel command not found")
+            self._insertFunctionStep("runSimulationParallel")
         else:
-            for i in range(numLinearFit + 1):
-                self._insertFunctionStep("runParallelGenesisRBFitting", i)
+            for i in range(self.getNumberOfSimulation()):
+                self._insertFunctionStep("runSimulation", i)
 
         # Create output data
         self._insertFunctionStep("createOutputStep")
@@ -398,15 +396,6 @@ class ProtGenesis(EMProtocol):
         elif self.EMfitChoice.get() == EMFIT_IMAGES:
             for i in range(n_em):
                 runCommand("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
-                if self.estimateAngleShift.get():
-                    currentAngles = md.MetaData()
-                    currentAngles.setValue(md.MDL_IMAGE, self.getInputEMprefix(i), currentAngles.addObject())
-                    currentAngles.setValue(md.MDL_ANGLE_ROT, 0.0, 1)
-                    currentAngles.setValue(md.MDL_ANGLE_TILT, 0.0, 1)
-                    currentAngles.setValue(md.MDL_ANGLE_PSI, 0.0, 1)
-                    currentAngles.setValue(md.MDL_SHIFT_X, 0.0, 1)
-                    currentAngles.setValue(md.MDL_SHIFT_Y, 0.0, 1)
-                    currentAngles.write(self._getExtraPath("%s_current_angles.xmd" % str(i + 1).zfill(5)))
 
     def convertInputVol(self,fnInput,volPrefix):
         """
@@ -444,183 +433,37 @@ class ProtGenesis(EMProtocol):
 
     # --------------------------- GENESIS step --------------------------------------------
 
-    def runParallelGenesis(self,indexLinearFit):
+    def createINPs(self):
+        for i in range(self.getNumberOfSimulation()):
+            self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(i) + ".pdb",
+                           outputPrefix=self.getOutputPrefix(i), indexFit=i)
+
+    def runSimulation(self, index):
+        programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
+        outpref= self.getOutputPrefix(index)
+        params = "%s_INP > %s.log" % (outpref,outpref)
+        env = self.getGenesisEnv()
+        env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
+
+        self.runJob(programname,params, env=env)
+
+    def runSimulationParallel(self):
         """
         Run multiple GENESIS simulations in parallel
-        :param int indexLinearFit:  current number of linear fitting
         :return None:
         """
+        env = self.getGenesisEnv()
+        env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
+        programPath = os.path.join( Plugin.getVar("GENESIS_HOME"), 'bin')
+        programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
+        extradir = self._getExtraPath()
 
-        # SETUP MPI parameters
-        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+        cmd = "seq -f \"%%05g\" 1 %i | parallel -P %i \"%s/%s %s/{}_output_INP > %s/{}_output.log \" " % (
+        self.getNumberOfSimulation(),self.numberOfMpi.get(), programPath, programname, extradir, extradir)
 
-        cmds = []
-        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
-        for i in range(n_parallel):
-            indexFit = i + indexLinearFit * numParallelFit
-            prefix = self.getOutputPrefix(indexFit)
+        print(cmd)
+        runCommand(cmd, env=env)
 
-            # Create INP file
-            self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(indexFit) + ".pdb",
-                           outputPrefix=prefix, indexFit=indexFit)
-
-            # Create Genesis command
-            genesis_cmd = self.getGenesisCmd(prefix=prefix)
-            cmds.append(genesis_cmd)
-
-        # Run Genesis
-        runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                        numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
-                        raiseError=self.raiseError.get())
-
-    def runParallelGenesisRBFitting(self,indexLinearFit):
-
-        # SETUP MPI parameters
-        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
-
-        #TODO initrst = str(self.inputRST.get())
-
-        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
-
-        # Loop rigidbody align / GENESIS fitting
-        for iterFit in range(self.rb_n_iter.get()):
-
-            # ------   ALIGN PDBs---------
-            # Transform PDBs to volume
-            cmds_pdb2vol = []
-            for i in range(n_parallel):
-                indexFit = i + indexLinearFit * numParallelFit
-                inputPDB = self.getInputPDBprefix(indexFit) + ".pdb" if iterFit == 0 \
-                    else self.getOutputPrefix(indexFit) + ".pdb"
-
-                tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                cmds_pdb2vol.append(pdb2vol(inputPDB=inputPDB, outputVol=tmpPrefix,
-                                            sampling_rate=self.pixel_size.get(),
-                                            image_size=self.image_size.get()))
-            runParallelJobs(cmds_pdb2vol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
-                            raiseError=self.raiseError.get())
-
-            # Loop 4 times to refine the angles
-            # sampling_rate = [10.0, 5.0, 3.0, 2.0]
-            # angular_distance = [-1, 20, 10, 5]
-            sampling_rate = [10.0]
-            angular_distance = [-1]
-            for i_align in range(len(sampling_rate)):
-                cmds_projectVol = []
-                cmds_alignement = []
-                for i in range(n_parallel):
-                    indexFit = i + indexLinearFit * numParallelFit
-                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    inputImage = self.getInputEMprefix(indexFit) + ".spi"
-                    tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                    currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-
-                    # get commands
-                    if self.rb_method.get() == RB_PROJMATCH:
-                        cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                          outputProj=tmpPrefix, expImage=inputImage,
-                                                          sampling_rate=sampling_rate[i_align],
-                                                          angular_distance=angular_distance[i_align]))
-                        cmds_alignement.append(projectMatch(inputImage=inputImage,
-                                                            inputProj=tmpPrefix, outputMeta=tmpMeta))
-                    else:
-                        cmds_projectVol.append(projectVol(inputVol=tmpPrefix,
-                                                          outputProj=tmpPrefix, expImage=inputImage,
-                                                          sampling_rate=sampling_rate[i_align],
-                                                          angular_distance=angular_distance[i_align],
-                                                          compute_neighbors=False))
-                        cmds_alignement.append(waveletAssignement(inputImage=inputImage,
-                                                                  inputProj=tmpPrefix, outputMeta=tmpMeta))
-                # run parallel jobs
-                runParallelJobs(cmds_projectVol, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
-                                raiseError=self.raiseError.get())
-                runParallelJobs(cmds_alignement, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
-                                raiseError=self.raiseError.get())
-
-                cmds_continuousAssign = []
-                for i in range(n_parallel):
-                    indexFit = i + indexLinearFit * numParallelFit
-                    tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    tmpMeta = self._getExtraPath("%s_tmp_angles.xmd" % str(indexFit + 1).zfill(5))
-                    currentAngles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                    if self.rb_method.get() == RB_PROJMATCH:
-                        flipAngles(inputMeta=tmpMeta, outputMeta=tmpMeta)
-                    cmds_continuousAssign.append(continuousAssign(inputMeta=tmpMeta,
-                                                                  inputVol=tmpPrefix,
-                                                                  outputMeta=currentAngles))
-                runParallelJobs(cmds_continuousAssign, env=self.getGenesisEnv(), hostConfig=self._stepsExecutor.hostConfig,
-                                raiseError=self.raiseError.get())
-
-
-            # Cleaning volumes and projections
-            for i in range(n_parallel):
-                indexFit = i + i1 * numParallelFit
-                tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                runCommand("rm -f %s*" % tmpPrefix)
-
-            # ------   Run Genesis ---------
-            cmds = []
-            for i in range(n_parallel):
-                indexFit = i + indexLinearFit * numParallelFit
-                if iterFit == 0:
-                    prefix = self.getOutputPrefix(indexFit)
-                    inputPDB = self.getInputPDBprefix(indexFit) + ".pdb"
-                else:
-                    prefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    inputPDB = self.getOutputPrefix(indexFit) + ".pdb"
-
-                # Create INP file
-                self.createGenesisInputFile(inputPDB=inputPDB,
-                               outputPrefix=prefix, indexFit=indexFit)
-
-                # run GENESIS
-                cmds.append(self.getGenesisCmd(prefix=prefix))
-            runParallelJobs(cmds, env=self.getGenesisEnv(), numberOfMpi=numMpiPerFit,
-                            numberOfThreads=self.numberOfThreads.get(), hostConfig=self._stepsExecutor.hostConfig,
-                            raiseError=self.raiseError.get())
-
-            if self.rb_n_iter.get()> 1 :
-                if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-                    raise RuntimeError("Simulation REMD not allowed for Rigid body fitting iteration > 1")
-
-                # append files
-                if iterFit != 0:
-                    for i in range(n_parallel):
-                        indexFit = i + indexLinearFit * numParallelFit
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                        newPrefix = self.getOutputPrefix(indexFit)
-
-                        cat_cmd = "cat %s.log >> %s.log" % (tmpPrefix, newPrefix)
-                        tcl_cmd = "animate read dcd %s.dcd waitfor all\n" % (newPrefix)
-                        tcl_cmd += "animate read dcd %s.dcd waitfor all\n" % (tmpPrefix)
-                        tcl_cmd += "animate write dcd %s.dcd \nexit \n" % newPrefix
-                        with open("%s.tcl" % tmpPrefix, "w") as f:
-                            f.write(tcl_cmd)
-                        cp_cmd = "cp %s.pdb %s.pdb" % (tmpPrefix, newPrefix)
-                        runCommand(cat_cmd)
-                        runCommand(cp_cmd)
-                        runCommand("vmd -dispdev text -e %s.tcl" % tmpPrefix)
-
-                # rstfile = ""
-                for i in range(n_parallel):
-                    indexFit = i + indexLinearFit * numParallelFit
-                    newPrefix = self.getOutputPrefix(indexFit)
-                    if iterFit != 0:
-                        tmpPrefix = self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5))
-                    else:
-                        tmpPrefix = self.getOutputPrefix(indexFit)
-
-                    # runCommand("cp %s.rst %s.tmp.rst" % (tmpPrefix, newPrefix))
-                    # rstfile += "%s.tmp.rst "%newPrefix
-                    #save angles
-                    angles = self._getExtraPath("%s_current_angles.xmd" % str(indexFit + 1).zfill(5))
-                    saved_angles = self._getExtraPath("%s_iter%i_angles.xmd" % (str(indexFit + 1).zfill(5), iterFit))
-                    runCommand("cp %s %s" % (angles, saved_angles))
-
-                    #cleaning
-                    runCommand("rm -rf %s" %self._getExtraPath("%s_tmp" % str(indexFit + 1).zfill(5)))
-        #         self.inputRST.set(rstfile)
-        # self.inputRST.set(initrst)
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
         """
@@ -1013,46 +856,14 @@ class ProtGenesis(EMProtocol):
             outputPrefix.append(self._getExtraPath("%s_output" % str(index + 1).zfill(5)))
         return outputPrefix
 
-    def getMPIParams(self):
-        """
-        Get mpi parameters for the simulation
-        :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
-        """
-
-        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-            nreplica = self.nreplica.get()
-            if nreplica > self.numberOfMpi.get():
-                raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
-        else :
-            nreplica = 1
-        n_fit = self.getNumberOfSimulation() * nreplica
-
-        if n_fit <= self.numberOfMpi.get():
-            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfSimulation()
-            numberOfLinearFit   = 1
-            numberOfParallelFit = self.getNumberOfSimulation()
-            numberOflastIter    = 0
-        else:
-            numberOfMpiPerFit   = nreplica
-            numberOfLinearFit   = n_fit//self.numberOfMpi.get()
-            numberOfParallelFit = self.numberOfMpi.get()//nreplica
-            numberOflastIter    = n_fit % self.numberOfMpi.get()
-
-        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
-
     def getRigidBodyParams(self, index=0):
         """
         Get the current rigid body parameters for the specified index in case of EMFIT with iamges
         :param int index: Index of the simulation
         :return list: angle_rot, angle_tilt, angle_psi, shift_x, shift_y
         """
-        if not self.estimateAngleShift.get():
-            mdImg = md.MetaData(self.imageAngleShift.get())
-            idx = int(index + 1)
-
-        else:
-            mdImg = md.MetaData(self._getExtraPath("%s_current_angles.xmd" % str(index + 1).zfill(5)))
-            idx=1
+        mdImg = md.MetaData(self.imageAngleShift.get())
+        idx = int(index + 1)
 
         return [
             mdImg.getValue(md.MDL_ANGLE_ROT, idx),
@@ -1071,20 +882,6 @@ class ProtGenesis(EMProtocol):
         environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
         return environ
-
-    def getGenesisCmd(self, prefix):
-        """
-        Get GENESIS cmd to run
-        :param str prefix: prefix of the simulation
-        :return str : GENESIS commadn to run
-        """
-        cmd=""
-        if self.md_program.get() == PROGRAM_ATDYN:
-            cmd +=  "atdyn %s " % ("%s_INP" % prefix)
-        else:
-            cmd += "spdyn %s " % ("%s_INP" % prefix)
-        cmd += "  > %s.log" % prefix
-        return cmd
 
     def getRestartFile(self, index=0):
         """
@@ -1113,7 +910,6 @@ class ProtGenesis(EMProtocol):
         with open(nm_file, "w") as f:
             for i in range(self.inputModes.get().getSize()):
                 if i >= 6:
-                    print(self.inputModes.get()[i+1].getModeFile())
                     f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
                     f.write(" -----------------------------------\n")
                     nm_vec = np.loadtxt(self.inputModes.get()[i+1].getModeFile())

@@ -115,24 +115,6 @@ class GenesisViewer(ProtocolViewer):
             group.addParam('displayCC', params.LabelParam,
                           label='Display Correlation Coefficient',
                           help='Show C.C. time series during the simulation')
-            if self.protocol.EMfitChoice.get() == EMFIT_IMAGES and \
-                    self.protocol.estimateAngleShift.get():
-                group.addParam('rigidBodyParams', params.FileParam, default=None,
-                              label="Target Rigid Body Parameters",
-                              help='Target parameter to compare')
-                group.addParam('displayAngularDistance', params.LabelParam,
-                              label='Display final angular distance',
-                              help='Show angular distance in degrees to the target rigid body params')
-                group.addParam('displayAngularDistanceTs', params.LabelParam,
-                              label='Display angular distance time series',
-                              help='Show angular distance time series'
-                                   'in degrees to the target rigid body params')
-                group.addParam('symmetry', params.StringParam,
-                              label='Symmetry group', default="C1",
-                              help='Symmetry group for angular distance computation if any. Valid groups are : '
-                                   'C1, Ci, Cs, Cn (from here on n must be an integer number with no more than 2 digits)' 
-                                       ' Cnv, Cnh, Sn, Dn, Dnv, Dnh, T, Td, Th, O, Oh '
-                                       ' I, I1, I2, I3, I4, I5, Ih, helical, dihedral, helicalDihedral ')
 
     def _getVisualizeDict(self):
         return {
@@ -141,8 +123,6 @@ class GenesisViewer(ProtocolViewer):
             'displayCC': self._plotCC,
             'displayRMSDts': self._plotRMSDts,
             'displayRMSD': self._plotRMSD,
-            'displayAngularDistance': self._plotAngularDistance,
-            'displayAngularDistanceTs': self._plotAngularDistanceTs,
             'displayTrajVMD': self._plotTrajVMD,
                 }
 
@@ -412,62 +392,6 @@ class GenesisViewer(ProtocolViewer):
         ax.plot(rmsdi, "o", color="tab:green", label="Initial RMSD", markeredgecolor='black')
         plotter.legend()
         plotter.show()
-
-    def _plotAngularDistance(self, paramName):
-        angular_dist = []
-        shift_dist = []
-        mdImgGT = md.MetaData(self.rigidBodyParams.get())
-        tmpPrefix = self.protocol._getExtraPath("tmpAngles")
-        for i in self.getSimulationList():
-            imgfn = self.protocol._getExtraPath("%s_current_angles.xmd" % (str(i+1).zfill(5)))
-            if os.path.exists(imgfn):
-                angDist, shftDist = getAngularShiftDist(angle1MetaFile=imgfn,
-                                    angle2MetaData=mdImgGT, angle2Idx=int(i+1),
-                                    tmpPrefix=tmpPrefix, symmetry=self.symmetry.get())
-                angular_dist.append(angDist)
-                shift_dist.append(shftDist)
-
-        plotter1 = FlexPlotter()
-        ax1 = plotter1.createSubPlot("Angular Distance (°)", "# Image", "Angular Distance (°)")
-        ax1.plot(angular_dist, "o")
-        plotter1.show()
-
-        print("Angular distance mean %f:"%np.mean(angular_dist))
-        print("Angular distance std %f:"%np.std(angular_dist))
-
-        plotter2 = FlexPlotter()
-        ax2 = plotter2.createSubPlot("Shift Distance (pix)", "# Image", "Shift Distance (pix)")
-        ax2.plot(shift_dist, "o")
-        plotter2.show()
-
-        print("Shift distance mean %f:"%np.mean(shift_dist))
-        print("Shift distance std %f:"%np.std(shift_dist))
-
-    def _plotAngularDistanceTs(self, paramName):
-        mdImgGT = md.MetaData(self.rigidBodyParams.get())
-        SimulationList = self.getSimulationList()
-        niter= self.protocol.rb_n_iter.get()
-        angular_dist = np.zeros((len(SimulationList),niter))
-        tmpPrefix = self.protocol._getExtraPath("tmpAngles")
-
-
-        for i in range(len(SimulationList)):
-            for j in range(niter):
-                imgfn = self.protocol._getExtraPath("%s_iter%i_angles.xmd" % (str(SimulationList[i]+1).zfill(5), j))
-                if os.path.exists(imgfn):
-                    angDist,_ = getAngularShiftDist(angle1MetaFile=imgfn,
-                                    angle2MetaData=mdImgGT, angle2Idx=int(SimulationList[i]+1),
-                                    tmpPrefix=tmpPrefix, symmetry=self.symmetry.get())
-                    angular_dist[i, j] = angDist
-
-                else:
-                    print("%s not found" %imgfn)
-
-        plotter1 = FlexPlotter()
-        ax1 = plotter1.createSubPlot("Angular Distance (°)", "Number of iterations", "Angular Distance (°)")
-        for i in range(len(SimulationList)):
-            ax1.plot(angular_dist[i,:])
-        plotter1.show()
 
     def getSimulationList(self):
         if self.protocol.getNumberOfSimulation() > 1:

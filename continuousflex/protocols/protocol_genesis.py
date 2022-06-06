@@ -310,9 +310,9 @@ class ProtGenesis(EMProtocol):
         if not self.disableParallelSim.get() and  \
             (self.simulationType.get() != SIMULATION_REMD and self.simulationType.get() != SIMULATION_RENMMD) and \
             self.getNumberOfSimulation() >1 :
-            if not existsCommand("parallel") :
-                raise RuntimeError("GNU parallel command not found")
-            self._insertFunctionStep("runSimulationParallel")
+            numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+            for i in range(numLinearFit+1):
+                self._insertFunctionStep("runSimulationParallel", i)
         else:
             for i in range(self.getNumberOfSimulation()):
                 self._insertFunctionStep("runSimulation", i)
@@ -447,22 +447,22 @@ class ProtGenesis(EMProtocol):
 
         self.runJob(programname,params, env=env)
 
-    def runSimulationParallel(self):
+    def runSimulationParallel(self, indexLinearFit):
         """
         Run multiple GENESIS simulations in parallel
         :return None:
         """
+        # SETUP MPI parameters
+        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
+        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
+        programname = "pardyn"
+        outpref= self._getExtraPath("{}_output")
+        params = "%s_INP %s.log %i" % (outpref,outpref, indexLinearFit * numParallelFit +1)
         env = self.getGenesisEnv()
         env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
-        programPath = os.path.join( Plugin.getVar("GENESIS_HOME"), 'bin')
-        programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
-        extradir = self._getExtraPath()
 
-        cmd = "seq -f \"%%05g\" 1 %i | parallel -P %i \"%s/%s %s/{}_output_INP > %s/{}_output.log \" " % (
-        self.getNumberOfSimulation(),self.numberOfMpi.get(), programPath, programname, extradir, extradir)
+        self.runJob(programname,params, env=env, numberOfMpi=n_parallel)
 
-        print(cmd)
-        runCommand(cmd, env=env)
 
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
@@ -864,14 +864,14 @@ class ProtGenesis(EMProtocol):
         """
         mdImg = md.MetaData(self.imageAngleShift.get())
         idx = int(index + 1)
-
-        return [
+        params = [
             mdImg.getValue(md.MDL_ANGLE_ROT, idx),
             mdImg.getValue(md.MDL_ANGLE_TILT, idx),
             mdImg.getValue(md.MDL_ANGLE_PSI, idx),
             mdImg.getValue(md.MDL_SHIFT_X, idx),
             mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
+        return params
 
     def getGenesisEnv(self):
         """
@@ -917,6 +917,27 @@ class ProtGenesis(EMProtocol):
                         f.write(" %e   %e   %e\n" % (nm_vec[j, 0], nm_vec[j, 1], nm_vec[j, 2]))
 
         return nm_file
+
+    def getMPIParams(self):
+        """
+        Get mpi parameters for the simulation
+        :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
+        """
+        nreplica = 1
+        n_fit = self.getNumberOfSimulation() * nreplica
+
+        if n_fit <= self.numberOfMpi.get():
+            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfSimulation()
+            numberOfLinearFit   = 1
+            numberOfParallelFit = self.getNumberOfSimulation()
+            numberOflastIter    = 0
+        else:
+            numberOfMpiPerFit   = nreplica
+            numberOfLinearFit   = n_fit//self.numberOfMpi.get()
+            numberOfParallelFit = self.numberOfMpi.get()//nreplica
+            numberOflastIter    = n_fit % self.numberOfMpi.get()
+
+        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
 
     def convertReusOutputDcd(self):
 

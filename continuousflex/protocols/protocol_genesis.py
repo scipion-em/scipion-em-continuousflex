@@ -22,6 +22,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 import os.path
+from pyworkflow.utils.path import createLink
 
 import pyworkflow.protocol.params as params
 from pwem.protocols import EMProtocol
@@ -39,7 +40,7 @@ from .utilities.pdb_handler import ContinuousFlexPDBHandler
 
 from xmipp3 import Plugin
 import pyworkflow.utils as pwutils
-from pyworkflow.utils import runCommand
+from pyworkflow.utils import runCommand, buildRunCommand
 
 class ProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
@@ -299,6 +300,10 @@ class ProtGenesis(EMProtocol):
         # Convert input PDB
         self._insertFunctionStep("convertInputPDBStep")
 
+        # Convert normal modes
+        if (self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD):
+            self._insertFunctionStep("convertNormalModeFileStep")
+
         # Convert input EM data
         if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
@@ -377,6 +382,20 @@ class ProtGenesis(EMProtocol):
                 runCommand(cmd)
                 print(cmd)
 
+    def convertNormalModeFileStep(self):
+        """
+        Convert NM data step
+        :return None:
+        """
+        nm_file = self.getInputPDBprefix() + ".nma"
+        with open(nm_file, "w") as f:
+            for i in range(self.inputModes.get().getSize()):
+                if i >= 6:
+                    f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
+                    f.write(" -----------------------------------\n")
+                    nm_vec = np.loadtxt(self.inputModes.get()[i + 1].getModeFile())
+                    for j in range(nm_vec.shape[0]):
+                        f.write(" %e   %e   %e\n" % (nm_vec[j, 0], nm_vec[j, 1], nm_vec[j, 2]))
 
     # --------------------------- Convert Input EM data --------------------------------------------
 
@@ -389,47 +408,43 @@ class ProtGenesis(EMProtocol):
         inputEMfn = self.getInputEMfn()
         n_em = self.getNumberOfInputEM()
 
+        dest_ext = "mrc" if self.EMfitChoice.get() == EMFIT_VOLUMES else "spi"
+
+        # Convert / copy EM data
+        for i in range(n_em):
+            pre, ext = os.path.splitext(os.path.basename(inputEMfn[i]))
+            if ext != ".%s"%dest_ext:
+                runProgram("xmipp_image_convert", "-i %s --oext %s -o %s.%s" %
+                           (inputEMfn[i], dest_ext, self.getInputEMprefix(i), dest_ext))
+            else:
+                if self.EMfitChoice.get() == EMFIT_VOLUMES:
+                    createLink(inputEMfn[i],"%s.%s"%(self.getInputEMprefix(i),dest_ext))
+                elif self.EMfitChoice.get() == EMFIT_IMAGES:
+                    createLink(inputEMfn[i],"%s.%s"%(self.getInputEMprefix(i),dest_ext))
+                    runCommand("cp %s %s.%s" %(inputEMfn[i], self.getInputEMprefix(i),dest_ext
+                                               ))
+
+        # Fix volumes origin
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
             for i in range(n_em):
-                self.convertInputVol(fnInput=inputEMfn[i], volPrefix = self.getInputEMprefix(i))
-
-        elif self.EMfitChoice.get() == EMFIT_IMAGES:
-            for i in range(n_em):
-                runCommand("cp %s %s.spi"%(inputEMfn[i], self.getInputEMprefix(i)))
-
-    def convertInputVol(self,fnInput,volPrefix):
-        """
-        Convert input volume data
-        :param str fnInput: input volume file name
-        :param str volPrefix: ouput volume prefix
-        :return None:
-        """
-
-        # Convert data to mrc
-        pre, ext = os.path.splitext(os.path.basename(fnInput))
-        if ext != ".mrc":
-            runProgram("xmipp_image_convert", "-i %s --oext mrc -o %s.mrc" %
-                        (fnInput,volPrefix))
-        else:
-            runProgram("cp","%s %s.mrc" %(fnInput,volPrefix))
-
-        # Update mrc header
-        with mrcfile.open("%s.mrc" % volPrefix) as old_mrc:
-            with mrcfile.new("%s.mrc" % volPrefix, overwrite=True) as new_mrc:
-                new_mrc.set_data(old_mrc.data)
-                new_mrc.voxel_size = self.voxel_size.get()
-                new_mrc.header['origin'] = old_mrc.header['origin']
-                if self.centerOrigin.get():
-                    origin = -np.array(old_mrc.data.shape)/2 *self.voxel_size.get()
-                    new_mrc.header['origin']['x'] = origin[0]
-                    new_mrc.header['origin']['y'] = origin[1]
-                    new_mrc.header['origin']['z'] = origin[2]
-                else:
-                    new_mrc.header['origin']['x'] = self.origin_x.get()
-                    new_mrc.header['origin']['y'] = self.origin_y.get()
-                    new_mrc.header['origin']['z'] = self.origin_z.get()
-                new_mrc.update_header_from_data()
-                new_mrc.update_header_stats()
+                # Update mrc header
+                volPrefix  = self.getInputEMprefix(i)
+                with mrcfile.open("%s.mrc" % volPrefix) as old_mrc:
+                    with mrcfile.new("%s.mrc" % volPrefix, overwrite=True) as new_mrc:
+                        new_mrc.set_data(old_mrc.data)
+                        new_mrc.voxel_size = self.voxel_size.get()
+                        new_mrc.header['origin'] = old_mrc.header['origin']
+                        if self.centerOrigin.get():
+                            origin = -np.array(old_mrc.data.shape) / 2 * self.voxel_size.get()
+                            new_mrc.header['origin']['x'] = origin[0]
+                            new_mrc.header['origin']['y'] = origin[1]
+                            new_mrc.header['origin']['z'] = origin[2]
+                        else:
+                            new_mrc.header['origin']['x'] = self.origin_x.get()
+                            new_mrc.header['origin']['y'] = self.origin_y.get()
+                            new_mrc.header['origin']['z'] = self.origin_z.get()
+                        new_mrc.update_header_from_data()
+                        new_mrc.update_header_stats()
 
     # --------------------------- GENESIS step --------------------------------------------
 
@@ -452,17 +467,37 @@ class ProtGenesis(EMProtocol):
         Run multiple GENESIS simulations in parallel
         :return None:
         """
-        # SETUP MPI parameters
-        numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
-        n_parallel = numParallelFit if indexLinearFit < numLinearFit else numLastIter
-        programname = "pardyn"
-        outpref= self._getExtraPath("{}_output")
-        params = "%s_INP %s.log %i" % (outpref,outpref, indexLinearFit * numParallelFit +1)
+
+        # Set number of MPI per fit
+        if self.getNumberOfSimulation() <= self.numberOfMpi.get():
+            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfSimulation()
+        else:
+            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
+                nreplica = self.nreplica.get()
+                if nreplica > self.numberOfMpi.get():
+                    raise RuntimeError("Number of MPI cores should be larger than the number of replicas.")
+            else:
+                nreplica = 1
+            numberOfMpiPerFit   = nreplica
+
+        # Set environnement
         env = self.getGenesisEnv()
         env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
 
-        self.runJob(programname,params, env=env, numberOfMpi=n_parallel)
+        # Build command
+        programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
+        extradir = self._getExtraPath()
+        params = "%s/{}_output_INP > %s/{}_output.log " %(extradir, extradir)
+        cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpiPerFit, hostConfig=self._stepsExecutor.hostConfig,
+                              env=env)
 
+        # Build parallel command
+        parallel_cmd = "seq -f \"%%05g\" 1 %i | parallel -P %i \" %s\" " % (
+        self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)
+
+        print("Command : %s" % cmd)
+        print("Parallel Command : %s" % parallel_cmd)
+        runCommand(parallel_cmd, env=env)
 
 
     def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
@@ -553,7 +588,7 @@ class ProtGenesis(EMProtocol):
             s += "\n[NMMD] \n" #-----------------------------------------------------------
             s+= "nm_number = %i \n" % self.nm_number.get()
             s+= "nm_mass = %f \n" % self.nm_mass.get()
-            s += "nm_file = %s \n" % self.getNormalModeFile(outputPrefix)
+            s += "nm_file = %s \n" % self.getInputPDBprefix()+".nma"
             if self.nm_init.get() is not None and self.nm_init.get() != "":
                 s += "nm_init = %s \n" % " ".join([ str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
             if self.nm_dt.get() is None:
@@ -762,7 +797,7 @@ class ProtGenesis(EMProtocol):
         if numberOfInputPDB != numberOfInputEM and \
                 numberOfInputEM != 1 and numberOfInputPDB != 1 \
                 and numberOfInputEM != 0:
-            raise RuntimeError("Number of input volumes and PDBs must be the same.")
+            raise RuntimeError("Number of input EM data and PDBs must be the same.")
         return np.max([numberOfInputEM, numberOfInputPDB])
 
     def getInputPDBfn(self):
@@ -905,18 +940,6 @@ class ProtGenesis(EMProtocol):
         else:
             return self.forcefield.get()
 
-    def getNormalModeFile(self, prefix):
-        nm_file = prefix+".nma"
-        with open(nm_file, "w") as f:
-            for i in range(self.inputModes.get().getSize()):
-                if i >= 6:
-                    f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
-                    f.write(" -----------------------------------\n")
-                    nm_vec = np.loadtxt(self.inputModes.get()[i+1].getModeFile())
-                    for j in range(nm_vec.shape[0]):
-                        f.write(" %e   %e   %e\n" % (nm_vec[j, 0], nm_vec[j, 1], nm_vec[j, 2]))
-
-        return nm_file
 
     def getMPIParams(self):
         """
@@ -985,5 +1008,3 @@ class ProtGenesis(EMProtocol):
                 reptmpPrefix = self._getExtraPath("%s_output_tmp%i" % (str(i + 1).zfill(5), j+1))
                 runCommand("mv %s.dcd %s.dcd"%(reptmpPrefix,repPrefix))
                 runCommand("mv %s.log %s.log"%(reptmpPrefix,repPrefix))
-
-

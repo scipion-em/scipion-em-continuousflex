@@ -33,6 +33,7 @@ import mrcfile
 from pwem.emlib.image import ImageHandler
 from pwem.utils import runProgram
 from pyworkflow.utils import getListFromRangeString
+import xmipp3.convert
 
 
 from .utilities.genesis_utilities import *
@@ -296,6 +297,8 @@ class ProtGenesis(EMProtocol):
         # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
+        # Create INP files
+        self._insertFunctionStep("createINPs")
 
         # Convert input PDB
         self._insertFunctionStep("convertInputPDBStep")
@@ -308,12 +311,8 @@ class ProtGenesis(EMProtocol):
         if self.EMfitChoice.get() != EMFIT_NONE:
             self._insertFunctionStep("convertInputEMStep")
 
-        # Create INP files
-        self._insertFunctionStep("createINPs")
-
         # RUN simulation
         if not self.disableParallelSim.get() and  \
-            (self.simulationType.get() != SIMULATION_REMD and self.simulationType.get() != SIMULATION_RENMMD) and \
             self.getNumberOfSimulation() >1 :
             numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
             for i in range(numLinearFit+1):
@@ -413,16 +412,11 @@ class ProtGenesis(EMProtocol):
         # Convert / copy EM data
         for i in range(n_em):
             pre, ext = os.path.splitext(os.path.basename(inputEMfn[i]))
-            if ext != ".%s"%dest_ext:
+            if self.EMfitChoice.get() == EMFIT_IMAGES and  ext == ".%s"%dest_ext:
+                createLink(inputEMfn[i], "%s.%s" % (self.getInputEMprefix(i), dest_ext))
+            else:
                 runProgram("xmipp_image_convert", "-i %s --oext %s -o %s.%s" %
                            (inputEMfn[i], dest_ext, self.getInputEMprefix(i), dest_ext))
-            else:
-                if self.EMfitChoice.get() == EMFIT_VOLUMES:
-                    createLink(inputEMfn[i],"%s.%s"%(self.getInputEMprefix(i),dest_ext))
-                elif self.EMfitChoice.get() == EMFIT_IMAGES:
-                    createLink(inputEMfn[i],"%s.%s"%(self.getInputEMprefix(i),dest_ext))
-                    runCommand("cp %s %s.%s" %(inputEMfn[i], self.getInputEMprefix(i),dest_ext
-                                               ))
 
         # Fix volumes origin
         if self.EMfitChoice.get() == EMFIT_VOLUMES:
@@ -449,14 +443,194 @@ class ProtGenesis(EMProtocol):
     # --------------------------- GENESIS step --------------------------------------------
 
     def createINPs(self):
-        for i in range(self.getNumberOfSimulation()):
-            self.createGenesisInputFile(inputPDB=self.getInputPDBprefix(i) + ".pdb",
-                           outputPrefix=self.getOutputPrefix(i), indexFit=i)
+        """
+        Create GENESIS input files
+        :return None:
+        """
+        for indexFit in range(self.getNumberOfSimulation()):
+            outputPrefix = self.getOutputPrefix(indexFit)
+            inputPDBprefix = self.getInputPDBprefix(indexFit)
+            inputEMprefix = self.getInputEMprefix(indexFit)
+            inp_file = self._getExtraPath("%s_INP" % str(indexFit + 1).zfill(5))
+            if self.restartChoice.get():
+                inputProt = self.restartProt.get()
+            else:
+                inputProt = self
+
+            s = "\n[INPUT] \n"  # -----------------------------------------------------------
+            s += "pdbfile = %s.pdb\n" % inputPDBprefix
+            if self.getForceField() == FORCEFIELD_CHARMM:
+                s += "topfile = %s\n" % inputProt.inputRTF.get()
+                s += "parfile = %s\n" % inputProt.inputPRM.get()
+                s += "psffile = %s.psf\n" % inputPDBprefix
+                if inputProt.inputSTR.get() != "" and inputProt.inputSTR.get() is not None:
+                    s += "strfile = %s\n" % inputProt.inputSTR.get()
+            elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
+                s += "grotopfile = %s.top\n" % inputPDBprefix
+            if self.restartChoice.get():
+                s += "rstfile = %s \n" % self.getRestartFile(indexFit)
+
+            s += "\n[OUTPUT] \n"  # -----------------------------------------------------------
+            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
+                s += "remfile = %s_remd{}.rem\n" % outputPrefix
+                s += "logfile = %s_remd{}.log\n" % outputPrefix
+                s += "dcdfile = %s_remd{}.dcd\n" % outputPrefix
+                s += "rstfile = %s_remd{}.rst\n" % outputPrefix
+                s += "pdbfile = %s_remd{}.pdb\n" % outputPrefix
+            else:
+                s += "dcdfile = %s.dcd\n" % outputPrefix
+                s += "rstfile = %s.rst\n" % outputPrefix
+                s += "pdbfile = %s.pdb\n" % outputPrefix
+
+            s += "\n[ENERGY] \n"  # -----------------------------------------------------------
+            if self.getForceField() == FORCEFIELD_CHARMM:
+                s += "forcefield = CHARMM \n"
+            elif self.getForceField() == FORCEFIELD_AAGO:
+                s += "forcefield = AAGO  \n"
+            elif self.getForceField() == FORCEFIELD_CAGO:
+                s += "forcefield = CAGO  \n"
+
+            if self.electrostatics.get() == ELECTROSTATICS_CUTOFF:
+                s += "electrostatic = CUTOFF  \n"
+            else:
+                s += "electrostatic = PME  \n"
+            s += "switchdist   = %.2f \n" % self.switch_dist.get()
+            s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
+            s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
+            if self.vdw_force_switch.get():
+                s += "vdw_force_switch = YES \n"
+            if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
+                s += "implicit_solvent = GBSA \n"
+                s += "gbsa_eps_solvent = 78.5 \n"
+                s += "gbsa_eps_solute  = 1.0 \n"
+                s += "gbsa_salt_cons   = 0.2 \n"
+                s += "gbsa_surf_tens   = 0.005 \n"
+
+            if self.simulationType.get() == SIMULATION_MIN:
+                s += "\n[MINIMIZE]\n"  # -----------------------------------------------------------
+                s += "method = SD\n"
+            else:
+                s += "\n[DYNAMICS] \n"  # -----------------------------------------------------------
+                if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
+                    s += "integrator = NMMD  \n"
+                elif self.integrator.get() == INTEGRATOR_VVERLET:
+                    s += "integrator = VVER  \n"
+                elif self.integrator.get() == INTEGRATOR_LEAPFROG:
+                    s += "integrator = LEAP  \n"
+
+                s += "timestep = %f \n" % self.time_step.get()
+            s += "nsteps = %i \n" % self.n_steps.get()
+            s += "eneout_period = %i \n" % self.eneout_period.get()
+            s += "crdout_period = %i \n" % self.crdout_period.get()
+            s += "rstout_period = %i \n" % self.n_steps.get()
+            s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
+
+            if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
+                s += "\n[NMMD] \n"  # -----------------------------------------------------------
+                s += "nm_number = %i \n" % self.nm_number.get()
+                s += "nm_mass = %f \n" % self.nm_mass.get()
+                s += "nm_file = %s.nma \n" % inputPDBprefix
+                if self.nm_init.get() is not None and self.nm_init.get() != "":
+                    s += "nm_init = %s \n" % " ".join([str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
+                if self.nm_dt.get() is None:
+                    s += "nm_dt = %f \n" % self.time_step.get()
+                else:
+                    s += "nm_dt = %f \n" % self.nm_dt.get()
+
+            if self.simulationType.get() != SIMULATION_MIN:
+                s += "\n[CONSTRAINTS] \n"  # -----------------------------------------------------------
+                if self.rigid_bond.get():
+                    s += "rigid_bond = YES \n"
+                else:
+                    s += "rigid_bond = NO \n"
+                if self.fast_water.get():
+                    s += "fast_water = YES \n"
+                    s += "water_model = %s \n" % self.water_model.get()
+                else:
+                    s += "fast_water = NO \n"
+
+            s += "\n[BOUNDARY] \n"  # -----------------------------------------------------------
+            if self.boundary.get() == BOUNDARY_PBC:
+                s += "type = PBC \n"
+                s += "box_size_x = %f \n" % self.box_size_x.get()
+                s += "box_size_y = %f \n" % self.box_size_y.get()
+                s += "box_size_z = %f \n" % self.box_size_z.get()
+            else:
+                s += "type = NOBC \n"
+
+            if self.simulationType.get() != SIMULATION_MIN:
+                s += "\n[ENSEMBLE] \n"  # -----------------------------------------------------------
+                if self.ensemble.get() == ENSEMBLE_NVE:
+                    s += "ensemble = NVE  \n"
+                elif self.ensemble.get() == ENSEMBLE_NPT:
+                    s += "ensemble = NPT  \n"
+                else:
+                    s += "ensemble = NVT  \n"
+                if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
+                    s += "tpcontrol = LANGEVIN  \n"
+                elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
+                    s += "tpcontrol = BERENDSEN  \n"
+                elif self.tpcontrol.get() == TPCONTROL_BUSSI:
+                    s += "tpcontrol = BUSSI  \n"
+                else:
+                    s += "tpcontrol = NO  \n"
+                s += "temperature = %.2f \n" % self.temperature.get()
+                if self.ensemble.get() == ENSEMBLE_NPT:
+                    s += "pressure = %.2f \n" % self.pressure.get()
+
+            if (self.EMfitChoice.get() == EMFIT_VOLUMES or self.EMfitChoice.get() == EMFIT_IMAGES) \
+                    and self.simulationType.get() != SIMULATION_MIN:
+                s += "\n[SELECTION] \n"  # -----------------------------------------------------------
+                s += "group1 = all and not hydrogen\n"
+
+                s += "\n[RESTRAINTS] \n"  # -----------------------------------------------------------
+                s += "nfunctions = 1 \n"
+                s += "function1 = EM \n"
+                constStr = self.constantK.get()
+                if "-" in constStr:
+                    splt = constStr.split("-")
+                    constStr = " ".join(
+                        [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), self.nreplica.get())])
+                s += "constant1 = %s \n" % constStr
+                s += "select_index1 = 1 \n"
+
+                s += "\n[EXPERIMENTS] \n"  # -----------------------------------------------------------
+                s += "emfit = YES  \n"
+                s += "emfit_sigma = %.4f \n" % self.emfit_sigma.get()
+                s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
+                s += "emfit_period = 1  \n"
+                if self.EMfitChoice.get() == EMFIT_VOLUMES:
+                    s += "emfit_target = %s.mrc \n" % inputEMprefix
+                elif self.EMfitChoice.get() == EMFIT_IMAGES:
+                    s += "emfit_type = IMAGE \n"
+                    s += "emfit_target = %s.spi \n" % inputEMprefix
+                    s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
+                    rigid_body_params = self.getRigidBodyParams(indexFit)
+                    s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
+                    s += "emfit_tilt_angle = %f\n" % rigid_body_params[1]
+                    s += "emfit_yaw_angle =  %f\n" % rigid_body_params[2]
+                    s += "emfit_shift_x = %f\n" % rigid_body_params[3]
+                    s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
+
+                if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
+                    s += "\n[REMD] \n"  # -----------------------------------------------------------
+                    s += "dimension = 1 \n"
+                    s += "exchange_period = %i \n" % self.exchange_period.get()
+                    s += "type1 = RESTRAINT \n"
+                    s += "nreplica1 = %i \n" % self.nreplica.get()
+                    s += "rest_function1 = 1 \n"
+
+            with open(inp_file, "w") as f:
+                f.write(s)
 
     def runSimulation(self, index):
+        """
+        Run GENESIS simulations
+        :return None:
+        """
         programname = "atdyn" if self.md_program.get() == PROGRAM_ATDYN else "spdyn"
-        outpref= self.getOutputPrefix(index)
-        params = "%s_INP > %s.log" % (outpref,outpref)
+        inp_file =self._getExtraPath("%s_INP" % str(index + 1).zfill(5))
+        params = "%s > %s.log" % (inp_file,self.getOutputPrefix(index))
         env = self.getGenesisEnv()
         env.set("OMP_NUM_THREADS",str(self.numberOfThreads.get()))
 
@@ -487,7 +661,7 @@ class ProtGenesis(EMProtocol):
         # Build command
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         extradir = self._getExtraPath()
-        params = "%s/{}_output_INP > %s/{}_output.log " %(extradir, extradir)
+        params = "%s/{}_INP > %s/{}_output.log " %(extradir, extradir)
         cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpiPerFit, hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
 
@@ -499,185 +673,6 @@ class ProtGenesis(EMProtocol):
         print("Parallel Command : %s" % parallel_cmd)
         runCommand(parallel_cmd, env=env)
 
-
-    def createGenesisInputFile(self,inputPDB, outputPrefix, indexFit):
-        """
-        Create INP input file for GENESIS
-        :param str inputPDB: input PDB file name
-        :param str outputPrefix: output prefix
-        :param int indexFit: index of the simulation
-        :return None:
-        """
-        inputPDBprefix = self.getInputPDBprefix(indexFit)
-        inputEMprefix = self.getInputEMprefix(indexFit)
-        inp_file = "%s_INP"% outputPrefix
-        if self.restartChoice.get():
-            inputProt = self.restartProt.get()
-        else:
-            inputProt = self
-
-        s = "\n[INPUT] \n" #-----------------------------------------------------------
-        s += "pdbfile = %s\n" % inputPDB
-        if self.getForceField() == FORCEFIELD_CHARMM:
-            s += "topfile = %s\n" % inputProt.inputRTF.get()
-            s += "parfile = %s\n" % inputProt.inputPRM.get()
-            s += "psffile = %s.psf\n" % inputPDBprefix
-            if inputProt.inputSTR.get() != "" and inputProt.inputSTR.get() is not None:
-                s += "strfile = %s\n" % inputProt.inputSTR.get()
-        elif self.getForceField() == FORCEFIELD_AAGO or self.getForceField() == FORCEFIELD_CAGO:
-            s += "grotopfile = %s.top\n" % inputPDBprefix
-        if self.restartChoice.get():
-            s += "rstfile = %s \n" % self.getRestartFile(indexFit)
-
-        s += "\n[OUTPUT] \n" #-----------------------------------------------------------
-        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-            s += "remfile = %s_remd{}.rem\n" %outputPrefix
-            s += "logfile = %s_remd{}.log\n" %outputPrefix
-            s += "dcdfile = %s_remd{}.dcd\n" %outputPrefix
-            s += "rstfile = %s_remd{}.rst\n" %outputPrefix
-            s += "pdbfile = %s_remd{}.pdb\n" %outputPrefix
-        else:
-            s += "dcdfile = %s.dcd\n" %outputPrefix
-            s += "rstfile = %s.rst\n" %outputPrefix
-            s += "pdbfile = %s.pdb\n" %outputPrefix
-
-        s += "\n[ENERGY] \n" #-----------------------------------------------------------
-        if self.getForceField() == FORCEFIELD_CHARMM:
-            s += "forcefield = CHARMM \n"
-        elif self.getForceField() == FORCEFIELD_AAGO:
-            s += "forcefield = AAGO  \n"
-        elif self.getForceField() == FORCEFIELD_CAGO:
-            s += "forcefield = CAGO  \n"
-
-        if self.electrostatics.get() == ELECTROSTATICS_CUTOFF :
-            s += "electrostatic = CUTOFF  \n"
-        else:
-            s += "electrostatic = PME  \n"
-        s += "switchdist   = %.2f \n" % self.switch_dist.get()
-        s += "cutoffdist   = %.2f \n" % self.cutoff_dist.get()
-        s += "pairlistdist = %.2f \n" % self.pairlist_dist.get()
-        if self.vdw_force_switch.get():
-            s += "vdw_force_switch = YES \n"
-        if self.implicitSolvent.get() == IMPLICIT_SOLVENT_GBSA:
-            s += "implicit_solvent = GBSA \n"
-            s += "gbsa_eps_solvent = 78.5 \n"
-            s += "gbsa_eps_solute  = 1.0 \n"
-            s += "gbsa_salt_cons   = 0.2 \n"
-            s += "gbsa_surf_tens   = 0.005 \n"
-
-        if self.simulationType.get() == SIMULATION_MIN:
-            s += "\n[MINIMIZE]\n" #-----------------------------------------------------------
-            s += "method = SD\n"
-        else:
-            s += "\n[DYNAMICS] \n" #-----------------------------------------------------------
-            if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
-                s += "integrator = NMMD  \n"
-            elif self.integrator.get() == INTEGRATOR_VVERLET:
-                s += "integrator = VVER  \n"
-            elif self.integrator.get() == INTEGRATOR_LEAPFROG:
-                s += "integrator = LEAP  \n"
-
-            s += "timestep = %f \n" % self.time_step.get()
-        s += "nsteps = %i \n" % self.n_steps.get()
-        s += "eneout_period = %i \n" % self.eneout_period.get()
-        s += "crdout_period = %i \n" % self.crdout_period.get()
-        s += "rstout_period = %i \n" % self.n_steps.get()
-        s += "nbupdate_period = %i \n" % self.nbupdate_period.get()
-
-        if self.simulationType.get() == SIMULATION_NMMD or self.simulationType.get() == SIMULATION_RENMMD:
-            s += "\n[NMMD] \n" #-----------------------------------------------------------
-            s+= "nm_number = %i \n" % self.nm_number.get()
-            s+= "nm_mass = %f \n" % self.nm_mass.get()
-            s += "nm_file = %s \n" % self.getInputPDBprefix()+".nma"
-            if self.nm_init.get() is not None and self.nm_init.get() != "":
-                s += "nm_init = %s \n" % " ".join([ str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
-            if self.nm_dt.get() is None:
-                s += "nm_dt = %f \n" % self.time_step.get()
-            else:
-                s += "nm_dt = %f \n" % self.nm_dt.get()
-
-
-        if self.simulationType.get() != SIMULATION_MIN:
-            s += "\n[CONSTRAINTS] \n" #-----------------------------------------------------------
-            if self.rigid_bond.get()        : s += "rigid_bond = YES \n"
-            else                            : s += "rigid_bond = NO \n"
-            if self.fast_water.get()      :
-                s += "fast_water = YES \n"
-                s += "water_model = %s \n" %self.water_model.get()
-            else                            : s += "fast_water = NO \n"
-
-        s += "\n[BOUNDARY] \n" #-----------------------------------------------------------
-        if self.boundary.get() == BOUNDARY_PBC:
-            s += "type = PBC \n"
-            s += "box_size_x = %f \n" % self.box_size_x.get()
-            s += "box_size_y = %f \n" % self.box_size_y.get()
-            s += "box_size_z = %f \n" % self.box_size_z.get()
-        else :
-            s += "type = NOBC \n"
-
-        if self.simulationType.get() != SIMULATION_MIN:
-            s += "\n[ENSEMBLE] \n" #-----------------------------------------------------------
-            if self.ensemble.get() == ENSEMBLE_NVE:
-                s += "ensemble = NVE  \n"
-            elif self.ensemble.get() == ENSEMBLE_NPT:
-                s += "ensemble = NPT  \n"
-            else:
-                s += "ensemble = NVT  \n"
-            if self.tpcontrol.get() == TPCONTROL_LANGEVIN:
-                s += "tpcontrol = LANGEVIN  \n"
-            elif self.tpcontrol.get() == TPCONTROL_BERENDSEN:
-                s += "tpcontrol = BERENDSEN  \n"
-            elif self.tpcontrol.get() == TPCONTROL_BUSSI:
-                s += "tpcontrol = BUSSI  \n"
-            else:
-                s += "tpcontrol = NO  \n"
-            s += "temperature = %.2f \n" % self.temperature.get()
-            if self.ensemble.get() == ENSEMBLE_NPT:
-                s += "pressure = %.2f \n" % self.pressure.get()
-
-        if (self.EMfitChoice.get()==EMFIT_VOLUMES or self.EMfitChoice.get()==EMFIT_IMAGES)\
-                and self.simulationType.get() != SIMULATION_MIN:
-            s += "\n[SELECTION] \n" #-----------------------------------------------------------
-            s += "group1 = all and not hydrogen\n"
-
-            s += "\n[RESTRAINTS] \n" #-----------------------------------------------------------
-            s += "nfunctions = 1 \n"
-            s += "function1 = EM \n"
-            constStr = self.constantK.get()
-            if "-" in constStr :
-                splt = constStr.split("-")
-                constStr = " ".join([str(int(i)) for i in np.linspace(int(splt[0]),int(splt[1]),self.nreplica.get())])
-            s += "constant1 = %s \n" %constStr
-            s += "select_index1 = 1 \n"
-
-            s += "\n[EXPERIMENTS] \n" #-----------------------------------------------------------
-            s += "emfit = YES  \n"
-            s += "emfit_sigma = %.4f \n" % self.emfit_sigma.get()
-            s += "emfit_tolerance = %.6f \n" % self.emfit_tolerance.get()
-            s += "emfit_period = 1  \n"
-            if self.EMfitChoice.get() == EMFIT_VOLUMES:
-                s += "emfit_target = %s.mrc \n" % inputEMprefix
-            elif self.EMfitChoice.get()==EMFIT_IMAGES :
-                s += "emfit_type = IMAGE \n"
-                s += "emfit_target = %s.spi \n" % inputEMprefix
-                s += "emfit_pixel_size =  %f\n" % self.pixel_size.get()
-                rigid_body_params = self.getRigidBodyParams(indexFit)
-                s += "emfit_roll_angle = %f\n" % rigid_body_params[0]
-                s += "emfit_tilt_angle = %f\n" % rigid_body_params[1]
-                s += "emfit_yaw_angle =  %f\n" % rigid_body_params[2]
-                s += "emfit_shift_x = %f\n" % rigid_body_params[3]
-                s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
-
-            if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-                s += "\n[REMD] \n" #-----------------------------------------------------------
-                s += "dimension = 1 \n"
-                s += "exchange_period = %i \n" % self.exchange_period.get()
-                s += "type1 = RESTRAINT \n"
-                s += "nreplica1 = %i \n" % self.nreplica.get()
-                s += "rest_function1 = 1 \n"
-
-        with open(inp_file, "w") as f:
-            f.write(s)
 
     # --------------------------- Create output step --------------------------------------------
 

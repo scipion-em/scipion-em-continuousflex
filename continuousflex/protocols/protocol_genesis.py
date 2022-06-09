@@ -314,9 +314,9 @@ class ProtGenesis(EMProtocol):
         # RUN simulation
         if not self.disableParallelSim.get() and  \
             self.getNumberOfSimulation() >1 :
-            numMpiPerFit, numLinearFit, numParallelFit, numLastIter = self.getMPIParams()
-            for i in range(numLinearFit+1):
-                self._insertFunctionStep("runSimulationParallel", i)
+            if not existsCommand("parallel") :
+                raise RuntimeError("GNU parallel command not found")
+            self._insertFunctionStep("runSimulationParallel")
         else:
             for i in range(self.getNumberOfSimulation()):
                 self._insertFunctionStep("runSimulation", i)
@@ -636,7 +636,7 @@ class ProtGenesis(EMProtocol):
 
         self.runJob(programname,params, env=env)
 
-    def runSimulationParallel(self, indexLinearFit):
+    def runSimulationParallel(self):
         """
         Run multiple GENESIS simulations in parallel
         :return None:
@@ -894,14 +894,14 @@ class ProtGenesis(EMProtocol):
         """
         mdImg = md.MetaData(self.imageAngleShift.get())
         idx = int(index + 1)
-        params = [
+
+        return [
             mdImg.getValue(md.MDL_ANGLE_ROT, idx),
             mdImg.getValue(md.MDL_ANGLE_TILT, idx),
             mdImg.getValue(md.MDL_ANGLE_PSI, idx),
             mdImg.getValue(md.MDL_SHIFT_X, idx),
             mdImg.getValue(md.MDL_SHIFT_Y, idx),
         ]
-        return params
 
     def getGenesisEnv(self):
         """
@@ -935,27 +935,6 @@ class ProtGenesis(EMProtocol):
         else:
             return self.forcefield.get()
 
-
-    def getMPIParams(self):
-        """
-        Get mpi parameters for the simulation
-        :return tuple: numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
-        """
-        nreplica = 1
-        n_fit = self.getNumberOfSimulation() * nreplica
-
-        if n_fit <= self.numberOfMpi.get():
-            numberOfMpiPerFit   = self.numberOfMpi.get()//self.getNumberOfSimulation()
-            numberOfLinearFit   = 1
-            numberOfParallelFit = self.getNumberOfSimulation()
-            numberOflastIter    = 0
-        else:
-            numberOfMpiPerFit   = nreplica
-            numberOfLinearFit   = n_fit//self.numberOfMpi.get()
-            numberOfParallelFit = self.numberOfMpi.get()//nreplica
-            numberOflastIter    = n_fit % self.numberOfMpi.get()
-
-        return numberOfMpiPerFit, numberOfLinearFit, numberOfParallelFit, numberOflastIter
 
     def convertReusOutputDcd(self):
 

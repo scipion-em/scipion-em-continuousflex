@@ -261,6 +261,87 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
     # CLEAN TMP FILES
     runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))
 
+# def runParallelJobs(commands, env=None, numberOfThreads=1, numberOfMpi=1, hostConfig=None, raiseError=True):
+#     """
+#     Run multiple commands in parallel. Wait until all commands returned
+#     :param list commands: list of commands to run in parallel
+#     :param dict env: Running environement of subprocesses
+#     :param numberOfThreads: Number of openMP threads
+#     :param numberOfMpi: Number of MPI cores
+#     :return None:
+#     """
+#
+#     # Set env
+#     if env is None:
+#         env = os.environ
+#     env["OMP_NUM_THREADS"] = str(numberOfThreads)
+#
+#     # run process
+#     processes = []
+#     for cmd in commands:
+#         programname, params = cmd.split(" ",1)
+#         cmd = buildRunCommand(programname, params, numberOfMpi=numberOfMpi, hostConfig=hostConfig,
+#                               env=env)
+#         print("Running command : %s" %cmd)
+#         processes.append(Popen(cmd, shell=True, env=env, stdout=sys.stdout, stderr = sys.stderr))
+#
+#     # Wait for processes
+#     for i in range(len(processes)):
+#         exitcode = processes[i].wait()
+#         print("Process done %s" %str(exitcode))
+#         if exitcode != 0:
+#             err_msg = "Command returned with errors : %s" %str(commands[i])
+#             if raiseError :
+#                 raise RuntimeError(err_msg)
+#             else:
+#                 print(err_msg)
+
+def buildParallelScript(commands,numberOfThreads=1,  raiseError=True):
+    """
+    :param list commands: list of commands to run in parallel
+    :param numberOfThreads: Number of openMP threads
+    :param raiseError: raise error if fails
+    :return None:
+    """
+
+    py_script =\
+        """
+from mpi4py import MPI
+import sys
+import os
+from subprocess import Popen
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+
+env = os.environ
+env["OMP_NUM_THREADS"] = str(%i)
+
+        """%numberOfThreads
+    for i in range(len(commands)):
+        py_script +=\
+            """
+if rank == %i:
+    p = Popen("%s", shell=True, stdout=sys.stdout, stderr = sys.stderr, env=env)
+    exitcode = p.wait()
+    if exitcode != 0:
+        err_msg = "Command returned with errors : %s"
+        if %s :
+            raise RuntimeError(err_msg)
+        else:
+            print(err_msg)
+            """ % (i, commands[i], commands[i], "True" if raiseError else "False")
+
+
+    py_script +=\
+    """
+exit(0)
+    """
+    return py_script
+
+
+
+
+
 def pdb2vol(inputPDB, outputVol, sampling_rate, image_size):
     """
     Create a density volume from a pdb

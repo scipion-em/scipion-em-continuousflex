@@ -73,6 +73,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select the set of volumes that will be analyzed using normal modes.')
+        form.addParam('inputMask', params.PointerParam,
+                      pointerClass='VolumeMask',
+                      label="Input mask", important=False,
+                      help='If provided, this mask will be applied to the simulated volume from normal modes.')
         form.addParam('copyDeformations', params.PathParam,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Precomputed results (for development)',
@@ -280,6 +284,10 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
 
         if self.getInputPdb().getPseudoAtoms():
             args += "--fixed_Gaussian "
+
+        if self.inputMask.get() is not None:
+            fnMask = self.inputMask.get().getFileName()
+            args += "--mask %(fnMask)s"
 
         args += "--alignVolumes %(frm_freq)f %(frm_maxshift)d "
 

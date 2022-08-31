@@ -287,7 +287,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
 
         if self.inputMask.get() is not None:
             fnMask = self.inputMask.get().getFileName()
-            args += "--mask %(fnMask)s"
+            args += "--mask %(fnMask)s "
 
         args += "--alignVolumes %(frm_freq)f %(frm_maxshift)d "
 

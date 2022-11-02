@@ -117,14 +117,19 @@ def m_inout_read_pdb(filename):
                 new_atom.chain = line[21]
             except:
                 pass
+            
             try:
-                new_atom.seq = int(line[22:26])
+                new_atom.seq = int(line[23:27])
             except:
-                pass
-            try:
-                new_atom.icode = line[26]
-            except:
-                pass
+                try:
+                    new_atom.seq = int(line[23:26])   
+                except:
+                    pass
+                try:
+                    new_atom.icode = line[26]
+                except:
+                    pass
+                
             try:
                 new_atom.x = float(line[30:38])
             except:

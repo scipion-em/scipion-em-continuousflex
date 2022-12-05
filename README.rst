@@ -105,6 +105,6 @@ Harastani, M., Vuillemot, R., Hamitouche, I., Moghadam, N. B., & Jonic, S. (2022
 Contact:
 ----------
 
-All questions regarding the software can be addressed to `[Contact] <continuousflex@gmail.com>`__
+All questions regarding the software can be sent through submitting an issue on the Github page or addressed to `[Contact] <continuousflex@gmail.com>`__
 
 # scipion-em-continuousflex

@@ -1,4 +1,4 @@
-# * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # *           Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # *
 # * IMPMC, UPMC Sorbonne University
@@ -40,8 +40,6 @@ import numpy as np
 import glob
 from joblib import dump
 from math import cos, sin, pi
-import xmippLib
-import math
 from continuousflex.protocols.convert import matrix2eulerAngles
 
 NMA_ALIGNMENT_WAV = 0
@@ -690,20 +688,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         partSet.setSamplingRate(sr)
         self._defineOutputs(outputImages=partSet)
 
-    # --------------------------- INFO functions --------------------------------------------
-    def _summary(self):
-        summary = []
-        return summary
 
-    def _validate(self):
-        errors = []
-        return errors
-
-    def _citations(self):
-        return ['harastani2020hybrid','Jonic2005', 'Sorzano2004b', 'Jin2014']
-
-    def _methods(self):
-        pass
 
     def get_number_of_volumes(self):
         if(self.importPdbs.get()):
@@ -726,3 +711,18 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
     def _getLocalModesFn(self):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _validate(self):
+        errors = []
+        return errors
+
+    def _citations(self):
+        return ['harastani2022continuousflex']
+
+    def _methods(self):
+        pass

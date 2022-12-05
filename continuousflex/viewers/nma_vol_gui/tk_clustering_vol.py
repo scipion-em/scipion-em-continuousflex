@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -25,16 +25,15 @@
 
 from os.path import basename
 import tkinter as tk
-
 import pyworkflow.gui as gui
 from pyworkflow.gui.widgets import Button, HotButton
-
 from continuousflex.protocols.data import Point
 from . import PointSelectorVol
 from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
+
 
 class ClusteringWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
@@ -224,14 +223,11 @@ class ClusteringWindowVol(gui.Window):
                 if dim == 2:
                     self._evalExpression()
                     self._updateSelectionLabel()
-                    # ax = self.plotter.createSubPlot("Click and drag to add some points to the Cluster",
-                    #                                 *baseList)
 
                     ax = self.plotter.plotArray2D("Click and drag to add some points to the Cluster",
                                                    *baseList)
                     self.ps = PointSelectorVol(ax, self.data, callback=self._updateSelectionLabel,
                                                LimitL=self.LimitLow, LimitH=self.LimitHigh, alpha=self._alpha, s=self._s)
-                    # self.ps = PointSelectorVol(ax, self.data, callback=None)
                 elif dim == 3:
                     try:
                         del self.ps  # Remove PointSelector

@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -25,14 +25,13 @@ from pwem.protocols import ProtAnalysis3D
 import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
-from pyworkflow.utils.path import makePath, copyFile
+from pyworkflow.utils.path import makePath
 from os.path import basename, isfile
-from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
-from .utilities.spider_files3 import save_volume, open_volume
+from .utilities.spider_files3 import save_volume
 from pyworkflow.utils import replaceBaseExt
 import numpy as np
 from continuousflex.protocols.utilities.mwr_wrapper import mwr
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
+from continuousflex.protocols.protocol_subtomograms_synthesize import FlexProtSynthesizeSubtomo
 from pwem.utils import runProgram
 
 METHOD_MCSFILL = 0
@@ -177,7 +176,7 @@ class FlexProtMissingWedgeRestoration(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return ['moebel2020monte']
+        return ['harastani2022continuousflex','moebel2020monte']
 
     def _methods(self):
         pass

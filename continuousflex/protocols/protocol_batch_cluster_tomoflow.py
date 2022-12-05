@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # *
 # **************************************************************************
 
-from pyworkflow.protocol.params import PointerParam, FileParam, IntParam
+from pyworkflow.protocol.params import PointerParam, FileParam
 from pwem.protocols import BatchProtocol
 from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
@@ -29,9 +29,9 @@ import pwem.emlib.metadata as md
 import os
 
 
-class FlexBatchProtHeteroFlowCluster(BatchProtocol):
+class FlexBatchProtTomoFlowCluster(BatchProtocol):
     """ Protocol executed when a cluster is created
-    from HeteroFlow dimred.
+    from TomoFlow dimred.
     """
     _label = 'tomoflow vol cluster'
 
@@ -98,7 +98,6 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
     def createOutputStep(self, outputVol):
         vol = Volume()
         vol.setFileName(outputVol)
-        #outputParticles
         vol.setSamplingRate(self.OutputVolumes.getSamplingRate())
         self._defineOutputs(outputVol=vol)
 
@@ -112,7 +111,7 @@ class FlexBatchProtHeteroFlowCluster(BatchProtocol):
         return errors
 
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         return []

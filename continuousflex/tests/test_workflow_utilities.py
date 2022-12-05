@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:     Mohamad Harastani (mohamad.harastani@upmc.fr)
+# * Authors:     Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # * IMPMC, Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,25 +20,15 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
-from continuousflex.protocols import FlexProtAlignmentNMAVol, FlexProtDimredNMAVol
-from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes
-from pwem.tests.workflows import TestWorkflow
-from pyworkflow.tests import setupTestProject, DataSet
-from continuousflex.protocols import (FlexProtNMA, NMA_CUTOFF_ABS,
-                                      FlexProtConvertToPseudoAtoms)
-from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
-from continuousflex.protocols.protocol_nma_dimred_vol import DIMRED_SKLEAN_PCA
-import os
 
 from pwem.protocols import ProtImportPdb
 from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
-
 from continuousflex.protocols import FlexProtSynthesizeSubtomo, FlexProtMissingWedgeRestoration, FlexProtVolumeDenoise
 
 
 class BM4D_and_MWR(TestWorkflow):
-    """ Test protocol for BM4D. """
+    """ Test protocol for BM4D and MWR. """
     @classmethod
     def setUpClass(cls):
         # Create a new project
@@ -79,14 +69,3 @@ class BM4D_and_MWR(TestWorkflow):
         protDenoise.inputVolumes.set(protSynthesize.outputVolumes)
         protDenoise.setObjLabel('Bm4D volume denoising')
         self.launchProtocol(protDenoise)
-
-
-
-
-
-
-
-
-
-
-

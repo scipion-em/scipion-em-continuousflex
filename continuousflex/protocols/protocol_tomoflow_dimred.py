@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -22,15 +22,13 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam, IntParam,
                                         LEVEL_ADVANCED)
 from pwem.protocols import ProtAnalysis3D
-from pwem.convert import cifToPdb
-from pyworkflow.utils.path import makePath, copyFile
-
+from pyworkflow.utils.path import copyFile
 import numpy as np
-import glob
 from sklearn import decomposition
 from joblib import dump
 import xmipp3
@@ -48,14 +46,11 @@ DIMRED_SPE = 9
 DIMRED_NPE = 10
 DIMRED_SKLEAN_PCA = 11
 
-
-
 # Values to be passed to the program
 DIMRED_VALUES = ['PCA', 'LTSA', 'DM', 'LLTSA', 'LPP', 'kPCA', 'pPCA', 'LE', 'HLLE', 'SPE', 'NPE', 'sklearn_PCA','None']
 
 # Methods that allows mapping
 DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE]
-
 
 
 class FlexProtDimredHeteroFlow(ProtAnalysis3D):
@@ -201,21 +196,6 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
     def createOutputStep(self):
         pass
 
-    # --------------------------- INFO functions --------------------------------------------
-    def _summary(self):
-        summary = []
-        return summary
-
-    def _validate(self):
-        errors = []
-        return errors
-
-    def _citations(self):
-        return []
-
-    def _methods(self):
-        return []
-
     # --------------------------- UTILS functions --------------------------------------------
 
     def getInputParticles(self):
@@ -243,3 +223,18 @@ class FlexProtDimredHeteroFlow(ProtAnalysis3D):
 
     def getMethodName(self):
         return DIMRED_VALUES[self.dimredMethod.get()]
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _validate(self):
+        errors = []
+        return errors
+
+    def _citations(self):
+        return ['harastani2022tomoflow','harastani2022continuousflex']
+
+    def _methods(self):
+        return []

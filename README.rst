@@ -11,10 +11,6 @@ Requirements
 You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols.
 If you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
 
-Make sure that you have cmake installed on your Linux system. For example, if you are using Ubuntu
- .. code-block::
-
-    sudo apt install cmake
 
 Installation
 ------------
@@ -56,7 +52,7 @@ If Matlab is installed but does not work, you may run the command "scipion3 conf
 Supported versions
 ------------------
 
-versions > 3.0.15
+versions > 3.3.0
 
 Protocols
 ---------
@@ -80,6 +76,7 @@ Notes:
 
 References
 ----------
+
 [1] Jin Q, Sorzano CO, de la Rosa-Trevin JM, Bilbao-Castro JR, Nunez-Ramirez R, Llorca O, Tama F, Jonic S: Iterative elastic 3D-to-2D alignment method using normal modes for studying structural dynamics of large macromolecular complexes. Structure 2014, 22:496-506. `[Open-access] <http://www-ext.impmc.upmc.fr/~jonic/Papers/HEMNMA.pdf>`__
 
 [2] Jonic S: Computational methods for analyzing conformational variability of macromolecular complexes from cryo-electron microscopy images. Curr Opin Struct Biol 2017, 43:114-121. `[Link] <http://dx.doi.org/10.1016/j.sbi.2016.12.011>`__ `[Author’s version] <http://www-ext.impmc.upmc.fr/~jonic/Papers/CurrentOpinionStructBiol_Jonic_2017.pdf>`__
@@ -99,6 +96,10 @@ References
 [9] C.O.S. Sorzano, S. Jonic, R. Núñez-Ramírez, N. Boisset, J.M. Carazo: Fast, robust, and accurate determination of transmission electron microscopy contrast transfer function. Journal of Structural Biology 2007, 160: 249-262. `[Journal] <https://doi.org/10.1016/j.jsb.2007.08.013>`__
 
 [10] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Journal] <https://www.sciencedirect.com/science/article/pii/S0304399105000173>`__
+
+Citation
+----------
+Harastani, M., Vuillemot, R., Hamitouche, I., Moghadam, N. B., & Jonic, S. (2022). ContinuousFlex: Software package for analyzing continuous conformational variability of macromolecules in cryo electron microscopy and tomography data. Journal of Structural Biology, 214(4), 107906. `[Journal] <https://doi.org/10.1016/j.jsb.2022.107906>`__
 
 Contact:
 ----------

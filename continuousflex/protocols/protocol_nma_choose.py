@@ -23,7 +23,6 @@
 # *
 # **************************************************************************
 
-
 from pwem.emlib import (MetaData, MDL_NMA, MDL_ENABLED, MDL_NMA_MINRANGE,
                         MDL_NMA_MAXRANGE)
 from pwem.objects import AtomStruct
@@ -32,10 +31,6 @@ from xmipp3.convert import getImageLocation
 from . import FlexProtConvertToPseudoAtomsBase
 from .protocol_nma_base import *
 from pwem.utils import runProgram
-
-
-#from xmipp3.protocols.pdb.protocol_pseudoatoms_base import *
-#from ..pdb.protocol_pseudoatoms_base import *
 
 
 class FlexrotNMAChoose(FlexProtConvertToPseudoAtomsBase, FlexProtNMABase):
@@ -250,4 +245,4 @@ class FlexrotNMAChoose(FlexProtConvertToPseudoAtomsBase, FlexProtNMABase):
         return summary
 
     def _citations(self):
-        return ['Nogales2013', 'Jin2014']
+        return ['harastani2022continuousflex','Nogales2013', 'Jin2014']

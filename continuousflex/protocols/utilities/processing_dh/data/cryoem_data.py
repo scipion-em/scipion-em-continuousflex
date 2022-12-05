@@ -2,7 +2,7 @@ import glob
 
 import numpy as np
 from torch.utils.data import Dataset
-from continuousflex.protocols.utilities.processing_dh.utils import spi2array, eul2quat, min_max
+from ..utils import spi2array, eul2quat, min_max
 import torch
 import pwem.emlib.metadata as md
 class cryodata(Dataset):

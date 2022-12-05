@@ -1,6 +1,5 @@
 from pwem.constants import *
 from pwem.wizards import *
-from pyworkflow.wizard import Wizard
 from continuousflex.protocols.protocol_denoise_volumes import FlexProtVolumeDenoise
 
 class FlexFilterVolumesWizard(FilterVolumesWizard):

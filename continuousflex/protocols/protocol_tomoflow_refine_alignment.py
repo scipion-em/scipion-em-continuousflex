@@ -1,5 +1,6 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
+# *
 # * IMPMC Sorbonne University
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -40,6 +41,8 @@ from pwem.emlib.image import ImageHandler
 from .convert import eulerAngles2matrix, matrix2eulerAngles
 from pyworkflow.utils import getListFromRangeString
 import multiprocessing
+from continuousflex import Plugin
+import joblib
 
 REFERENCE_EXT = 0
 REFERENCE_STA = 1
@@ -532,6 +535,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
                                                                    path_flowx, path_flowy, path_flowz, gpu_p)
                 script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_run.py'
                 command = "python " + script_path + args
+                command = Plugin.getContinuousFlexCmd(command)
                 check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
                            env=None, cwd=None)
 
@@ -548,7 +552,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
 
     def warpByFlow(self, num):
-        import farneback3d
         makePath(self._getExtraPath() + '/estimated_volumes_' + str(num))
         if num != 1:
             if(not(self.KeepFiles.get())):
@@ -563,13 +566,23 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         for objId in mdImgs:
             N += 1
 
+        ref_dump = self._getTmpPath('ref_dump.pkl')
+        joblib.dump(reference, ref_dump)
+
         mdWarped = md.MetaData()
         for i in range(1, N + 1):
             print('Warping a copy of the reference volume by the optical flow ', i)
             flow_i = self.read_optical_flow_by_number(i, op_path=self._getExtraPath() + '/optical_flows_' + str(num) + '/')
-            warped_i = farneback3d.warp_by_flow(reference, np.float32(flow_i))
+            # dumping the optical flow to use it in an outside script
+            flow_dump = self._getTmpPath('flow_dump.pkl')
+            joblib.dump(flow_i, flow_dump)
             warped_path_i = estVol_root + str(i).zfill(6) + '.spi'
-            save_volume(warped_i, warped_path_i)
+            args = " %s %s %s" % (ref_dump, flow_dump, warped_path_i)
+            script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_warp.py'
+            command = "python " + script_path + args
+            command = Plugin.getContinuousFlexCmd(command)
+            check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                       env=None, cwd=None)
             mdWarped.setValue(md.MDL_IMAGE, warped_path_i, mdWarped.addObject())
             mdWarped.setValue(md.MDL_ITEM_ID, i, i)
         warpedVolFn = self._getExtraPath('warped_volumes_' + str(num) + '.xmd')
@@ -736,17 +749,6 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
         else:
             self._defineOutputs(OutputVolumes=partSet)
 
-    # --------------------------- INFO functions --------------------------------------------
-    def _summary(self):
-        summary = []
-        return summary
-
-    def _citations(self):
-        return []
-
-    def _methods(self):
-        pass
-
     # --------------------------- UTILS functions --------------------------------------------
     def read_optical_flow(self, path_flowx, path_flowy, path_flowz):
         x = ImageHandler().read(path_flowx).getData()
@@ -796,3 +798,14 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
     def getVolumeDimesion(self):
         return self.inputVolumes.get().getDimensions()[0]
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _citations(self):
+        return ['harastani2022tomoflow','harastani2022continuousflex']
+
+    def _methods(self):
+        pass

@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -27,10 +27,7 @@ import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename, isfile
-from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
-from .utilities.spider_files3 import save_volume, open_volume
 from pyworkflow.utils import replaceBaseExt
-import numpy as np
 from continuousflex.protocols.utilities.bm4d import bm4d
 from pwem.utils import runProgram
 
@@ -227,7 +224,7 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         pass

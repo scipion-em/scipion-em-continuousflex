@@ -23,9 +23,6 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module implement the classes to create plots on xmipp.
-"""
 
 from pwem.viewers.plotter import EmPlotter
 

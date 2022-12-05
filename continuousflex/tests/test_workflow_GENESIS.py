@@ -24,8 +24,6 @@
 from pwem.protocols import ProtImportPdb, ProtImportVolumes#, ProtImportParticles, ProtImportVolumes
 from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
-
-from continuousflex.protocols.protocol_genesis import *
 from continuousflex.protocols.protocol_generate_topology import ProtGenerateTopology
 from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
 from continuousflex.viewers.viewer_genesis import *

@@ -23,16 +23,14 @@
 # *
 # **************************************************************************
 
-
-from pyworkflow.object import String
-from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
-                                        IntParam, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import PointerParam
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from subprocess import check_call
 import sys
 import continuousflex
 from pyworkflow import BETA
+from continuousflex import Plugin
 
 OPTION_NMA = 0
 OPTION_ANGLES = 1
@@ -78,7 +76,7 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         form.addParam('epochs', params.IntParam, expertLevel=params.LEVEL_ADVANCED,label = 'Number of epochs', default = 400)
         form.addParam('batch_size', params.IntParam ,expertLevel=params.LEVEL_ADVANCED, label = 'Batch size', default = 2)
         form.addParallelSection(threads=0, mpi=0)
-    
+
     
     #--------------------------- INSERT steps functions --------------------------------------------
 
@@ -89,7 +87,6 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
     #--------------------------- STEPS functions --------------------------------------------
 
     def performDeepHEMNMAStep(self):
-
         epochs = self.epochs.get()
         batch_size = self.batch_size.get()
         lr = self.learning_rate.get()
@@ -100,16 +97,9 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         params = " %s %s %d %d %f %d %d" % (imgsFn, self._getExtraPath(), epochs, batch_size, lr, mode, device)
         script_path = continuousflex.__path__[0]+'/protocols/utilities/deep_hemnma.py'
         command = "python " + script_path + params
+        command = Plugin.getContinuousFlexCmd(command)
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
-        pass
 
-    """
-    def create_single_particle_path(self):
-        self.writeModesMetaData()
-        # Write a metadata with the normal modes information
-        # to launch the nma alignment programs
-        writeSetOfParticles(self.inputParticles.get(), self.imgsFn)
-    """
 
     def createOutputStep(self):
         pass
@@ -124,7 +114,7 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
         return errors
     
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex','hamitouche2022deephemnma']
     
     def _methods(self):
         return []
@@ -147,7 +137,7 @@ class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
     
     def getDeformationFile(self):
         return self._getExtraPath('deformations.txt')
-    
+
     def getProjectorFile(self):
         return self.mappingFile.get()
 

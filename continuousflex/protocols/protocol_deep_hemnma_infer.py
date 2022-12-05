@@ -24,8 +24,7 @@
 # **************************************************************************
 
 import xmipp3.convert
-from pyworkflow.protocol.params import (PointerParam, StringParam, EnumParam,
-                                        IntParam, LEVEL_ADVANCED)
+from pyworkflow.protocol.params import PointerParam
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
 from subprocess import check_call
@@ -35,11 +34,9 @@ import continuousflex
 from pyworkflow.utils.path import copyFile
 import pwem as em
 import pwem.emlib.metadata as md
-from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
-                            getImageLocation, createItemMatrix,
-                            setXmippAttributes)
+from xmipp3.convert import (createItemMatrix, setXmippAttributes)
 from pyworkflow import BETA
-
+from continuousflex import Plugin
 
 OPTION_NMA = 0
 OPTION_ANGLES = 1
@@ -114,6 +111,7 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         params = " %s %s %s %d %d %d %d" % (self.imgsFn, weights, self._getExtraPath(), num_modes, batch_size, mode, device)
         script_path = continuousflex.__path__[0]+'/protocols/utilities/deep_hemnma_infer.py'
         command = "python " + script_path + params
+        command = Plugin.getContinuousFlexCmd(command)
         check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=None, cwd=None)
         pass
 
@@ -147,7 +145,7 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         return errors
     
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex','hamitouche2022deephemnma']
     
     def _methods(self):
         return []

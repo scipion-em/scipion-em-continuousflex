@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -166,7 +166,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         pass

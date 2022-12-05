@@ -1,4 +1,7 @@
-from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
+# By Mohamad Harastani
+
+from spider_files3 import open_volume, save_volume
+
 import time
 import numpy as np
 import sys
@@ -15,6 +18,7 @@ def opflow_vols(path_vol0, path_vol1, pyr_scale, levels, winsize, iterations, po
     vol1 = vol1 * factor2
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
     import pycuda.autoinit
     import farneback3d
 

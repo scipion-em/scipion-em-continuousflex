@@ -22,11 +22,6 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module implement the wrappers aroung Xmipp CL2D protocol
-visualization program.
-"""
-
 from os.path import basename
 from pyworkflow.protocol.params import StringParam, LEVEL_ADVANCED
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
@@ -57,7 +52,7 @@ METADATA_PROJECT = 0
 METADATA_FILE = 1
 
 class FlexAlignmentNMAViewer(ProtocolViewer):
-    """ Visualization of results from the NMA protocol
+    """ Visualization of results from the NMA alignment protocol (HEMNMA)
     """
     _label = 'viewer nma alignment'
     _targets = [FlexProtAlignmentNMA]
@@ -228,7 +223,6 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
         modeIds = []
         for i, objId in enumerate(md_modes):
             modeIds.append(md_modes.getValue(MDL_ORDER, objId))
-        # print(modeIds)
         # Get the parameters from both lists:
         rtp_protocol = []
         xy_protocol = []
@@ -264,7 +258,6 @@ class FlexAlignmentNMAViewer(ProtocolViewer):
                                                                   rtp_gt[i][0], rtp_gt[i][1], rtp_gt[i][2],
                                                                   False, True, False))
         # Normal mode amplitudes distances: we need to find the subset of normal modes used in alignment in the groundtruth
-        mode_distances = []
         counter = 0
         plt.figure()
         mean_amplitudes = []

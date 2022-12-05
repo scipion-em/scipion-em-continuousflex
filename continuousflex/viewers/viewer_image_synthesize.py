@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # *           Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
@@ -22,18 +22,14 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
-
 from os.path import basename
-
 from pwem.emlib import MetaData, MDL_ORDER
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-from pyworkflow.utils import replaceBaseExt, replaceExt
-
+from pyworkflow.utils import  replaceExt
 from continuousflex.protocols.data import Point, Data
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtSynthesizeImages
-import xmipp3
 import pwem.emlib.metadata as md
 from pwem.viewers import ObjectView
 from continuousflex.protocols.protocol_image_synthesize import NMA_YES
@@ -41,7 +37,7 @@ import matplotlib.pyplot as plt
 
 
 class FlexProtSynthesizeImageViewer(ProtocolViewer):
-    """ Visualization of results from synthesized images
+    """ Visualization of results from synthesized images protocol
     """
     _label = 'viewer synthetic images'
     _targets = [FlexProtSynthesizeImages]
@@ -169,12 +165,10 @@ class FlexProtSynthesizeImageViewer(ProtocolViewer):
         mdVolumes = md.MetaData(self.protocol._getExtraPath('GroundTruth.xmd'))
         data = Data()
         for objId in mdVolumes:
-            # pointData = list(map(float, particle._xmipp_nmaDisplacements))
             pointData = list(mdVolumes.getValue(md.MDL_NMA,objId))
             # inserting 6 zeros for the first 6 never used modes
             for j in range(6):
                 pointData.insert(0, 0)
-            # print(pointData)
             data.addPoint(Point(pointId=objId,
                                 data=pointData,
                                 weight=0.0))

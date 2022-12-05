@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -25,17 +25,16 @@
 
 from os.path import basename
 import tkinter as tk
-
 import pyworkflow.gui as gui
 from pyworkflow.utils.properties import Icon
 from pyworkflow.gui.widgets import Button, HotButton
-
 from continuousflex.protocols.data import Point, PathData
 from . import PointPathVol
 from continuousflex.viewers.plotter_vol import FlexNmaVolPlotter
 
 FIGURE_LIMIT_NONE = 0
 FIGURE_LIMITS = 1
+
 
 class TrajectoriesWindowVol(gui.Window):
     """ This class creates a Window that will display some Point's
@@ -210,7 +209,6 @@ class TrajectoriesWindowVol(gui.Window):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                # self.plotter = FlexNmaVolPlotter(data=self.data)
                 # Actually plot
                 if self.limits_modes == FIGURE_LIMIT_NONE:
                     self.plotter = FlexNmaVolPlotter(data=self.data,
@@ -226,7 +224,6 @@ class TrajectoriesWindowVol(gui.Window):
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
                                                 alpha=self.alpha, s=self.s)
                 doShow = True
-                # self.plotter.useLastPlot = True
             else:
                 self.plotter.clear()
                 doShow = False
@@ -305,7 +302,6 @@ class TrajectoriesWindowVolHeteroFlow(TrajectoriesWindowVol):
                                           title="Invalid input")]
 
             if self.plotter is None or self.plotter.isClosed():
-                # self.plotter = FlexNmaVolPlotter(data=self.data)
                 # Actually plot
 
                 if self.limits_modes == FIGURE_LIMIT_NONE:
@@ -322,7 +318,6 @@ class TrajectoriesWindowVolHeteroFlow(TrajectoriesWindowVol):
                                                 zlim_low=self.zlim_low, zlim_high=self.zlim_high,
                                                 alpha = self.alpha, s = self.s)
                 doShow = True
-                # self.plotter.useLastPlot = True
             else:
                 self.plotter.clear()
                 doShow = False

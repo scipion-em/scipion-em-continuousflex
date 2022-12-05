@@ -25,19 +25,18 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes
 from pwem.tests.workflows import TestWorkflow
-from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
-
 from continuousflex.protocols import (FlexProtNMA, FlexProtAlignmentNMA,
                                       FlexProtDimredNMA, NMA_CUTOFF_ABS,
-                                      FlexProtConvertToPseudoAtoms, FlexBatchProtNMACluster)
-
+                                      FlexProtConvertToPseudoAtoms)
 from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 from continuousflex.protocols.protocol_nma_base import NMA_CUTOFF_REL
 from continuousflex.protocols.protocol_nma_alignment import NMA_ALIGNMENT_PROJ
 from xmipp3.protocols import XmippProtCropResizeParticles
+
 
 class TestHEMNMA_1(TestWorkflow):
     """ Test protocol for HEMNMA (Hybrid Electron Microscopy Normal Mode Analysis). """
@@ -90,22 +89,7 @@ class TestHEMNMA_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA dimred')
         self.launchProtocol(protDimRed)
 
-        # newProt = self.newProtocol(FlexBatchProtNMACluster)
-        # newProt.setObjLabel('Cluster: x1 <- 30')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('clusters/atomic/left.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-        #
-        # newProt = self.newProtocol(FlexBatchProtNMACluster)
-        # newProt.setObjLabel('Cluster: x1 > 30')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('clusters/atomic/right.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-
-
-        #------------------------------------------------        
+        #------------------------------------------------
         # Case 2. Import Vol -> Pdb -> NMA
         #------------------------------------------------
 
@@ -149,21 +133,6 @@ class TestHEMNMA_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA dimred')
         self.launchProtocol(protDimRed)
 
-        # newProt = self.newProtocol(FlexBatchProtNMACluster)
-        # newProt.setObjLabel('Cluster: x1 <- 15')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('clusters/pseudo/left.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-        #
-        # newProt = self.newProtocol(FlexBatchProtNMACluster)
-        # newProt.setObjLabel('Cluster: x1 > 15')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('clusters/pseudo/right.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-
-
 
 class TestHEMNMA_2(TestWorkflow):
     """ Test protocol for HEMNMA (Hybrid Electron Microscopy Normal Mode Analysis). """
@@ -173,7 +142,6 @@ class TestHEMNMA_2(TestWorkflow):
         # Create a new project
         setupTestProject(cls)
         cls.ds = DataSet.getDataSet('nma_V2.0')
-        # cls.ds = DataSet.getDataSet('nma')
 
     def test_HEMNMA_atomic(self):
         """ Run NMA simple workflow for both Atomic and Pseudoatoms. """

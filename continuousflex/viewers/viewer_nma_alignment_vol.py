@@ -1,6 +1,5 @@
 # **************************************************************************
-# *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -22,17 +21,13 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module implement the wrappers aroung Xmipp CL2D protocol
-visualization program.
-"""
 
 from os.path import basename
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LEVEL_ADVANCED
 from pyworkflow.protocol import params
 from continuousflex.protocols.protocol_nma_alignment_vol import FlexProtAlignmentNMAVol
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import FlexProtSynthesizeSubtomo
+from continuousflex.protocols.protocol_subtomograms_synthesize import FlexProtSynthesizeSubtomo
 from continuousflex.protocols.data import Point, Data
 from pwem.emlib import MetaData, MDL_ORDER, MDL_ANGLE_ROT, MDL_ANGLE_TILT, MDL_ANGLE_PSI, MDL_SHIFT_X, MDL_SHIFT_Y, \
     MDL_SHIFT_Z, MDL_NMA
@@ -56,8 +51,9 @@ Z_LIMITS = 1
 METADATA_PROJECT = 0
 METADATA_FILE = 1
 
+
 class FlexAlignmentNMAVolViewer(ProtocolViewer):
-    """ Visualization of results from the NMA protocol
+    """ Visualization of results from the NMA alignment vol protocol (HEMNMA-3D)
     """
     _label = 'viewer nma alignment vol'
     _targets = [FlexProtAlignmentNMAVol]
@@ -233,7 +229,6 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
         modeIds = []
         for i, objId in enumerate(md_modes):
             modeIds.append(md_modes.getValue(MDL_ORDER, objId))
-        # print(modeIds)
         # Get the parameters from both lists:
         rtp_protocol = []
         xyz_protocol = []
@@ -271,7 +266,6 @@ class FlexAlignmentNMAVolViewer(ProtocolViewer):
                                                                   rtp_gt[i][0], rtp_gt[i][1], rtp_gt[i][2],
                                                                   False, True, False))
         # Normal mode amplitudes distances: we need to find the subset of normal modes used in alignment in the groundtruth
-        mode_distances = []
         counter = 0
         plt.figure()
         mean_amplitudes = []

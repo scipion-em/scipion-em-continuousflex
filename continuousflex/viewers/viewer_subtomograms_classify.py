@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -21,20 +21,10 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
-
-from os.path import basename
 import numpy as np
-from pwem.emlib import MetaData, MDL_ORDER
 from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, IntParam, LEVEL_ADVANCED
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-from pyworkflow.utils import replaceBaseExt, replaceExt
-
-from continuousflex.protocols.data import Point, Data
-from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtSubtomoClassify
-import xmipp3
-import pwem.emlib.metadata as md
-from pwem.viewers import ObjectView
 import matplotlib.pyplot as plt
 from joblib import load
 import scipy.cluster.hierarchy as sch

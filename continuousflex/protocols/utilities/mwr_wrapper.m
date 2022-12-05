@@ -26,7 +26,7 @@
 % https://doi.org/10.1016/j.yjsbx.2019.100013.
 % (https://www.sciencedirect.com/science/article/pii/S259015241930011X)
 
-% by Mohamad Harastani (mohamad.harastani@upmc.fr)
+% by Mohamad Harastani (mohamad.harastani@igbmc.fr)
 
 
 function mwr_wrapper(path_vol_in, path_wedge, path_vol_out, sigma_noise, T, Tb, beta, mask_shifted)

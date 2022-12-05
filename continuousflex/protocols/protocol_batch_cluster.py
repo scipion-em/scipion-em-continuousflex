@@ -1,9 +1,9 @@
 # **************************************************************************
 # *
 # * Authors:
+# * Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # * Slavica Jonic (slavica.jonic@upmc.fr)
-# * Mohamad Harastani (mohamad.harastani@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -151,7 +151,7 @@ class FlexBatchProtNMACluster(BatchProtocol):
         return errors
     
     def _citations(self):
-        return []
+        return ['harastani2022continuousflex']
     
     def _methods(self):
         return []

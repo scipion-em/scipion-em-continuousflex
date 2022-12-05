@@ -1,5 +1,6 @@
 # **************************************************************************
-# * Author:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
+# *           Remi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,6 +21,7 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
 from pyworkflow.protocol import params
@@ -37,6 +39,7 @@ import pwem.emlib.metadata as md
 PDB_SOURCE_PATTERN = 0
 PDB_SOURCE_OBJECT = 1
 PDB_SOURCE_TRAJECT = 2
+
 
 class FlexProtAlignPdb(ProtAnalysis3D):
     """ Protocol to perform rigid body alignement on a set of PDB files. """
@@ -182,7 +185,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             # add to MD
             trans_mat = np.zeros((4,4))
             trans_mat[:3,:3] = rot_mat
-            trans_mat[:,3] = tran
+            trans_mat[:,3][:3] = tran
             rot, tilt, psi,shftx, shfty, shftz = matrix2eulerAngles(trans_mat)
             index = alignXMD.addObject()
             alignXMD.setValue(md.MDL_ANGLE_ROT, rot, index)
@@ -260,7 +263,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         return errors
 
     def _citations(self):
-        return ['harastani2020hybrid','Jin2014']
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         pass

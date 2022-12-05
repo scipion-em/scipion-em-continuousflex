@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -24,9 +24,7 @@
 # **************************************************************************
 
 from math import sqrt
-# from continuousflex.viewers.plotter_vol import plotArray2D
 from continuousflex.viewers.plotter_vol import plotArray2D_xy
-
 
 STATE_NO_POINTS = 0  # no points have been selected, double-click will add first one
 STATE_DRAW_POINTS = 1  # still adding points, double-click will set the last one

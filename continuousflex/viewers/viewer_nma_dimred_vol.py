@@ -1,6 +1,5 @@
 # **************************************************************************
-# *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,15 +19,9 @@
 # *
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
-# *
 # **************************************************************************
+
 from continuousflex.protocols.data import PathData
-
-"""
-This module implement the wrappers around Xmipp CL2D protocol
-visualization program.
-"""
-
 from os.path import basename, join, exists, isfile
 import numpy as np
 from pyworkflow.utils.path import cleanPath, makePath

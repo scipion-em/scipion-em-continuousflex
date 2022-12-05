@@ -1,3 +1,5 @@
+# By Mohamad Harastani
+
 # This function converts a TomBox table (motive list) into xmipp (scipion) metadata file
 # given a metadata input containing a list of the subtomograms
 from pwem.emlib import metadata as md

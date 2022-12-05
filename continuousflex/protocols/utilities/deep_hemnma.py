@@ -1,9 +1,11 @@
+# Author: Ilyes Hamitouche
+
 import torch.nn as nn
 from torchvision import transforms
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from continuousflex.protocols.utilities.processing_dh.data import cryodata
-from continuousflex.protocols.utilities.processing_dh.models import deephemnma
+from processing_dh.data import cryodata
+from processing_dh.models import deephemnma
 import numpy as np
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -14,6 +16,7 @@ def norm(imgs_path, output_path, FLAG, mode, batch_size):
     random_seed = 42
     validation_split = .2
     shuffle_dataset = True
+
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
     split = int(np.floor((1-validation_split) * dataset_size))
@@ -25,8 +28,8 @@ def norm(imgs_path, output_path, FLAG, mode, batch_size):
 
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
-    print('the train set size is: {} images'.format(len(train_sampler)))
-    print('the validation set size is: {} images'.format(len(valid_sampler)))
+    #print('the train set size is: {} images'.format(len(train_sampler)))
+    #print('the validation set size is: {} images'.format(len(valid_sampler)))
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
     validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
     sum_, squared_sum_, num_batches = 0, 0, 0
@@ -60,8 +63,21 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
         DEVICE = 'cpu'
     mean, std = norm(imgs_path, output_path, FLAG, mode, batch_size)
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((mean), (std))])
-    dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transform)
-    dataset_size = len(dataset)
+    transform1 = transforms.Compose([transforms.ToTensor(),
+                                    transforms.RandomRotation((-45, 45)),
+                                     transforms.Normalize((mean), (std))])
+    dataset1 = cryodata(imgs_path, output_path, flag=FLAG, mode= mode,
+                        transform=transform)
+    dataset2 = cryodata(imgs_path, output_path, flag=FLAG, mode= mode,
+                        transform=transform1)
+    transform2 = transforms.Compose([transforms.ToTensor(),
+                                    transforms.RandomRotation((-90, 90)),
+                                     transforms.Normalize((mean), (std))])
+    dataset3 = cryodata(imgs_path, output_path, flag=FLAG, mode= mode,
+                        transform=transform2)
+    increased_dataset = torch.utils.data.ConcatDataset([dataset1, dataset2, dataset3])
+    #dataset = cryodata(imgs_path, output_path, flag=FLAG, mode = mode, transform=transform)
+    dataset_size = len(increased_dataset)
     indices = list(range(dataset_size))
     split = int(np.floor((1-validation_split) * dataset_size))
 
@@ -72,10 +88,10 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
 
     train_sampler = SubsetRandomSampler(train_indices)
     valid_sampler = SubsetRandomSampler(val_indices)
-    print('the train set size is: {} images'.format(len(train_sampler)))
-    print('the validation set size is: {} images'.format(len(valid_sampler)))
-    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
-    validation_loader = DataLoader(dataset, batch_size=batch_size, sampler=valid_sampler)
+    print('the train set size is: {} images'.format(len(train_sampler)//3))
+    print('the validation set size is: {} images'.format(len(valid_sampler)//3))
+    train_loader = DataLoader(increased_dataset, batch_size=batch_size, sampler=train_sampler)
+    validation_loader = DataLoader(increased_dataset, batch_size=batch_size, sampler=valid_sampler)
     
     im, p = next(iter(train_loader))
     if FLAG=='nma':
@@ -97,6 +113,7 @@ def train(imgs_path, output_path, epochs=400, batch_size=2, lr=1e-4, flag=0, dev
         running_loss = 0.0
 
         for img, params in train_loader:
+            img = img/255.
             optimizer.zero_grad()
             pred_params = model(img.to(DEVICE), 'train')
             l = criterion(params.to(DEVICE), pred_params)

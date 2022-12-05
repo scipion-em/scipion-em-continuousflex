@@ -1,3 +1,5 @@
+# By Remi Vuillemot
+
 import numpy as np
 import copy
 from Bio.SVDSuperimposer import SVDSuperimposer

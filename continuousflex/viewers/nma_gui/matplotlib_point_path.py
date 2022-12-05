@@ -24,7 +24,6 @@
 # *
 # **************************************************************************
 
-from math import sqrt
 from continuousflex.viewers.nma_plotter import plotArray2D_xy
 import numpy as np
 

@@ -1,10 +1,9 @@
 # **************************************************************************
 # *
-# * Authors:     
+# * Authors:
+# * Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # * J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # * Slavica Jonic (slavica.jonic@upmc.fr)
-# *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,11 +25,8 @@
 # *
 # **************************************************************************
 
-import os
 from collections import OrderedDict
-
-from pwem.emlib import (MDL_NMA_MODEFILE, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE, MDL_NMA_EIGENVAL,
-                        MDL_ORDER)
+from pwem.emlib import (MDL_NMA_MODEFILE, MDL_NMA_COLLECTIVITY, MDL_NMA_SCORE, MDL_ORDER)
 from pyworkflow.utils import Environ
 from pwem.objects import NormalMode
 
@@ -43,7 +39,6 @@ MODE_DICT = OrderedDict([
        ("_modeFile", MDL_NMA_MODEFILE),
        ("_collectivity", MDL_NMA_COLLECTIVITY),
        ("_score", MDL_NMA_SCORE),
-       #("_eigenvalue", MDL_NMA_EIGENVAL),
 ])
 
 

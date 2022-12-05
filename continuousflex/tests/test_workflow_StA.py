@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Author:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Author:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # * IMPMC, UPMC, Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,25 +20,26 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
 from pwem.protocols import ProtImportPdb
 from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
-
 from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS)
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR
+from continuousflex.protocols.protocol_subtomograms_synthesize import MODE_RELATION_LINEAR
 from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
 from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from xmipp3.protocols import XmippProtCreateMask3D
-from continuousflex.protocols.protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign
+from continuousflex.protocols.protocol_tomoflow_refine_alignment import FlexProtRefineSubtomoAlign
+
 
 class TestStA(TestWorkflow):
-    """ Check the full StA protocol """
+    """ tes for StA protocol """
 
     @classmethod
     def setUpClass(cls):
         # Create a new project
         setupTestProject(cls)
-        cls.ds = DataSet.getDataSet('nma')
+        cls.ds = DataSet.getDataSet('nma_V2.0')
 
     def test_StA(self):
         """ Run NMA then synthesize sybtomograms"""

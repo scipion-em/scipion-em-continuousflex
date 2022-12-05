@@ -1,7 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
-# *             Slavica Jonic                (slavica.jonic@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -505,7 +504,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         return summary
 
     def _citations(self):
-        return ['CHEN2013235']
+        return ['harastani2022continuousflex','CHEN2013235']
 
     def _methods(self):
         pass

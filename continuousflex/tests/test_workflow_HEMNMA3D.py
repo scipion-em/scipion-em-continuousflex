@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:     Mohamad Harastani (mohamad.harastani@upmc.fr)
+# * Authors:     Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # * IMPMC, Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,31 +20,17 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
 from continuousflex.protocols import FlexProtAlignmentNMAVol, FlexProtDimredNMAVol
-from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes
-from pwem.tests.workflows import TestWorkflow
-from pyworkflow.tests import setupTestProject, DataSet
-from continuousflex.protocols import (FlexProtNMA, NMA_CUTOFF_ABS,
-                                      FlexProtConvertToPseudoAtoms)
+from continuousflex.protocols import FlexProtConvertToPseudoAtoms
 from continuousflex.protocols.pdb.protocol_pseudoatoms_base import NMA_MASK_THRE
 from continuousflex.protocols.protocol_nma_dimred_vol import DIMRED_SKLEAN_PCA
-import os
-
-from pwem.protocols import ProtImportPdb, ProtImportParticles, ProtImportVolumes
+from pwem.protocols import ProtImportPdb, ProtImportVolumes
 from pwem.tests.workflows import TestWorkflow
-from pwem import Domain
 from pyworkflow.tests import setupTestProject, DataSet
-
 from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS, NMA_CUTOFF_REL)
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_LINEAR, MODE_RELATION_3CLUSTERS, \
-    MODE_RELATION_MESH, MODE_RELATION_RANDOM
-from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
-from continuousflex.protocols.protocol_subtomograms_classify import FlexProtSubtomoClassify
-from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
+from continuousflex.protocols.protocol_subtomograms_synthesize import MODE_RELATION_3CLUSTERS
 from xmipp3.protocols import XmippProtCropResizeVolumes
-
-from continuousflex.protocols.protocol_batch_cluster_vol import FlexBatchProtNMAClusterVol
-
 
 
 class TestHEMNMA3D_1(TestWorkflow):
@@ -96,20 +82,6 @@ class TestHEMNMA3D_1(TestWorkflow):
         protDimRed.setObjLabel('HEMNMA-3D dimred')
         self.launchProtocol(protDimRed)
 
-        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        # newProt.setObjLabel('Cluster: x1 <- 100')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_left.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-        #
-        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        # newProt.setObjLabel('Cluster: x1 > 100')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/atomic_right.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-
         # ------------------------------------------------
         # Case 2. Import Vol -> Pdb -> NMA
         # ------------------------------------------------
@@ -149,20 +121,6 @@ class TestHEMNMA3D_1(TestWorkflow):
         protDimRed.inputNMA.set(protAlignment)
         protDimRed.setObjLabel('HEMNMA-3D dimred')
         self.launchProtocol(protDimRed)
-
-        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        # newProt.setObjLabel('Cluster: x1 <- 100')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_left.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
-        #
-        # newProt = self.newProtocol(FlexBatchProtNMAClusterVol)
-        # newProt.setObjLabel('Cluster: x1 > 100')
-        # newProt.inputNmaDimred.set(protDimRed)
-        # fnSqlite = self.ds.getFile('HEMNMA_3D/clusters/pseudo_right.sqlite')
-        # newProt.sqliteFile.set(fnSqlite)
-        # self.launchProtocol(newProt)
 
 
 class TestHEMNMA3D_2(TestWorkflow):

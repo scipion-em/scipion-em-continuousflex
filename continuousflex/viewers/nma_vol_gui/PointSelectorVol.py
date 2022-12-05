@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -23,9 +23,9 @@
 # *
 # **************************************************************************
 
-from continuousflex.viewers.plotter_vol import plotArray2D
 from continuousflex.viewers.plotter_vol import plotArray2D_xy
 from math import sqrt
+
 
 class PointSelectorVol():
     """ Graphical manager based on Matplotlib to handle mouse
@@ -138,5 +138,4 @@ class PointSelectorVol():
             self.callback()
         self.plot_selected.set_data(xs1, ys1)
         self.rectangle_selection.set_data(xs, ys)
-
         self.ax.figure.canvas.draw()

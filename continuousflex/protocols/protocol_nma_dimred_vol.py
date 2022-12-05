@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -256,7 +256,7 @@ class FlexProtDimredNMAVol(ProtAnalysis3D):
         return errors
 
     def _citations(self):
-        return []
+        return ['harastani2021hemnma','harastani2022continuousflex']
 
     def _methods(self):
         return []

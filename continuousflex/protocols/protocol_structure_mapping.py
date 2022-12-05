@@ -276,29 +276,7 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
             cleanPattern(self._getExtraPath('transformation-matrix*'))
             cleanPattern(self._getExtraPath('modes*'))
                                       
-    #--------------------------- INFO functions --------------------------------------------
-    def _validate(self):
-        errors = []
-        for pointer in self.inputVolumes:
-            if pointer.pointsNone():
-                errors.append('Invalid input, pointer: %s' % pointer.getObjValue())
-                errors.append('              extended: %s' % pointer.getExtended())                
-        return errors 
-           
-    def _summary(self):
-        summary = []
-        nVols = self._getNumberOfInputs()
-            
-        if nVols > 0:
-            summary.append("Volumes to calculate StructMap: *%d* " % nVols)
-        else:
-            summary.append("No volumes selected.")
-                        
-        return summary 
-       
-    def _citations(self):
-        return ['Sorzano2016']
-    
+
     #--------------------------- UTILS functions --------------------------------------------
     def _iterInputVolumes(self):
         """ Iterate over all the input volumes. """
@@ -329,5 +307,26 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         
     def _defineResultsName(self,i):
         return self._getExtraPath('CoordinateMatrix%d.txt'%i)
-        
-    
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _validate(self):
+        errors = []
+        for pointer in self.inputVolumes:
+            if pointer.pointsNone():
+                errors.append('Invalid input, pointer: %s' % pointer.getObjValue())
+                errors.append('              extended: %s' % pointer.getExtended())
+        return errors
+
+    def _summary(self):
+        summary = []
+        nVols = self._getNumberOfInputs()
+
+        if nVols > 0:
+            summary.append("Volumes to calculate StructMap: *%d* " % nVols)
+        else:
+            summary.append("No volumes selected.")
+
+        return summary
+
+    def _citations(self):
+        return ['harastani2022continuousflex', 'Sorzano2016']

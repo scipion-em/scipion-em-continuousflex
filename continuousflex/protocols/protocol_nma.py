@@ -35,10 +35,9 @@ from pwem.convert.atom_struct import cifToPdb
 from pwem.emlib import MetaData, MDL_NMA_ATOMSHIFT, MDL_NMA_MODEFILE
 from pyworkflow.utils import redStr, replaceBaseExt
 from pyworkflow.utils.path import copyFile, createLink, makePath, cleanPath, moveFile
-from pyworkflow.protocol.params import (PointerParam, IntParam, FloatParam, 
+from pyworkflow.protocol.params import (PointerParam, IntParam, FloatParam,
                                         LEVEL_ADVANCED)
 from pwem.objects import SetOfNormalModes
-
 from xmipp3.base import XmippMdRow
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 from .convert import rowToMode, getNMAEnviron
@@ -47,7 +46,7 @@ from .convert import rowToMode, getNMAEnviron
 class FlexProtNMA(FlexProtNMABase):
     """ Flexible angular alignment using normal modes """
     _label = 'nma analysis'
-    
+
     def _defineParams(self, form):
         form.addSection(label='Normal Mode Analysis')
         form.addParam('inputStructure', PointerParam, label="Input structure",
@@ -56,61 +55,62 @@ class FlexProtNMA(FlexProtNMABase):
                       help='The input structure can be an atomic model '
                            '(true PDB) or a pseudoatomic model\n'
                            '(an EM volume converted into pseudoatoms)')
-        FlexProtNMABase._defineParamsCommon(self,form)
+        FlexProtNMABase._defineParamsCommon(self, form)
         form.addParam('rtbBlockSize', IntParam, default=10,
                       expertLevel=LEVEL_ADVANCED,
                       label='Number of residues per RTB block (for atomic structures)',
-                      help='Used only with atoms. Normal modes of atomic structures are computed with the RTB method. \n'
-			   'This is the RTB block size. In the RTB method, aminoacids are grouped into blocks of this size '
-			   'that are moved translationally and rotationally together.') 
-              
-        form.addSection(label='Animation')        
+                      help='Used only with atoms. Normal modes of atomic structures are computed with the RTB method. '
+                           '\n '
+                           'This is the RTB block size. In the RTB method, aminoacids are grouped into blocks of this '
+                           'size '
+                           'that are moved translationally and rotationally together.')
+
+        form.addSection(label='Animation')
         form.addParam('amplitude', FloatParam, default=50,
                       label='Amplitude',
-		      help='Used only for animations of computed normal modes. '
-			   'This is the amplitude with which atoms or pseudoatoms are moved '
-			   'along normal modes in the animations. \n'
-			   'Normal-mode amplitudes corresponding to given images are computed by image analysis.') 
+                      help='Used only for animations of computed normal modes. '
+                           'This is the amplitude with which atoms or pseudoatoms are moved '
+                           'along normal modes in the animations. \n'
+                           'Normal-mode amplitudes corresponding to given images are computed by image analysis.')
         form.addParam('nframes', IntParam, default=10,
                       expertLevel=LEVEL_ADVANCED,
                       label='Number of frames',
-		      help='Number of frames used in animations.')
+                      help='Number of frames used in animations.')
         form.addParam('downsample', FloatParam, default=1,
                       expertLevel=LEVEL_ADVANCED,
                       # condition=isEm
                       label='Downsample pseudoatoms (for visualization)',
                       help='Used only with pseudoatoms and only for visualization purposes. \n'
-			   'A downsample factor of 2 means removing one half of the pseudoatoms.')
+                           'A downsample factor of 2 means removing one half of the pseudoatoms.')
         form.addParam('pseudoAtomThreshold', FloatParam, default=0,
                       expertLevel=LEVEL_ADVANCED,
                       # condition=isEm
                       label='Pseudoatom mass threshold (for visualization)',
                       help='Used only with pseudoatoms and only for visualization purposes. \n '
-			   'Pseudoatoms whose mass is below this threshold are removed. \n'
+                           'Pseudoatoms whose mass is below this threshold are removed. \n'
                            'The threshold value should be between 0 and 1. '
                            'A threshold of 0 implies no pseudoatom removal.')
 
-                                   
     def _insertAllSteps(self):
         # Some steps will differ if the input is a volume or a pdb file
         self.structureEM = self.inputStructure.get().getPseudoAtoms()
         n = self.numberOfModes.get()
         # Link the input
         inputFn = self.inputStructure.get().getFileName()
-        localFn = self._getPath(replaceBaseExt(basename(inputFn),'pdb'))
+        localFn = self._getPath(replaceBaseExt(basename(inputFn), 'pdb'))
         self._insertFunctionStep('copyPdbStep', inputFn, localFn,
                                  self.structureEM)
-        
+
         # Construct string for relative-absolute cutoff
         # This is used to detect when to reexecute a step or not
-        cutoffStr=''
+        cutoffStr = ''
         if self.cutoffMode == NMA_CUTOFF_REL:
-            cutoffStr = 'Relative %f'%self.rcPercentage.get()
+            cutoffStr = 'Relative %f' % self.rcPercentage.get()
         else:
-            cutoffStr = 'Absolute %f'%self.rc.get()
+            cutoffStr = 'Absolute %f' % self.rc.get()
 
         # Compute modes
-        self.pseudoAtomRadius=1
+        self.pseudoAtomRadius = 1
         if self.structureEM:
             with open(inputFn, 'r') as fh:
                 first_line = fh.readline()
@@ -118,19 +118,20 @@ class FlexProtNMA(FlexProtNMABase):
                 self.pseudoAtomRadius = float(second_line.split()[2])
             if self.cutoffMode == NMA_CUTOFF_REL:
                 params = '-i %s --operation distance_histogram %s' \
-                     % (localFn, self._getExtraPath('pseudoatoms_distance.hist'))
+                         % (localFn, self._getExtraPath('pseudoatoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computeModesStep', localFn, n, cutoffStr)
-            self._insertFunctionStep('reformatOutputStep',"pseudoatoms.pdb")
+            self._insertFunctionStep('reformatOutputStep', "pseudoatoms.pdb")
         else:
             if self.cutoffMode == NMA_CUTOFF_REL:
-                params = '-i %s --operation distance_histogram %s' % (localFn, self._getExtraPath('atoms_distance.hist'))
+                params = '-i %s --operation distance_histogram %s' % (
+                localFn, self._getExtraPath('atoms_distance.hist'))
                 self._insertRunJobStep("xmipp_pdb_analysis", params)
             self._insertFunctionStep('computePdbModesStep', n,
                                      self.rtbBlockSize.get(),
                                      cutoffStr)
             self._insertFunctionStep('reformatPdbOutputStep', n)
-        
+
         self._insertFunctionStep('qualifyModesStep', n,
                                  self.collectivityThreshold.get(),
                                  self.structureEM)
@@ -141,7 +142,7 @@ class FlexProtNMA(FlexProtNMABase):
                                  self.pseudoAtomRadius)
         self._insertFunctionStep('computeAtomShiftsStep', n)
         self._insertFunctionStep('createOutputStep')
-        
+
     def copyPdbStep(self, inputFn, localFn, isEM):
         """ Copy the input pdb file and also create a link 'atoms.pdb'
         """
@@ -175,7 +176,7 @@ class FlexProtNMA(FlexProtNMABase):
         for line in lines:
             if line.startswith("ATOM ") or line.startswith("TER "):
                 # print(int(line.split()[1]))
-                if int(line.split()[1])>99999:
+                if int(line.split()[1]) > 99999:
                     if line.startswith("ATOM "):
                         newline = line.replace("ATOM  1", "ATOM 1")
                     else:
@@ -185,18 +186,18 @@ class FlexProtNMA(FlexProtNMABase):
                     newlines.append(line)
         with open(localFn, mode='w') as f:
             f.writelines(newlines)
-        
+
     def computePdbModesStep(self, numberOfModes, RTBblockSize, cutoffStr):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))
-                
+
         self._enterWorkingDir()
         # For atoms, the interaction force constant was set to 10 as ElNemo RTB code may ask for its value \
-	    # (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
+        # (the RTBForceConstant entry was removed from gui as the value does not change the ENM computed normal modes).
         self.runJob('nma_record_info_PDB.py', "%d %d atoms.pdb %f %f"
                     % (numberOfModes, RTBblockSize, rc, 10.0),
                     env=getNMAEnviron())
-        self.runJob("nma_elnemo_pdbmat","",env=getNMAEnviron())
-        self.runJob("nma_diagrtb","",env=getNMAEnviron())
+        self.runJob("nma_elnemo_pdbmat", "", env=getNMAEnviron())
+        self.runJob("nma_diagrtb", "", env=getNMAEnviron())
 
         if not exists("diagrtb.eigenfacs"):
             msg = "Modes cannot be computed. Check the number of modes you " \
@@ -210,69 +211,69 @@ class FlexProtNMA(FlexProtNMABase):
             msg += "between 200 and 6 times the number of RTB blocks, consider " \
                    "increasing cut-off distance."
             self._printWarnings(redStr(msg) + '\n')
-        self.runJob("rm","-f *.dat_run diagrtb.dat pdbmat.xyzm pdbmat.sdijf "
-                         "pdbmat.dat")
-        
+        self.runJob("rm", "-f *.dat_run diagrtb.dat pdbmat.xyzm pdbmat.sdijf "
+                          "pdbmat.dat")
+
         self._leaveWorkingDir()
-        
+
     def reformatPdbOutputStep(self, numberOfModes):
         self._enterWorkingDir()
-        
+
         makePath('modes')
         Natoms = self._countAtoms("atoms.pdb")
         fhIn = open('diagrtb.eigenfacs')
-        fhAni = open('vec_ani.txt','w')
-        
+        fhAni = open('vec_ani.txt', 'w')
+
         for n in range(numberOfModes):
             # Skip two lines
             fhIn.readline()
             fhIn.readline()
-            fhOut=open('modes/vec.%d'%(n+1),'w')
+            fhOut = open('modes/vec.%d' % (n + 1), 'w')
             for i in range(Natoms):
-                line=fhIn.readline()
+                line = fhIn.readline()
                 fhOut.write(line)
-                fhAni.write(line.rstrip().lstrip()+" ")
+                fhAni.write(line.rstrip().lstrip() + " ")
             fhOut.close()
-            if n!=(numberOfModes-1):
+            if n != (numberOfModes - 1):
                 fhAni.write("\n")
         fhIn.close()
         fhAni.close()
-        self.runJob("nma_prepare_for_animate.py","",env=getNMAEnviron())
+        self.runJob("nma_prepare_for_animate.py", "", env=getNMAEnviron())
         cleanPath("vec_ani.txt")
         moveFile('vec_ani.pkl', 'extra/vec_ani.pkl')
 
         self._leaveWorkingDir()
-        
-    def animateModesStep(self, numberOfModes,amplitude,nFrames,downsample,
-                         pseudoAtomThreshold,pseudoAtomRadius):
+
+    def animateModesStep(self, numberOfModes, amplitude, nFrames, downsample,
+                         pseudoAtomThreshold, pseudoAtomRadius):
         makePath(self._getExtraPath('animations'))
         self._enterWorkingDir()
-        
+
         if self.structureEM:
             fn = "pseudoatoms.pdb"
-            self.runJob("nma_animate_pseudoatoms.py","%s extra/vec_ani.pkl 7 %d "
-                                                     "%f extra/animations/"
-                                                     "animated_mode %d %d %f"%\
-                      (fn,numberOfModes,amplitude,nFrames,downsample,
-                       pseudoAtomThreshold),env=getNMAEnviron())
+            self.runJob("nma_animate_pseudoatoms.py", "%s extra/vec_ani.pkl 7 %d "
+                                                      "%f extra/animations/"
+                                                      "animated_mode %d %d %f" % \
+                        (fn, numberOfModes, amplitude, nFrames, downsample,
+                         pseudoAtomThreshold), env=getNMAEnviron())
         else:
-            fn="atoms.pdb"
-            self.runJob("nma_animate_atoms.py","%s extra/vec_ani.pkl 7 %d %f "
-                                               "extra/animations/animated_mode "
-                                               "%d"%\
-                      (fn,numberOfModes,amplitude,nFrames),env=getNMAEnviron())
-        
-        for mode in range(7,numberOfModes+1):
+            fn = "atoms.pdb"
+            self.runJob("nma_animate_atoms.py", "%s extra/vec_ani.pkl 7 %d %f "
+                                                "extra/animations/animated_mode "
+                                                "%d" % \
+                        (fn, numberOfModes, amplitude, nFrames), env=getNMAEnviron())
+
+        for mode in range(7, numberOfModes + 1):
             fnAnimation = join("extra", "animations", "animated_mode_%03d"
                                % mode)
-            fhCmd=open(fnAnimation+".vmd",'w')
+            fhCmd = open(fnAnimation + ".vmd", 'w')
             fhCmd.write("mol new %s.pdb\n" % self._getPath(fnAnimation))
             fhCmd.write("animate style Loop\n")
             fhCmd.write("display projection Orthographic\n")
             if self.structureEM:
                 fhCmd.write("mol modcolor 0 0 Beta\n")
                 fhCmd.write("mol modstyle 0 0 Beads %f 8.000000\n"
-                            %(pseudoAtomRadius))
+                            % (pseudoAtomRadius))
             else:
                 fhCmd.write("mol modcolor 0 0 Index\n")
                 if self._checkPDB_CA(fn):
@@ -281,20 +282,20 @@ class FlexProtNMA(FlexProtNMABase):
                     #         "2.600000 0\n")
                 else:
                     fhCmd.write("mol modstyle 0 0 NewRibbons 1.800000 6.000000 "
-                            "2.600000 0\n")
+                                "2.600000 0\n")
             fhCmd.write("animate speed 0.5\n")
             fhCmd.write("animate forward\n")
             fhCmd.close();
-        
+
         self._leaveWorkingDir()
-  
+
     def computeAtomShiftsStep(self, numberOfModes):
         fnOutDir = self._getExtraPath("distanceProfiles")
         makePath(fnOutDir)
-        maxShift=[]
-        maxShiftMode=[]
-        
-        for n in range(7, numberOfModes+1):
+        maxShift = []
+        maxShiftMode = []
+
+        for n in range(7, numberOfModes + 1):
             fnVec = self._getPath("modes", "vec.%d" % n)
             if exists(fnVec):
                 fhIn = open(fnVec)
@@ -302,34 +303,34 @@ class FlexProtNMA(FlexProtNMABase):
                 atomCounter = 0
                 for line in fhIn:
                     x, y, z = map(float, line.split())
-                    d = math.sqrt(x*x+y*y+z*z)
-                    if n==7:
+                    d = math.sqrt(x * x + y * y + z * z)
+                    if n == 7:
                         maxShift.append(d)
                         maxShiftMode.append(7)
                     else:
-                        if d>maxShift[atomCounter]:
-                            maxShift[atomCounter]=d
-                            maxShiftMode[atomCounter]=n
-                    atomCounter+=1
-                    md.setValue(MDL_NMA_ATOMSHIFT,d,md.addObject())
-                md.write(join(fnOutDir,"vec%d.xmd" % n))
+                        if d > maxShift[atomCounter]:
+                            maxShift[atomCounter] = d
+                            maxShiftMode[atomCounter] = n
+                    atomCounter += 1
+                    md.setValue(MDL_NMA_ATOMSHIFT, d, md.addObject())
+                md.write(join(fnOutDir, "vec%d.xmd" % n))
                 fhIn.close()
         md = MetaData()
         for i, _ in enumerate(maxShift):
-            fnVec = self._getPath("modes", "vec.%d" % (maxShiftMode[i]+1))
+            fnVec = self._getPath("modes", "vec.%d" % (maxShiftMode[i] + 1))
             if exists(fnVec):
                 objId = md.addObject()
-                md.setValue(MDL_NMA_ATOMSHIFT, maxShift[i],objId)
+                md.setValue(MDL_NMA_ATOMSHIFT, maxShift[i], objId)
                 md.setValue(MDL_NMA_MODEFILE, fnVec, objId)
         md.write(self._getExtraPath('maxAtomShifts.xmd'))
-                                                      
+
     def createOutputStep(self):
         fnSqlite = self._getPath('modes.sqlite')
         nmSet = SetOfNormalModes(filename=fnSqlite)
 
         md = MetaData(self._getPath('modes.xmd'))
         row = XmippMdRow()
-        
+
         for objId in md:
             row.readFromMd(md, objId)
             nmSet.append(rowToMode(row))
@@ -337,7 +338,6 @@ class FlexProtNMA(FlexProtNMABase):
         nmSet.setPdb(inputPdb)
         self._defineOutputs(outputModes=nmSet)
         self._defineSourceRelation(self.inputStructure, nmSet)
-
 
     def _checkPDB_CA(self, fnPDB):
         # This function returns true if all the atoms are CA and P, otherwise false
@@ -348,3 +348,14 @@ class FlexProtNMA(FlexProtNMABase):
                 if atom.type != " P":
                     return False
         return True
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _citations(self):
+        return ['harastani2022continuousflex']
+
+    def _methods(self):
+        pass

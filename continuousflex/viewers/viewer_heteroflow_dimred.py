@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *             Slavica Jonic                (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -21,34 +21,30 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-from continuousflex.protocols.data import PathData
-
-"""
-This module implement the wrappers around Xmipp CL2D protocol
-visualization program.
-"""
 
 import os
 from os.path import basename, join, exists, isfile
 import numpy as np
 import pwem.emlib.metadata as md
-from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
+from pyworkflow.utils.path import cleanPath, makePath
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
 from pyworkflow.gui.browser import FileBrowserWindow
-from continuousflex.protocols.protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
+from continuousflex.protocols.protocol_tomoflow_dimred import FlexProtDimredHeteroFlow
 from continuousflex.protocols.data import Point, Data
 from .plotter_vol import FlexNmaVolPlotter
 from continuousflex.viewers.nma_vol_gui import ClusteringWindowVolHeteroFlow
 from continuousflex.viewers.nma_vol_gui import TrajectoriesWindowVolHeteroFlow
 from pwem.viewers.viewer_chimera import Chimera
-
 from joblib import load, dump
 from continuousflex.protocols.utilities.spider_files3 import open_volume, save_volume
+import continuousflex
+from continuousflex import Plugin
+from subprocess import check_call
+import sys
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
-
 from pyworkflow.protocol import params
 
 FIGURE_LIMIT_NONE = 0
@@ -65,7 +61,7 @@ POINT_LIMITS = 1
 
 
 class FlexDimredHeteroFlowViewer(ProtocolViewer):
-    """ Visualization of results from the NMA protocol
+    """ Visualization of results from TomoFlow Dimred protocol
     """
     _label = 'viewer heteroflow dimred'
     _targets = [FlexProtDimredHeteroFlow]
@@ -297,9 +293,9 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         partSet.write()
         partSet.close()
 
-        from continuousflex.protocols.protocol_batch_cluster_heteroflow import FlexBatchProtHeteroFlowCluster
+        from continuousflex.protocols.protocol_batch_cluster_tomoflow import FlexBatchProtTomoFlowCluster
 
-        newProt = project.newProtocol(FlexBatchProtHeteroFlowCluster)
+        newProt = project.newProtocol(FlexBatchProtTomoFlowCluster)
         clusterName = self.clusterWindow.getClusterName()
         if clusterName:
             newProt.setObjLabel(clusterName)
@@ -309,38 +305,8 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         project.getRunsGraph()
 
 
-
-
+    #TODO
     def _loadAnimationData(self, obj):
-        # prot = self.protocol
-        # animationName = obj.getFileName()  # assumes that obj.getFileName is the folder of animation
-        # animationPath = prot._getExtraPath(animationName)
-        # # animationName = animationPath.split('animation_')[-1]
-        # animationRoot = join(animationPath, animationName)
-        #
-        # animationSuffixes = ['.vmd', '.pdb', 'trajectory.txt']
-        # for s in animationSuffixes:
-        #     f = animationRoot + s
-        #     if not exists(f):
-        #         self.errorMessage('Animation file "%s" not found. ' % f)
-        #         return
-        #
-        # # Load animation trajectory points
-        # trajectoryPoints = np.loadtxt(animationRoot + 'trajectory.txt')
-        # data = PathData(dim=trajectoryPoints.shape[1])
-        #
-        # for i, row in enumerate(trajectoryPoints):
-        #     data.addPoint(Point(pointId=i + 1, data=list(row), weight=1))
-        #
-        # self.trajectoriesWindow.setPathData(data)
-        # self.trajectoriesWindow.setAnimationName(animationName)
-        # self.trajectoriesWindow._onUpdateClick()
-        #
-        # def _showVmd():
-        #     vmdFn = animationRoot + '.vmd'
-        #     VmdView(' -e %s' % vmdFn).show()
-        #
-        # self.getTkRoot().after(500, _showVmd)
         pass
 
     def _loadAnimation(self):
@@ -351,7 +317,6 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         browser.show()
 
     def _generateAnimation(self):
-        import farneback3d
         prot = self.protocol
         # This is not getting the file correctly, we are workingaround it:
         # projectorFile = prot.getProjectorFile()
@@ -418,16 +383,26 @@ class FlexDimredHeteroFlowViewer(ProtocolViewer):
         bigmat_pinv = None # removing if from the memory
         fnref = self.protocol._getExtraPath('reference.spi')
         shape = np.shape(open_volume(fnref))
-
+        ref = open_volume(fnref)
+        # dumping the reference volume to use it in an outside script
+        # creating the directory Tmp since it is usually deleted after the execution of the protocol
+        if not exists(self.protocol._getTmpPath()):
+            os.mkdir(self.protocol._getTmpPath())
+        ref_dump = self.protocol._getTmpPath('ref_dump.pkl')
+        dump(ref, ref_dump)
         for i, trash in enumerate(deformations):
             flowi = np.transpose(line[:, i])
             flowi = np.reshape(flowi, [3, shape[0], shape[1], shape[2]])
             pathi = animationRoot + str(i).zfill(3) + 'deformed_by_opflow.vol'
-            ref = open_volume(fnref)
-            ref = farneback3d.warp_by_flow(ref, np.float32(flowi))
-            save_volume(ref, pathi)
-            # command = '-i ' + pathi + ' --select below 0.6 --substitute value 0'
-            # runJob(None,'xmipp_transform_threshold',command)
+            flow_dump = self.protocol._getTmpPath('flow_dump.pkl')
+            dump(np.float32(flowi), flow_dump)
+            args = " %s %s %s" % (ref_dump, flow_dump, pathi)
+            script_path = continuousflex.__path__[0] + '/protocols/utilities/optflow_warp.py'
+            command = "python " + script_path + args
+            command = Plugin.getContinuousFlexCmd(command)
+            check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                       env=None, cwd=None)
+
         fn_cxc = self.protocol._getExtraPath('chimera_%s.cxc' % animation)
         # cxc_command = 'open ' + animationPath + '/*.vol vseries true\n'
         cxc_command = 'open animation_%s/*.vol vseries true\n' % animation

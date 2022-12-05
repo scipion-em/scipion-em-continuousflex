@@ -20,6 +20,8 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
+import joblib
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
 from pyworkflow.utils.path import makePath, copyFile
@@ -29,7 +31,6 @@ from pwem.objects import SetOfNormalModes, AtomStruct
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
-from umap import UMAP
 
 import numpy as np
 import glob
@@ -39,7 +40,10 @@ from joblib import dump
 from .utilities.genesis_utilities import dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
 import pwem.emlib.metadata as md
-
+import continuousflex
+from continuousflex import Plugin
+from subprocess import check_call
+import sys
 
 PDB_SOURCE_SUBTOMO = 0
 PDB_SOURCE_PATTERN = 1
@@ -164,9 +168,17 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             self.writePrincipalComponents(prefix=pathPC, matrix = matrix)
 
         elif self.method.get() == REDUCE_METHOD_UMAP:
-            umap = UMAP(n_components=self.reducedDim.get(), n_neighbors=15, n_epochs=1000).fit(pdbs_matrix)
-            Y = umap.transform(pdbs_matrix)
-            dump(umap, self._getExtraPath('pca_pickled.joblib'))
+            pdbs_dump = self._getTmpPath('pdbs_dump.pkl')
+            joblib.dump(pdbs_matrix, pdbs_dump)
+            Y_dump = self._getTmpPath('Y_dump.pkl')
+            args = "%d %d %d %s %s %s" % (self.reducedDim.get(), 15, 1000,
+                                       pdbs_dump, self._getExtraPath('pca_pickled.joblib'), Y_dump)
+            script_path = continuousflex.__path__[0] + '/protocols/utilities/umap_run.py '
+            command = "python " + script_path + args
+            command = Plugin.getContinuousFlexCmd(command)
+            check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
+                       env=None, cwd=None)
+            Y = joblib.load(Y_dump)
 
         np.savetxt(self.getOutputMatrixFile(),Y)
 
@@ -204,7 +216,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         return errors
 
     def _citations(self):
-        return ['harastani2020hybrid','Jin2014']
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         pass

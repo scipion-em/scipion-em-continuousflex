@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Author:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Author:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,14 +20,12 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
 from pyworkflow.object import String
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
-from pwem.convert import cifToPdb
 from pyworkflow.utils.path import makePath, copyFile, removeBaseExt
 from pyworkflow.protocol import params
-
-from .protocol_subtomogram_averaging import FlexProtSubtomogramAveraging
 from sklearn.cluster import AgglomerativeClustering, KMeans
 import time
 import os
@@ -35,14 +33,11 @@ from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
 import pwem.emlib.metadata as md
 from continuousflex.protocols.utilities.spider_files3 import save_volume, open_volume
 import xmipp3
-
 from pwem.objects import Volume
 import numpy as np
-import glob
 from sklearn import decomposition
 from joblib import dump, load
 from pwem.utils import runProgram
-
 
 
 class FlexProtSubtomoClassify(ProtAnalysis3D):
@@ -359,7 +354,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         return errors
 
     def _citations(self):
-        return ['harastani2020hybrid','Jin2014']
+        return ['harastani2022continuousflex']
 
     def _methods(self):
         pass

@@ -1,16 +1,26 @@
-import torch.nn as nn
+# Author: Ilyes Hamitouche
+
 from torchvision import transforms
-import torch.optim as optim
 from torch.utils.data import DataLoader
-from continuousflex.protocols.utilities.processing_dh.data import cryodata
-from continuousflex.protocols.utilities.processing_dh.utils import quater2euler, reverse_min_max
-from continuousflex.protocols.utilities.processing_dh.models import deephemnma
+from processing_dh.data import cryodata
+from processing_dh.utils import quater2euler, reverse_min_max
+from processing_dh.models import deephemnma
 import numpy as np
 import torch
 from pathlib import Path
 import sys
 import pwem.emlib.metadata as md
-
+def norm(imgs_path, weights_path, flag, mode, batch_size):
+    dataset = cryodata(imgs_path, weights_path, flag=flag, mode=mode, transform=transforms.ToTensor())
+    train_loader = DataLoader(dataset, batch_size=batch_size)
+    sum_, squared_sum_, num_batches = 0, 0, 0
+    for img, image_name in train_loader:
+        sum_ += torch.mean(img, dim=[0, 2, 3])
+        squared_sum_ += torch.mean(img**2, dim=[0, 2, 3])
+        num_batches += 1
+    mean = sum_/num_batches
+    std = (squared_sum_/num_batches - mean**2)**0.5
+    return mean, std
 def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0, device=0, mode='inference'):
     FLAG = ''
     if flag==0:
@@ -27,8 +37,9 @@ def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0,
     else:
         DEVICE = 'cpu'
 
-
-    dataset = cryodata(imgs_path, weights_path, flag=FLAG, mode = mode, transform=transforms.ToTensor())
+    mean, std = norm(imgs_path, weights_path, flag=FLAG, mode=mode, batch_size=batch_size)
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((mean), (std))])
+    dataset = cryodata(imgs_path, weights_path, flag=FLAG, mode=mode, transform=transform)
 
     dataset_size = len(dataset)
     print('the train set size is: {} images'.format(dataset_size))
@@ -45,13 +56,14 @@ def infer(imgs_path, weights_path, output_path, num_modes, batch_size=2, flag=0,
         model = deephemnma(2).to(DEVICE)
         predictions = np.zeros((dataset_size, 2), dtype='float32')
     elif FLAG=='all':
-        model = deephemnma(9).to(DEVICE)
+        model = deephemnma(6+num_modes).to(DEVICE)
         predictions = np.zeros((dataset_size, 6+num_modes), dtype='float32')
 
     model.load_state_dict(torch.load(weights_path))
+    model.eval()
     with torch.no_grad():
         i = 0
-        for img, params in data_loader:
+        for img, image_name in data_loader:
             pred_params = model(img.to(DEVICE), mode)
             predictions[i * batch_size:(i + 1) * batch_size, :] = pred_params.cpu()
             i+=1

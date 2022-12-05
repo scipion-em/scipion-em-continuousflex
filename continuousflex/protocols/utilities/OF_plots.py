@@ -1,8 +1,6 @@
-import matplotlib
-# matplotlib.use('Qt5Agg')
+# By Mohamad Harastani
+
 import matplotlib.pyplot as plt
-# ['GTK3Agg', 'GTK3Cairo', 'MacOSX', 'nbAgg', 'Qt4Agg', 'Qt4Cairo', 'Qt5Agg', 'Qt5Cairo', 'TkAgg', 'TkCairo', 'WebAgg',
-# 'WX', 'WXAgg', 'WXCairo', 'agg', 'cairo', 'pdf', 'pgf', 'ps', 'svg', 'template']
 import numpy as np
 from scipy.signal import resample_poly
 

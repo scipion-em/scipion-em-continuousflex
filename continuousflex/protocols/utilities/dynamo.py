@@ -7,6 +7,7 @@ from xmippLib import Euler_matrix2angles
 import pandas as pd
 import math
 
+
 def dynamo_mat(tdrot, tilt, narot, shiftx, shifty, shiftz):
     tdrot = radians(tdrot)
     tilt = radians(tilt)
@@ -32,8 +33,6 @@ def dynamo_mat(tdrot, tilt, narot, shiftx, shifty, shiftz):
     m[1,3] = shifty
     m[2,3] = shiftz
     m[3,3] = 1
-
-
 
     return m
 

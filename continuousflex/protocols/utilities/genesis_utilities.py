@@ -1,3 +1,5 @@
+# By Remi Vuillemot
+
 import numpy as np
 from pyworkflow.utils import runCommand
 import pwem.emlib.metadata as md

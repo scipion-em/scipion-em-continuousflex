@@ -29,6 +29,7 @@ from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolu
 from pwem.constants import ALIGN_PROJ
 from continuousflex.protocols.convert import matrix2eulerAngles
 
+
 class ProtNMMDRefine(ProtGenesis):
     """ Protocol to perform NMMD refinement using GENESIS """
     _label = 'NMMD refine'
@@ -144,7 +145,7 @@ class ProtNMMDRefine(ProtGenesis):
             # add to MD
             trans_mat = np.zeros((4,4))
             trans_mat[:3,:3] = rot_mat
-            trans_mat[:,3] = tran
+            trans_mat[:,3][:3] = tran
             rot, tilt, psi,shftx, shfty, shftz = matrix2eulerAngles(trans_mat)
             index = alignXMD.addObject()
             alignXMD.setValue(md.MDL_ANGLE_ROT, rot, index)
@@ -333,3 +334,18 @@ class ProtNMMDRefine(ProtGenesis):
     def getAlignementprefix(self, itr=None):
         if itr is None : itr = self._iter
         return self._getExtraPath("alignement_iter_%s.xmd"%str(itr+1).zfill(3))
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _validate(self):
+        errors = []
+        return errors
+
+    def _citations(self):
+        return ['harastani2022continuousflex','vuillemot2022NMMD']
+
+    def _methods(self):
+        return []

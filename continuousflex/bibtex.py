@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # **************************************************************************
 # *
-# * Authors:     Mohamad Harastani (mohamad.harastani@upmc.fr)
+# * Authors:     Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -154,6 +154,44 @@ url = {https://www.sciencedirect.com/science/article/pii/S1047847713000737},
 author = {Yuxiang Chen and Stefan Pfeffer and Thomas Hrabe and Jan Michael Schuller and Friedrich Förster},
 keywords = {Cryo-electron tomography, Subtomogram averaging, Spherical harmonics},
 abstract = {In cryoelectron tomography alignment and averaging of subtomograms, each dnepicting the same macromolecule, improves the resolution compared to the individual subtomogram. Major challenges of subtomogram alignment are noise enhancement due to overfitting, the bias of an initial reference in the iterative alignment process, and the computational cost of processing increasingly large amounts of data. Here, we propose an efficient and accurate alignment algorithm via a generalized convolution theorem, which allows computation of a constrained correlation function using spherical harmonics. This formulation increases computational speed of rotational matching dramatically compared to rotation search in Cartesian space without sacrificing accuracy in contrast to other spherical harmonic based approaches. Using this sampling method, a reference-free alignment procedure is proposed to tackle reference bias and overfitting, which also includes contrast transfer function correction by Wiener filtering. Application of the method to simulated data allowed us to obtain resolutions near the ground truth. For two experimental datasets, ribosomes from yeast lysate and purified 20S proteasomes, we achieved reconstructions of approximately 20Å and 16Å, respectively. The software is ready-to-use and made public to the community.}
+}
+
+@article{harastani2022continuousflex,
+  title={ContinuousFlex: Software package for analyzing continuous conformational variability of macromolecules in cryo electron microscopy and tomography data},
+  author={Harastani, Mohamad and Vuillemot, R{\'e}mi and Hamitouche, Ilyes and Moghadam, Nima Barati and Jonic, Slavica},
+  journal={Journal of Structural Biology},
+  volume={214},
+  number={4},
+  pages={107906},
+  year={2022},
+  publisher={Elsevier}
+}
+
+@article{harastani2022tomoflow,
+  title={TomoFlow: Analysis of continuous conformational variability of macromolecules in cryogenic subtomograms based on 3D dense optical flow},
+  author={Harastani, Mohamad and Eltsov, Mikhail and Leforestier, Am{\'e}lie and Jonic, Slavica},
+  journal={Journal of molecular biology},
+  volume={434},
+  number={2},
+  pages={167381},
+  year={2022},
+  publisher={Elsevier}
+}
+
+@article{harastani2021hemnma,
+  title={Hemnma-3d: Cryo electron tomography method based on normal mode analysis to study continuous conformational variability of macromolecular complexes},
+  author={Harastani, Mohamad and Eltsov, Mikhail and Leforestier, Am{\'e}lie and Jonic, Slavica},
+  journal={Frontiers in molecular biosciences},
+  pages={317},
+  year={2021},
+  publisher={Frontiers}
+}
+
+@article{hamitouche2022deephemnma,
+  title={DeepHEMNMA: ResNet-based hybrid analysis of continuous conformational heterogeneity in cryo-EM single particle images},
+  author={Hamitouche, Ilyes and Jonic, Slavica},
+  journal={Frontiers in Molecular Biosciences},
+  year={2022}
 }
 
 """

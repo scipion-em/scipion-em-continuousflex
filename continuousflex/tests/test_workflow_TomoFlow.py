@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Author:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Author:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # * IMPMC, UPMC, Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -20,21 +20,22 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+
 from pwem.protocols import ProtImportPdb
 from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
-
 from continuousflex.protocols import (FlexProtNMA, FlexProtSynthesizeSubtomo, NMA_CUTOFF_ABS)
-from continuousflex.protocols.protocol_subtomogrmas_synthesize import MODE_RELATION_3CLUSTERS, MODE_RELATION_PARABOLA
+from continuousflex.protocols.protocol_subtomograms_synthesize import MODE_RELATION_3CLUSTERS, MODE_RELATION_PARABOLA
 from continuousflex.protocols.protocol_pdb_dimred import FlexProtDimredPdb
 from continuousflex.protocols.protocol_subtomogram_averaging import FlexProtSubtomogramAveraging, IMPORT_XMIPP_MD, COPY_STA
-from continuousflex.protocols.protocol_heteroflow import FlexProtHeteroFlow
-from continuousflex.protocols.protocol_heteroflow_dimred import FlexProtDimredHeteroFlow
-from continuousflex.protocols.protocol_subtomogram_refine_alignment import FlexProtRefineSubtomoAlign
+from continuousflex.protocols.protocol_tomoflow import FlexProtHeteroFlow
+from continuousflex.protocols.protocol_tomoflow_dimred import FlexProtDimredHeteroFlow
+from continuousflex.protocols.protocol_tomoflow_refine_alignment import FlexProtRefineSubtomoAlign
 from xmipp3.protocols import XmippProtCreateMask3D
 
+
 class TestTomoFlow(TestWorkflow):
-    """ Check subtomograms are generated propoerly """
+    """ TomoFlow pipeline test """
 
     @classmethod
     def setUpClass(cls):

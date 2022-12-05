@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:    Mohamad Harastani            (mohamad.harastani@upmc.fr)
+# * Authors:    Mohamad Harastani            (mohamad.harastani@igbmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -20,11 +20,8 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module implement the wrappers aroung Xmipp CL2D protocol
-visualization program.
-"""
-from continuousflex.protocols.protocol_heteroflow import FlexProtHeteroFlow
+
+from continuousflex.protocols.protocol_tomoflow import FlexProtHeteroFlow
 from pwem.viewers import EmProtocolViewer
 from pyworkflow.protocol.params import LabelParam, IntParam, EnumParam, StringParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO

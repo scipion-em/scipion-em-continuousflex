@@ -1,7 +1,7 @@
 # **************************************************************************
-# * Authors:     J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
+# * Authors:     Mohamad Harastani (mohamad.harastani@igbmc.fr)
+# *              J.M. De la Rosa Trevin (jmdelarosa@cnb.csic.es)
 # *              Slavica Jonic  (slavica.jonic@upmc.fr)
-# *              Mohamad Harastani (mohamad.harastani@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -22,17 +22,12 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 from continuousflex.protocols.data import PathData
-
-"""
-This module implement the wrappers around Xmipp CL2D protocol
-visualization program.
-"""
-
 from os.path import basename, join, exists, isfile
 import numpy as np
 from joblib import load
-from pyworkflow.utils.path import cleanPath, makePath, cleanPattern
+from pyworkflow.utils.path import cleanPath, makePath
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
@@ -60,7 +55,7 @@ POINT_LIMITS_NONE = 0
 POINT_LIMITS = 1
 
 class FlexDimredNMAViewer(ProtocolViewer):
-    """ Visualization of results from the NMA protocol
+    """ Visualization of results from the NMA alingment dimred protocol (HEMNMA)
     """
     _label = 'viewer nma dimred'
     _targets = [FlexProtDimredNMA]

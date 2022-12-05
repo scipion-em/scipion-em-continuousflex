@@ -1,5 +1,6 @@
 # **************************************************************************
-# * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
+# *           Remi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -21,21 +22,15 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
-
-from os.path import basename
 import numpy as np
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pwem.viewers import ChimeraView
-from pwem.constants import ALIGN_PROJ
-
 from pwem.objects.data import SetOfParticles,SetOfVolumes
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtDimredPdb
-from xmipp3.convert import  writeSetOfParticles, readSetOfParticles
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
-
 from joblib import load
 from continuousflex.viewers.tk_dimred import PCAWindowDimred
 from continuousflex.protocols.data import Point, Data, PathData
@@ -46,9 +41,6 @@ from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHand
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
 from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClusterSet
-
-
-
 import os
 
 X_LIMITS_NONE = 0
@@ -66,7 +58,7 @@ NUM_POINTS_TRAJECTORY=10
 
 
 class FlexProtPdbDimredViewer(ProtocolViewer):
-    """ Visualization of dimensionality reduction on PDBs
+    """ Visualization of dimensionality reduction on atomic structures
     """
     _label = 'viewer PDBs dimred'
     _targets = [FlexProtDimredPdb]
@@ -211,8 +203,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def viewPcaSinglularValues(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
         fig = plt.figure('PCA singlular values')
-        plt.stem(pca.singular_values_)
-        plt.xticks(np.arange(0, len(pca.singular_values_), 1))
+        plt.stem(np.arange(1, len(pca.singular_values_)+1), pca.singular_values_)
         plt.show()
         pass
 
@@ -249,7 +240,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # Get animation root
         animation = self.trajectoriesWindow.getClusterName()
         animationPath = prot._getExtraPath('animation_%s' % animation)
-        if not os.path.isdir:
+        if not os.path.isdir(animationPath):
             cleanPath(animationPath)
             makePath(animationPath)
         animationRoot = os.path.join(animationPath, '')
@@ -410,7 +401,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _saveAnimation(self, tkWindow):
         # get cluster name
         animationPath = self.protocol._getExtraPath("animation_" + tkWindow.getClusterName())
-        if not os.path.isdir:
+        if not os.path.isdir(animationPath):
             cleanPath(animationPath)
             makePath(animationPath)
         animationRoot = os.path.join(animationPath, '')
@@ -426,6 +417,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         if set(classID) != {0}:
             np.savetxt(animationRoot + 'clusters.txt', np.array(classID))
             saved.append('clusters.txt')
+
+        try :
+            self.trajectoriesWindow.plotter.figure.savefig(animationRoot + 'figure.png',dpi=500)
+        except:
+            pass
 
         if len(saved) != 0:
             self.trajectoriesWindow.showInfo('Successfully saved : %s.' % str(saved))

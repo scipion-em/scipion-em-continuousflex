@@ -28,36 +28,29 @@
 # *
 # **************************************************************************
 
-
 from os.path import basename
 import os
-from pwem.convert.atom_struct import cifToPdb
-from pyworkflow.utils import replaceBaseExt
-
 from pyworkflow.utils import isPower2, getListFromRangeString
 from pyworkflow.utils.path import copyFile, cleanPath
 import pyworkflow.protocol.params as params
 from pwem.protocols import ProtAnalysis3D
-
 from pyworkflow.protocol.params import NumericRangeParam
 import pwem as em
 import pwem.emlib.metadata as md
-
 from xmipp3.base import XmippMdRow
 from xmipp3.convert import (writeSetOfParticles, xmippToLocation,
                             getImageLocation, createItemMatrix,
                             setXmippAttributes)
 from .convert import modeToRow
-from pwem.utils import runProgram
 from pwem import Domain
+import multiprocessing
 
 NMA_ALIGNMENT_WAV = 0
 NMA_ALIGNMENT_PROJ = 1
-import multiprocessing
 
 
 class FlexProtAlignmentNMA(ProtAnalysis3D):
-    """ Protocol for flexible angular alignment. """
+    """ Protocol for flexible angular alignment (HEMNMA). """
     _label = 'nma alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------
@@ -274,7 +267,7 @@ class FlexProtAlignmentNMA(ProtAnalysis3D):
         return errors
 
     def _citations(self):
-        return ['harastani2020hybrid','Jonic2005', 'Sorzano2004b', 'Jin2014']
+        return ['harastani2022continuousflex','harastani2020hybrid','Jin2014']
 
     def _methods(self):
         pass

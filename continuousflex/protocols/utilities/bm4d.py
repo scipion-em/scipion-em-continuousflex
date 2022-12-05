@@ -1,3 +1,5 @@
+# By Mohamad Harastani
+
 import continuousflex
 import os
 import tkinter.messagebox as tk

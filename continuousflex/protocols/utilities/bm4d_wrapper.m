@@ -22,7 +22,7 @@
 %      Proc. SPIE Electronic Imaging 2012, San Francisco, CA, USA, Jan. 2012.
 
 
-% by Mohamad Harastani (mohamad.harastani@upmc.fr)
+% by Mohamad Harastani (mohamad.harastani@igbmc.fr)
 
 
 function bm4d_wrapper(path_vol_in, path_vol_out, distribution, sigma, profile, do_wiener)

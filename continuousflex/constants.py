@@ -2,7 +2,7 @@
 # **************************************************************************
 # *
 # * Authors:
-# * Mohamad Harastani (mohamad.harastani@upmc.fr)
+# * Mohamad Harastani (mohamad.harastani@igbmc.fr)
 # * Slavica Jonic (slavica.jonic@upmc.fr)
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -30,11 +30,7 @@ CONTINUOUSFLEX_HOME = 'CONTINUOUSFLEX_HOME'
 NMA_HOME = 'NMA_HOME'
 VMD_HOME = 'VMD_HOME'
 GENESIS_HOME = 'GENESIS_HOME'
-SITUS_HOME = 'SITUS_HOME'
 MATLAB_HOME = 'MATLAB_HOME'
 CONTINUOUSFLEX_URL = 'https://github.com/scipion-em/scipion-em-continuousflex'
 # Supported versions
-VV = '0.6'
-
-
-
+VV = '3.3.0'

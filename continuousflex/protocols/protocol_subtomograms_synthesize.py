@@ -1,5 +1,5 @@
 # **************************************************************************
-# * Authors:  Mohamad Harastani          (mohamad.harastani@upmc.fr)
+# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
 # *           Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
@@ -810,20 +810,6 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         partSet.setSamplingRate(self.samplingRate.get())
         self._defineOutputs(outputVolumes=partSet)
 
-    # --------------------------- INFO functions --------------------------------------------
-    def _summary(self):
-        summary = []
-        return summary
-
-    def _validate(self):
-        errors = []
-        return errors
-
-    def _citations(self):
-        return ['harastani2020hybrid','Jonic2005', 'Sorzano2004b', 'Jin2014']
-
-    def _methods(self):
-        pass
 
     def get_number_of_volumes(self):
         if(self.importPdbs.get()):
@@ -833,6 +819,7 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
         else:
             numberOfVolumes = self.numberOfVolumes.get()
         return numberOfVolumes
+
     # --------------------------- UTILS functions --------------------------------------------
     def _printWarnings(self, *lines):
         """ Print some warning lines to 'warnings.xmd', 
@@ -845,3 +832,18 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
     def _getLocalModesFn(self):
         modesFn = self.inputModes.get().getFileName()
         return self._getBasePath(modesFn)
+
+    # --------------------------- INFO functions --------------------------------------------
+    def _summary(self):
+        summary = []
+        return summary
+
+    def _validate(self):
+        errors = []
+        return errors
+
+    def _citations(self):
+        return ['harastani2022continuousflex','harastani2020hybrid']
+
+    def _methods(self):
+        pass

@@ -22,24 +22,16 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This module implement the wrappers around Xmipp NMA protocol
-visualization program.
-"""
 
 from pyworkflow.gui.project import ProjectWindow
 from pyworkflow.protocol.params import LabelParam, IntParam
 from pyworkflow.viewer import ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO
-
-from pwem.viewers import ObjectView, VmdView, DataView
+from pwem.viewers import VmdView, DataView
 from pwem.emlib import MDL_NMA_ATOMSHIFT
 from pwem.objects import SetOfNormalModes
-
 from continuousflex.protocols import FlexProtNMA
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
-
 import os
-
 
 OBJCMD_NMA_PLOTDIST = "Plot distance profile"
 OBJCMD_NMA_VMD = "Display VMD animation"
@@ -53,11 +45,7 @@ class FlexNMAViewer(ProtocolViewer):
     _targets = [FlexProtNMA, SetOfNormalModes]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
-#     def setProtocol(self, protocol):
-#         ProtocolViewer.setProtocol(self, protocol)
-#         inputPdb = protocol.inputStructure.get()
-#         self.isEm.set(inputPdb.getPseudoAtoms())
-        
+
     def _defineParams(self, form):
 
         if isinstance(self.protocol, SetOfNormalModes):
@@ -102,10 +90,6 @@ class FlexNMAViewer(ProtocolViewer):
                         
     def _viewParam(self, paramName):
         if paramName == 'displayModes':
-            # The following two lines display modes.sqlite file
-            # modes =  self.protocol.outputModes
-            # return [ObjectView(self._project, modes.strId(), modes.getFileName())]
-            # The following two lines display modes.xmd file
             if isinstance(self.protocol, SetOfNormalModes):
                 modes = os.path.dirname(self.protocol[1].getModeFile()) + ".xmd"
             else:

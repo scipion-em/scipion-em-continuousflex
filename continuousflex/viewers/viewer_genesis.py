@@ -22,22 +22,17 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
 
-
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
-import pyworkflow.protocol.params as params
 from continuousflex.protocols.protocol_genesis import *
 from continuousflex.protocols.utilities.genesis_utilities import *
-
 from .plotter import FlexPlotter
 from pwem.viewers import VmdView, ChimeraView
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os
 import glob
-import pwem.emlib.metadata as md
-import re
-
 from matplotlib.pyplot import cm
+
 
 class GenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol

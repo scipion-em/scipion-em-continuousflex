@@ -49,6 +49,7 @@ Note: GENESIS is not installed by default in continuousflex. To install GENESIS,
 Note: Matlab with its image processing toolbox is optional. It will only be needed if missing-wedge correction using Monte Carlo or volume denoising using BM4D are to be used
 We assume that Matlab is installed on your system in "~/programs/Matlab".
 If Matlab is installed but does not work, you may run the command "scipion3 config" and look for MATLAB_HOME in the config file (the config file is usually at ~/scipion3/config/scipion.conf)
+
 Supported versions
 ------------------
 
@@ -104,6 +105,6 @@ Harastani, M., Vuillemot, R., Hamitouche, I., Moghadam, N. B., & Jonic, S. (2022
 Contact:
 ----------
 
-All questions regarding the software can be addressed to `[Contact] <continuousflex@gmail.com>`__
+All questions regarding the software can be sent through submitting an issue on the Github page or addressed to `[Contact] <continuousflex@gmail.com>`__
 
 # scipion-em-continuousflex

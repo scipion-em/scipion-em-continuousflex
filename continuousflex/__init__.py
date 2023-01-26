@@ -43,7 +43,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 CF_VERSION = 'git'
 
-__version__ = "3.3.0"
+__version__ = "3.3.1"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
@@ -117,16 +117,13 @@ class Plugin(pwem.Plugin):
 
         def getCondaInstallation(version):
             installationCmd = cls.getCondaActivationCmd()
-            installationCmd += 'conda create -y -n continuousflex-' + version + ' --clone scipion3 && '
-            installationCmd += cls.getActivationCmd(version) + ' && '
-            installationCmd += 'conda install -y -c conda-forge arpack lapack && '
-            installationCmd += 'pip install umap-learn && '
+            config_path = continuousflex.__path__[0]+'/conda.yaml'
+            installationCmd += 'conda env create -f {} --force -n continuousflex-'.format(config_path) + version + ' && '
             installationCmd += 'touch env-created.txt'
             return installationCmd
 
         # Install the conda environment with lapack and arpack
         defineCondaInstallation(CF_VERSION)
-
 
         # Cleaning the nma binaries files and folder before expanding
         if os.path.exists(env.getEmFolder() + '/nma*.tgz'):
@@ -134,9 +131,14 @@ class Plugin(pwem.Plugin):
 
 
         cmd_1 = cls.getCondaActivationCmd() + ' ' + cls.getActivationCmd(CF_VERSION)
-        cmd = cmd_1  + ' && cd ElNemo; make; mv nma_* ..'
+        cmd = cmd_1 + ' && cd ElNemo; make; mv nma_* ..'
+        # TODO: if gcc, mpi and fortran are installed on the system, then these ljnes can be used to override their banaries
+        # 'ln -s $GCC "$(dirname "${GCC}")"/gcc'
+        # 'ln -s $GXX "$(dirname "${GXX}")"/gxx'
+        # 'ln -s $(which x86_64-conda-linux-gnu-gfortran) "$(dirname "$(which x86_64-conda-linux-gnu-gfortran)")"/gfortran'
 
-        lib_path = os.environ['CONDA_PYTHON_EXE'][:-10] + 'envs/continuousflex-' + CF_VERSION + '/lib'
+
+        lib_path = os.environ['CONDA_PREFIX_1'] + '/envs/continuousflex-' + CF_VERSION + '/lib'
         # linking blas, arpack and lapack libraries to scipion lin
         os.system('ln -f -s ' + lib_path + '/libopenblas* ' + env.getLibFolder())
         os.system('ln -f -s ' + lib_path + '/libarpack* ' + env.getLibFolder())
@@ -170,7 +172,8 @@ class Plugin(pwem.Plugin):
 
         target_branch = "merge_genesis_1.4"
         cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
-                      ' ./configure LDFLAGS=-L%s ; make install;' % (target_branch, lib_path)
+                      ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"-fallow-argument-mismatch -ffree-line-length-none\";' \
+                      ' make install;' % (target_branch, lib_path)
         env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[(cmd , ["bin/atdyn"])],

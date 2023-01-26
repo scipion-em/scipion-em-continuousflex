@@ -54,3 +54,4 @@ from .protocol_deep_hemnma_infer import FlexProtDeepHEMNMAInfer
 from .protocol_genesis import ProtGenesis
 from .protocol_nmmd_refine import ProtNMMDRefine
 from .protocol_generate_topology import ProtGenerateTopology
+from .protocol_pdb_synthesize import FlexProtSynthesizePDBs

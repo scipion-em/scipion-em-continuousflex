@@ -110,7 +110,7 @@ class Plugin(pwem.Plugin):
             cf_commands = []
             cf_commands.append((getCondaInstallation(version), 'env-created.txt'))
 
-            env.addPackage('continuousflex', version=version,
+            env.addPackage('ContinuousFlex', version=version,
                            commands=cf_commands,
                            tar=VOID_TGZ,
                            default=True)
@@ -136,13 +136,8 @@ class Plugin(pwem.Plugin):
         # 'ln -s $GCC "$(dirname "${GCC}")"/gcc'
         # 'ln -s $GXX "$(dirname "${GXX}")"/gxx'
         # 'ln -s $(which x86_64-conda-linux-gnu-gfortran) "$(dirname "$(which x86_64-conda-linux-gnu-gfortran)")"/gfortran'
-
-
         lib_path = os.environ['CONDA_PREFIX_1'] + '/envs/continuousflex-' + CF_VERSION + '/lib'
-        # linking blas, arpack and lapack libraries to scipion lin
-        os.system('ln -f -s ' + lib_path + '/libopenblas* ' + env.getLibFolder())
-        os.system('ln -f -s ' + lib_path + '/libarpack* ' + env.getLibFolder())
-        os.system('ln -f -s ' + lib_path + '/liblapack* ' + env.getLibFolder())
+
         env.addPackage('nma', version='3.1',
                        url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
                        createBuildDir=False,
@@ -174,7 +169,8 @@ class Plugin(pwem.Plugin):
         cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
                       ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"-fallow-argument-mismatch -ffree-line-length-none\";' \
                       ' make install;' % (target_branch, lib_path)
+
         env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[(cmd , ["bin/atdyn"])],
-                       neededProgs=['mpif90'], default=True)
+                       neededProgs=['mpif90'], default=False)

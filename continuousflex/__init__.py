@@ -43,7 +43,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 CF_VERSION = 'git'
 
-__version__ = "3.3.2"
+__version__ = "3.3.3"
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
@@ -136,7 +136,12 @@ class Plugin(pwem.Plugin):
         # 'ln -s $GCC "$(dirname "${GCC}")"/gcc'
         # 'ln -s $GXX "$(dirname "${GXX}")"/gxx'
         # 'ln -s $(which x86_64-conda-linux-gnu-gfortran) "$(dirname "$(which x86_64-conda-linux-gnu-gfortran)")"/gfortran'
+
         lib_path = os.environ['CONDA_PREFIX_1'] + '/envs/continuousflex-' + CF_VERSION + '/lib'
+        # linking blas, arpack and lapack libraries to scipion lib
+        os.system('ln -f -s ' + lib_path + '/libopenblas* ' + env.getLibFolder())
+        os.system('ln -f -s ' + lib_path + '/libarpack* ' + env.getLibFolder())
+        os.system('ln -f -s ' + lib_path + '/liblapack* ' + env.getLibFolder())
 
         env.addPackage('nma', version='3.1',
                        url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',

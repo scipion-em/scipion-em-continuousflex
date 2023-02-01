@@ -44,7 +44,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.3.5"
+__version__ = "3.3.6"
 
 
 class Plugin(pwem.Plugin):
@@ -143,7 +143,7 @@ class Plugin(pwem.Plugin):
                 config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
             else:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-            installationCmd += 'conda create -f {} --force -n continuousflex-'.format(
+            installationCmd += 'conda create --file {} -n continuousflex-'.format(
                 config_path) + version + ' && '
             installationCmd += cls.getActivationCmd(version)
             installationCmd += ' && touch {}'.format(txtfile)

@@ -44,7 +44,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.3.8"
+__version__ = "3.3.9"
 
 
 class Plugin(pwem.Plugin):
@@ -107,35 +107,6 @@ class Plugin(pwem.Plugin):
                            tar=VOID_TGZ,
                            default=True)
 
-            lib_path = cls.getCondaLibPath()
-
-            env.addPackage('nma', version='3.1',
-                           url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
-                           createBuildDir=False,
-                           buildDir='nma',
-                           target="nma",
-                           commands=[('cd ElNemo; make; mv nma_* ..', 'nma_elnemo_pdbmat'),
-                                     ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
-                                      % lib_path, 'nma_diag_arpack')],
-                           neededProgs=['gfortran'], default=True)
-
-            target_branch = "merge_genesis_1.4"
-            output = subprocess.getoutput("gfortran --version")
-            gfotran_version = int(re.search(r'\d+', output).group())
-            if gfotran_version >= 10:
-                FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
-            else:
-                FFLAGS = "-ffree-line-length-none"
-
-            cmd = 'git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
-                  ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
-                  ' make install;' % (target_branch, lib_path, FFLAGS)
-
-            env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
-                           buildDir='MD-NMMD-Genesis', tar="void.tgz",
-                           commands=[(cmd, ["bin/atdyn"])],
-                           neededProgs=['mpif90'], default=True)
-
         def getCondaInstallation(version, txtfile):
             installationCmd = cls.getCondaActivationCmd()
             # If nvcc is not in the path, don't install Optical Flow or DeepLearning Libraries
@@ -152,3 +123,31 @@ class Plugin(pwem.Plugin):
         # Install the conda environment followed by the binaries
         defineCondaInstallation(__version__)
 
+        lib_path = cls.getCondaLibPath()
+
+        env.addPackage('nma', version='3.1',
+                       url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
+                       createBuildDir=False,
+                       buildDir='nma',
+                       target="nma",
+                       commands=[('cd ElNemo; make; mv nma_* ..', 'nma_elnemo_pdbmat'),
+                                 ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
+                                  % lib_path, 'nma_diag_arpack')],
+                       neededProgs=['gfortran'], default=True)
+
+        target_branch = "merge_genesis_1.4"
+        output = subprocess.getoutput("gfortran --version")
+        gfotran_version = int(re.search(r'\d+', output).group())
+        if gfotran_version >= 10:
+            FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
+        else:
+            FFLAGS = "-ffree-line-length-none"
+
+        cmd = 'git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
+              ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
+              ' make install;' % (target_branch, lib_path, FFLAGS)
+
+        env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
+                       buildDir='MD-NMMD-Genesis', tar="void.tgz",
+                       commands=[(cmd, ["bin/atdyn"])],
+                       neededProgs=['mpif90'], default=True)

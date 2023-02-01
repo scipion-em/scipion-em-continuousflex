@@ -143,7 +143,7 @@ class Plugin(pwem.Plugin):
                 config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
             else:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-            installationCmd += 'conda env create -f {} --force -n continuousflex-'.format(
+            installationCmd += 'conda create -f {} --force -n continuousflex-'.format(
                 config_path) + version + ' && '
             installationCmd += cls.getActivationCmd(version)
             installationCmd += ' && touch {}'.format(txtfile)

@@ -35,7 +35,6 @@ import subprocess
 import re
 import pyworkflow.utils as pwutils
 
-
 _logo = "logo.png"
 
 MD_NMMD_GENESIS_VERSION = "1.1"
@@ -44,7 +43,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.3.9"
+__version__ = "3.3.10"
 
 
 class Plugin(pwem.Plugin):
@@ -114,7 +113,7 @@ class Plugin(pwem.Plugin):
                 config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
             else:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-            installationCmd += 'conda env create -f {} -n continuousflex-'.format(
+            installationCmd += 'conda env create -f {} --force -n continuousflex-'.format(
                 config_path) + version + ' && '
             installationCmd += cls.getActivationCmd(version)
             installationCmd += ' && touch {}'.format(txtfile)
@@ -123,8 +122,6 @@ class Plugin(pwem.Plugin):
         # Install the conda environment followed by the binaries
         defineCondaInstallation(__version__)
 
-        lib_path = cls.getCondaLibPath()
-
         env.addPackage('nma', version='3.1',
                        url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
                        createBuildDir=False,
@@ -132,7 +129,8 @@ class Plugin(pwem.Plugin):
                        target="nma",
                        commands=[('cd ElNemo; make; mv nma_* ..', 'nma_elnemo_pdbmat'),
                                  ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
-                                  % lib_path, 'nma_diag_arpack')],
+                                  % (os.popen(cls.getContinuousFlexCmd('which python')).read()[:-11] + 'lib')
+                                  , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
         target_branch = "merge_genesis_1.4"
@@ -145,7 +143,9 @@ class Plugin(pwem.Plugin):
 
         cmd = 'git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
               ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
-              ' make install;' % (target_branch, lib_path, FFLAGS)
+              ' make install;' % (target_branch,
+                                  (os.popen(cls.getContinuousFlexCmd('which python')).read()[:-11] + 'lib')
+                                  , FFLAGS)
 
         env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",

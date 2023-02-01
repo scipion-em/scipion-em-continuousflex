@@ -37,6 +37,7 @@ from pyworkflow.protocol.constants import LEVEL_ADVANCED
 from pwem.protocols import Prot3D #this is not an error
 from pwem.viewers.viewer_chimera import Chimera
 from xmipp3.convert import getImageLocation
+from pwem import Domain
 
 
 NMA_MASK_NONE = 0
@@ -85,7 +86,7 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
             fnMask = self._getExtraPath('mask%s.vol' % prefix)
             maskParams = '-i %s -o %s --select below %f --substitute binarize'\
                          % (fnVol, fnMask, self.maskThreshold.get())
-            self._insertRunJobStep('xmipp_transform_threshold', maskParams)
+            self.runJob("xmipp_transform_threshold", maskParams, env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
         elif self.maskMode == NMA_MASK_FILE:
             fnMask = getImageLocation(self.volumeMask.get())
         return fnMask
@@ -106,17 +107,17 @@ class FlexProtConvertToPseudoAtomsBase(Prot3D):
                   "-v 2 --intensityColumn Bfactor"
         if fnMask:
             params += " --mask binary_file %(fnMask)s"
-        self.runJob("xmipp_volume_to_pseudoatoms", params % locals())
+        self.runJob("xmipp_volume_to_pseudoatoms", params % locals(), env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
         for suffix in ["_approximation.vol", "_distance.hist"]:
             moveFile(self._getPath(pseudoatoms + suffix),
                      self._getExtraPath(pseudoatoms + suffix))
         self.runJob("xmipp_image_convert",
                     "-i %s_approximation.vol -o %s_approximation.mrc -t vol"
                     % (self._getExtraPath(pseudoatoms),
-                       self._getExtraPath(pseudoatoms)))
+                       self._getExtraPath(pseudoatoms)), env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
         self.runJob("xmipp_image_header",
                     "-i %s_approximation.mrc --sampling_rate %f" %
-                    (self._getExtraPath(pseudoatoms), sampling))
+                    (self._getExtraPath(pseudoatoms), sampling),env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
         cleanPattern(self._getPath(pseudoatoms + '_*'))
 
     def createChimeraScript(self, volume, pdb):

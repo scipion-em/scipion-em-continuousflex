@@ -43,6 +43,7 @@ from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDU
 from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClusterSet
 from .plotter import FlexPlotter
 import os
+from matplotlib.ticker import MaxNLocator
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -72,10 +73,10 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
 
-        group = form.addGroup("Display Singular Values")
-        group.addParam('displayPcaSingularValues', LabelParam,
-                      label="Display singular values",
-                      help="The values should help you see how many dimensions are in the data ",
+        group = form.addGroup("Display Explained Variance")
+        group.addParam('displayPcaExplainedVariance', LabelParam,
+                      label="Display Explained Variance",
+                      help="Display the amount of variance explained by each PCA component. ",
                       condition=self.protocol.method.get()==REDUCE_METHOD_PCA)
 
         group = form.addGroup("Display PCA")
@@ -152,7 +153,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 'displayPCA': self._displayPCA,
                 'displayFreeEnergy': self._displayFreeEnergy,
                 'displayAnimationtool': self._displayAnimationtool,
-                'displayPcaSingularValues': self.viewPcaSinglularValues,
+                'displayPcaExplainedVariance': self.viewPcaExplainedVariance,
                 }
 
     def _displayPCA(self, paramName):
@@ -245,11 +246,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         return [self.trajectoriesWindow]
 
 
-    def viewPcaSinglularValues(self, paramName):
+    def viewPcaExplainedVariance(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
-        fig = plt.figure('PCA singlular values')
-        plt.stem(np.arange(1, len(pca.singular_values_)+1), pca.singular_values_)
-        plt.show()
+        plotter = FlexPlotter()
+        ax = plotter.createSubPlot("Explained variance","PCA component", "EV (%)")
+        ax.stem(np.arange(1, len(pca.explained_variance_ratio_)+1), 100*pca.explained_variance_ratio_)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plotter.show()
         pass
 
     def getData(self):

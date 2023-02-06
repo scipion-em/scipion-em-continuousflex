@@ -24,22 +24,20 @@
 import joblib
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
-from pyworkflow.utils.path import makePath, copyFile
+from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
 from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
 from pwem.objects import SetOfNormalModes, AtomStruct
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
-from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
+from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd,dcd2numpyArr
 
 import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump
 
-from .utilities.genesis_utilities import dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
-import pwem.emlib.metadata as md
 import continuousflex
 from continuousflex import Plugin
 from subprocess import check_call
@@ -128,9 +126,14 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         # Get pdbs coordinates
         if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
             pdbs_arr = dcd2numpyArr(inputFiles[0])
+            start = self.dcd_start.get()
+            step = self.dcd_step.get()
+            end = self.dcd_end.get() if self.dcd_end.get() != -1 else pdbs_arr.shape[0]
+            pdbs_arr = pdbs_arr[start:end:step]
             for i in range(1,len(inputFiles)):
                 pdb_arr_i = dcd2numpyArr(inputFiles[i])
-                pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i), axis=0)
+                pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i[start:end:step]), axis=0)
+
 
         elif self.pdbSource.get() == PDB_SOURCE_ALIGNED:
             pdbs_arr = dcd2numpyArr(inputFiles[0])
@@ -259,4 +262,4 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         for i in range(self.reducedDim.get()):
             with open("%s/vec.%i"%(prefix,i+1), "w") as f:
                     for j in range(matrix.shape[1]):
-                        f.write(" %e   %e   %e\n" % (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 1]))
+                        f.write(" %e   %e   %e\n" % (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 2]))

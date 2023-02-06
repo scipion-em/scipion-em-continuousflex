@@ -40,6 +40,9 @@ PDB_SOURCE_PATTERN = 0
 PDB_SOURCE_OBJECT = 1
 PDB_SOURCE_TRAJECT = 2
 
+MATCHING_PDB_NONE = 0
+MATCHING_PDB_CHAIN = 1
+MATCHING_PDB_SEG = 2
 
 class FlexProtAlignPdb(ProtAnalysis3D):
     """ Protocol to perform rigid body alignement on a set of PDB files. """
@@ -48,7 +51,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('pdbSource', EnumParam, default=0,
+        form.addParam('pdbSource', EnumParam, default=PDB_SOURCE_PATTERN,
                       label='Source of PDBs',
                       choices=['File pattern', 'Object', 'Trajectory Files'],
                       help='Use the file pattern as file location with /*.pdb')
@@ -83,12 +86,10 @@ class FlexProtAlignPdb(ProtAnalysis3D):
                       label="Step of the trajectory",
                       help='Step to skip points in the trajectory', expertLevel=params.LEVEL_ADVANCED)
 
-
-
         form.addParam('alignRefPDB', params.PointerParam, pointerClass='AtomStruct',
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
-        form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=0,
+        form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=MATCHING_PDB_NONE,
                       choices=['All PDBs are matching', 'Match chain name + residue no',
                                'Match segment name + residue no'],
                       help="Method to find atomic coordinates correspondence between the pdb set "
@@ -130,11 +131,13 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         # Get pdbs coordinates
         if self.pdbSource.get() == PDB_SOURCE_TRAJECT:
             pdbs_arr = dcd2numpyArr(inputFiles[0])
-            nframe, natom, _ = pdbs_arr.shape
-            pdbs_arr = pdbs_arr
+            start = self.dcd_start.get()
+            step = self.dcd_step.get()
+            end = self.dcd_end.get() if self.dcd_end.get() != -1 else pdbs_arr.shape[0]
+            pdbs_arr = pdbs_arr[start:end:step]
             for i in range(1,len(inputFiles)):
                 pdb_arr_i = dcd2numpyArr(inputFiles[i])
-                pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i), axis=0)
+                pdbs_arr = np.concatenate((pdbs_arr, pdb_arr_i[start:end:step]), axis=0)
 
         else:
             pdbs_matrix = []
@@ -154,28 +157,28 @@ class FlexProtAlignPdb(ProtAnalysis3D):
 
         # open files
         inputPDB = ContinuousFlexPDBHandler(self.getPDBRef())
+        inputPDB.write_pdb(self._getExtraPath("reference.pdb"))
         refPDB = ContinuousFlexPDBHandler(self.alignRefPDB.get().getFileName())
         arrDCD = dcd2numpyArr(self._getExtraPath("coords.dcd"))
         nframe, natom,_ =arrDCD.shape
         alignXMD = md.MetaData()
 
         # find matching index between reference and pdbs
-        if self.matchingType.get() == 1:
+        if self.matchingType.get() == MATCHING_PDB_CHAIN:
             idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=refPDB, matchingType=0)
             refPDB.select_atoms(idx_matching_atoms[:, 1])
-        elif self.matchingType.get() == 2:
+        elif self.matchingType.get() == MATCHING_PDB_SEG:
             idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=refPDB, matchingType=1)
             refPDB.select_atoms(idx_matching_atoms[:, 1])
         else:
             idx_matching_atoms = None
-        refPDB.write_pdb(self._getExtraPath("reference.pdb"))
 
         # loop over all pdbs
         for i in range(nframe):
             print("Aligning PDB %i ... " %i)
 
             # rotate
-            if self.matchingType.get() != 0 :
+            if self.matchingType.get() != MATCHING_PDB_NONE :
                 coord = arrDCD[i][idx_matching_atoms[:, 0]]
             else:
                 coord = arrDCD[i]
@@ -203,7 +206,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
     def createOutputStep(self):
         pdbset = self._createSetOfPDBs("outputPDBs")
         arrDCD = dcd2numpyArr(self._getExtraPath("coords.dcd"))
-        refPDB = ContinuousFlexPDBHandler(self._getExtraPath("reference.pdb"))
+        refPDB = ContinuousFlexPDBHandler(self.getPDBRef())
 
         nframe, natom,_ = arrDCD.shape
         for i in range(nframe):
@@ -238,8 +241,6 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             r2 = p2.getTransform()
             rot = r2.getRotationMatrix()
             tran = np.array(r2.getShifts()) / inputSet.getSamplingRate()
-            # middle = np.ones(3) * p1.getDim()[0]/2 * inputSet.getSamplingRate()
-            # new_tran = np.dot(middle, rot) + tran
             new_trans = np.zeros((4, 4))
             new_trans[:3, 3] = tran
             new_trans[:3, :3] = rot

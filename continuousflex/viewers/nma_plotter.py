@@ -243,6 +243,16 @@ def plotArray2D(ax, data, vvmin=None, vvmax=None, s = None, alpha = None, cbar_l
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
+
+    #Limit the number of points to 100000 otherwise, it slow down too much
+    npoints = len(xdata)
+    maxpoints = 100000
+    if npoints > maxpoints :
+        scale = npoints//maxpoints
+        xdata = np.array(xdata)[::scale]
+        ydata = np.array(ydata)[::scale]
+        weights = np.array(weights)[::scale]
+        
     if vvmin:
         cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
     else:
@@ -255,6 +265,16 @@ def plotArray2D_xy(ax, data, vvmin=None, vvmax=None, s = None, alpha = None):
     xdata = data.getXData()
     ydata = data.getYData()
     weights = data.getWeights()
+
+    #Limit the number of points to 100000 otherwise, it slow down too much
+    npoints = len(xdata)
+    maxpoints = 100000
+    if npoints > maxpoints :
+        scale = npoints//maxpoints
+        xdata = np.array(xdata)[::scale]
+        ydata = np.array(ydata)[::scale]
+        weights = np.array(weights)[::scale]
+
     if vvmin:
         cax = ax.scatter(xdata, ydata, c=weights, vmin=vvmin.get(), vmax=vvmax.get(), s=s, alpha=alpha)
     else:

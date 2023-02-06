@@ -33,12 +33,14 @@ import os
 import glob
 from matplotlib.pyplot import cm
 
+COMPARE_PDB_INIT = 0
+COMPARE_PDB_OTHER = 1
 
-class GenesisViewer(ProtocolViewer):
+class FlexGenesisViewer(ProtocolViewer):
     """ Visualization of results from the GENESIS protocol
     """
-    _label = 'viewer genesis'
-    _targets = [ProtGenesis]
+    _label = 'MD-NMMD-Genesis Viewer'
+    _targets = [FlexProtGenesis]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def _defineParams(self, form):
@@ -61,25 +63,10 @@ class GenesisViewer(ProtocolViewer):
                                ' "1,3-5" -> [1,3,4,5]'
                                ' "1, 2, 4" -> [1,2,4]')
 
-        form.addParam('compareToPDB', params.BooleanParam, default=False,
-                        label="Compare to external PDB",
-                        help='TODO')
-
-        group = form.addGroup('External PDB',condition= "compareToPDB")
-        group.addParam('targetPDB', params.PathParam, default=None,
-                        label="Target PDB (s)", important=True,
-                        help=' Target PDBs to compute RMSD against. Atom mathcing is performed between '
-                             ' the output PDBs and the target PDBs. Use the file pattern as file location with /*.pdb',
-                       condition= "compareToPDB")
-        group.addParam('referencePDB', params.PathParam, default="",
-                        label="Intial PDB",
-                        help='Atom matching will ignore the output PDB and will use the initial PDB instead.',
-                        expertLevel=params.LEVEL_ADVANCED,condition= "compareToPDB")
-
-        group.addParam('alignTarget', params.BooleanParam, default=False,
-                        label="Align Target PDB",
-                        help='TODO',condition= "compareToPDB")
-
+        form.addParam("numberCurvePerPlot",params.IntParam,default = 10,
+                      label="Number of curve per plot ", help="Defines the maximum number of curve"
+                      " per plot before averaging into one curve",expertLevel=params.LEVEL_ADVANCED
+                      )
         group = form.addGroup('Chimera 3D view')
         group.addParam('displayChimera', params.LabelParam,
                       label='Display results in Chimera',
@@ -95,15 +82,37 @@ class GenesisViewer(ProtocolViewer):
                       label='Display Potential Energy',
                       help='Show time series of the potentials used in MD simulation/Minimization')
 
-        group = form.addGroup('RMSD analysis', condition= "compareToPDB")
+        group = form.addGroup('RMSD analysis')
+        group.addParam('compareToPDB', params.EnumParam, default=COMPARE_PDB_INIT,
+                      label="Compare to ", choices=['initial PDB', 'another PDB'],
+                      help='Perform RMSD between the trajectory and another PDB')
+        group.addParam('targetPDB', params.PathParam, default=None,
+                        label="Target PDB (s)", important=True,
+                        help=' Target PDBs to compute RMSD against. Atom mathcing is performed between '
+                             ' the output PDBs and the target PDBs. Use the file pattern as file location with /*.pdb',
+                       condition= "compareToPDB==%i"%COMPARE_PDB_OTHER)
+        group.addParam('referencePDB', params.PathParam, default="",
+                        label="Intial PDB (optional)",
+                        help='Atom matching will replace the structural information of the output PDBs by the new PDB ',
+                        expertLevel=params.LEVEL_ADVANCED,condition= "compareToPDB==%i"%COMPARE_PDB_OTHER)
+
+        group.addParam('alignTarget', params.BooleanParam, default=False,
+                        label="Align Target PDB",
+                        help='Rigid body align (rotation +translation) the PDBs before RMSD analysis',
+                       condition= "compareToPDB==%i"%COMPARE_PDB_OTHER)
+
         group.addParam('displayRMSDts', params.LabelParam,
-                      label='Display RMSD time series',
-                      help='TODO',condition= "compareToPDB")
+                      label='Display RMSD time series')
 
         group.addParam('displayRMSD', params.LabelParam,
-                      label='Display final RMSD',
-                      help='TODO',condition= "compareToPDB")
+                      label='Display final RMSD')
 
+        if self.protocol.simulationType.get() == SIMULATION_NMMD\
+                or self.protocol.simulationType.get() == SIMULATION_RENMMD:
+            group = form.addGroup('NMMD')
+            group.addParam('displayNMMD', params.LabelParam,
+                          label='Display normal modes time series',
+                          help='Show normal mode amplitude time series during the simulation')
 
         if self.protocol.EMfitChoice.get() != EMFIT_NONE:
             group = form.addGroup('Cryo EM fitting')
@@ -116,6 +125,7 @@ class GenesisViewer(ProtocolViewer):
             'displayChimera': self._plotChimera,
             'displayEnergy': self._plotEnergy,
             'displayCC': self._plotCC,
+            'displayNMMD': self._plotNMMD,
             'displayRMSDts': self._plotRMSDts,
             'displayRMSD': self._plotRMSD,
             'displayTrajVMD': self._plotTrajVMD,
@@ -137,7 +147,7 @@ class GenesisViewer(ProtocolViewer):
                     count+=1
                     f.write("color #%s lime \n"%count)
 
-            if self.compareToPDB.get():
+            if self.compareToPDB.get() == COMPARE_PDB_OTHER:
                 f.write("open %s \n" % os.path.abspath(self.getTargetPDB(index)))
                 count+=1
                 f.write("color #%s orange \n"%count)
@@ -161,7 +171,7 @@ class GenesisViewer(ProtocolViewer):
             f.write("mol new %s.pdb waitfor all\n" % self.protocol.getInputPDBprefix(index))
             f.write("mol addfile %s.dcd waitfor all\n" % self.getOutputPrefixAll(index)[0])
 
-            if self.protocol.forcefield.get() == FORCEFIELD_CHARMM:
+            if self.protocol.getForceField()== FORCEFIELD_CHARMM:
                 f.write("mol modstyle 0 0 NewCartoon \n")
             else:
                 f.write("mol modstyle 0 0 Tube \n")
@@ -173,14 +183,14 @@ class GenesisViewer(ProtocolViewer):
                 f.write("mol modstyle 1 0 Isosurface 0.5 0 0 0 1 1  \n")
                 f.write("mol modmaterial 1 0 Transparent \n")
 
-            if self.compareToPDB.get():
+            if self.compareToPDB.get() == COMPARE_PDB_OTHER:
                 targetFile = self.getTargetPDB(index)
                 f.write("set nf [molinfo top get numframes]\n")
                 f.write("mol new %s waitfor all\n" %targetFile)
                 f.write( "for {set i 1 } {$i < $nf} {incr i} {\n")
                 f.write( "animate dup frame 0 1\n")
                 f.write("}\n")
-                if self.protocol.forcefield.get() == FORCEFIELD_CHARMM:
+                if self.protocol.getForceField() == FORCEFIELD_CHARMM:
                     f.write("mol modstyle 0 1 NewCartoon \n")
                 else:
                     f.write("mol modstyle 0 1 Tube \n")
@@ -218,7 +228,27 @@ class GenesisViewer(ProtocolViewer):
 
         self.genesisPlotter(title="Energy (kcal/mol)", data=enelist, ndata=len(enelist),
                             nrep=len(enelist[0]), labels=labels)
+    def _plotNMMD(self, paramName):
+        nm = {}
+        for i in self.getSimulationList():
+            outputPrefix = self.getOutputPrefixAll(i)
+            for j in outputPrefix:
+                log_file = readLogFile(j + ".log")
+                for e in range(self.protocol.getNumberOfNormalModes()):
+                    nm_name = "NM_AMP%s"%str(e+1).zfill(3)
+                    if nm_name in log_file:
+                        if nm_name in nm :
+                            nm[nm_name].append(log_file[nm_name])
+                        else:
+                            nm[nm_name] = [log_file[nm_name]]
+        nmlist =[]
+        labels=[]
+        for i in nm :
+            labels.append(i)
+            nmlist.append(nm[i])
 
+        self.genesisPlotter(title="Normal Mode Amplitude", data=nmlist, ndata=len(nmlist),
+                            nrep=len(nmlist[0]), labels=labels)
     def _plotEnergyDetail(self):
         ene_default = ["BOND", "ANGLE", "UREY-BRADLEY", "DIHEDRAL", "IMPROPER", "CMAP", "VDWAALS", "ELECT", "NATIVE_CONTACT",
                "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
@@ -269,9 +299,9 @@ class GenesisViewer(ProtocolViewer):
 
     def genesisPlotter(self, title, data, ndata, nrep, labels):
         plotter = FlexPlotter()
+        nmax = self.numberCurvePerPlot.get()
         ax = plotter.createSubPlot(title, "", title)
-        nmax= 10
-        colors = [cm.get_cmap("tab10", 10)(i) for i in range(nmax) ]
+        colors = [cm.get_cmap("tab10", nmax)(i) for i in range(nmax) ]
 
         for i in range(ndata):
             if ndata <= nmax and nrep > 1:
@@ -291,9 +321,7 @@ class GenesisViewer(ProtocolViewer):
                 if 1 < nrep <= nmax:
                     if ndata == 1 :
                         ax.plot(x, data[i][j], color= colors[j], alpha=0.5, label="#%i"%(j+1))
-                    # else:
-                    #     ax.plot(x, data[i][j], color= colors[i], alpha=0.5)
-                if nrep == 1 and ndata <= 10:
+                if nrep == 1 and ndata <= nmax:
                     ax.plot(x, data[i][j], color= colors[i],label=labels[i])
         if ndata > nmax :
             try:
@@ -318,8 +346,11 @@ class GenesisViewer(ProtocolViewer):
             ref_pdb = ContinuousFlexPDBHandler(self.referencePDB.get())
         else:
             ref_pdb = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix()+".pdb")
-        target_pdb = ContinuousFlexPDBHandler(self.getTargetPDB())
-        idx_matchin_atoms = ref_pdb.matchPDBatoms(reference_pdb=target_pdb, ca_only=True)
+        if self.compareToPDB.get()  == 1:
+            target_pdb = ContinuousFlexPDBHandler(self.getTargetPDB())
+            idx_matchin_atoms = ref_pdb.matchPDBatoms(reference_pdb=target_pdb, ca_only=True)
+        else:
+            idx_matchin_atoms = None
 
         # Get RMSD list
         rmsd = []
@@ -336,7 +367,10 @@ class GenesisViewer(ProtocolViewer):
                 rmsd_curr = []
 
                 inputPDB = ContinuousFlexPDBHandler(self.protocol.getInputPDBprefix(i)+".pdb")
-                targetPDB = ContinuousFlexPDBHandler(self.getTargetPDB(i))
+                if self.compareToPDB.get() == 1:
+                    targetPDB = ContinuousFlexPDBHandler(self.getTargetPDB(i))
+                else:
+                    targetPDB = ref_pdb
                 rmsd_curr.append(inputPDB.getRMSD(reference_pdb=targetPDB, align=self.alignTarget.get(), idx_matching_atoms=idx_matchin_atoms))
                 coord_arr = dcd2numpyArr(outprf + ".dcd")
                 for i in range(len(coord_arr)):
@@ -360,7 +394,10 @@ class GenesisViewer(ProtocolViewer):
         target_mols = []
         for i in self.getSimulationList():
             inputPDB = self.protocol.getInputPDBprefix(i)+".pdb"
-            targetPDB = self.getTargetPDB(i)
+            if self.compareToPDB.get() == 1:
+                targetPDB = self.getTargetPDB(i)
+            else:
+                targetPDB = inputPDB
             outputPrefs = self.getOutputPrefixAll(i)
             target_mols.append(ContinuousFlexPDBHandler(targetPDB))
             initial_mols.append(ContinuousFlexPDBHandler(inputPDB))
@@ -372,7 +409,10 @@ class GenesisViewer(ProtocolViewer):
             ref_mol = ContinuousFlexPDBHandler(self.referencePDB.get())
         else:
             ref_mol = initial_mols[0]
-        idx_match = ref_mol.matchPDBatoms(reference_pdb=target_mols[0],ca_only=True)
+        if self.compareToPDB.get() == 1:
+            idx_match = ref_mol.matchPDBatoms(reference_pdb=target_mols[0],ca_only=True)
+        else:
+            idx_match = None
         rmsdi=[]
         rmsdf=[]
         for i in range(len(self.getSimulationList())):

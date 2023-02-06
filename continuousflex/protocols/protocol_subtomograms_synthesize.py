@@ -48,6 +48,7 @@ import time
 import glob
 from joblib import dump
 from math import cos, sin, pi
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 
 NMA_ALIGNMENT_WAV = 0
@@ -581,6 +582,27 @@ class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
             else:
                 psi1 = np.random.normal(self.MeanPsi.get(), self.StdPsi.get())
 
+            # uniform over the sphere
+            if (self.psi.get() == ROTATION_UNIFORM) and\
+                (self.tilt.get()==ROTATION_UNIFORM) and \
+                    (self.rot.get()==ROTATION_UNIFORM) and \
+                    self.LowRot.get() == 0.0 and self.HighRot.get() == 360.0 and \
+                    self.LowTilt.get() == 0.0 and self.HighTilt.get() == 180.0 and \
+                    self.LowPsi.get() == 0.0 and self.HighPsi.get() == 360.0:
+                x1,x2,x3 = np.random.uniform(0,1,3)
+                R = np.array([
+                    [np.cos(2*np.pi*x1), np.sin(2*np.pi*x1), 0],
+                    [-np.sin(2*np.pi*x1), np.cos(2*np.pi*x1), 0],
+                    [0, 0, 1]
+                ])
+                v = np.array([[np.cos(2*np.pi*x2)*np.sqrt(x3),
+                              np.sin(2*np.pi*x2)*np.sqrt(x3),
+                              np.sqrt(1-x3)]])
+                H = np.eye(3) - 2*np.dot(v.T,v)
+                M = -np.dot(H,R)
+                trans_mat = np.zeros((4,4))
+                trans_mat[:3,:3] = M
+                rot1,tilt1,psi1,_,_,_ = matrix2eulerAngles(trans_mat)
 
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')
             params += " -o " + self._getExtraPath(str(i + 1).zfill(5) + '_df.vol')

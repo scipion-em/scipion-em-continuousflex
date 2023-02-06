@@ -21,6 +21,7 @@
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
 # **************************************************************************
+import numpy as np
 
 from continuousflex.protocols.protocol_genesis import *
 import pyworkflow.protocol.params as params
@@ -28,31 +29,38 @@ from sklearn import decomposition
 from xmipp3.convert import writeSetOfVolumes, writeSetOfParticles, readSetOfVolumes, readSetOfParticles
 from pwem.constants import ALIGN_PROJ
 from continuousflex.protocols.convert import matrix2eulerAngles
+from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
+from pwem.objects import SetOfNormalModes
+from .convert import rowToMode
+from xmipp3.base import XmippMdRow
 
+class FlexProtMDSPACE(FlexProtGenesis):
 
-class ProtNMMDRefine(ProtGenesis):
-    """ Protocol to perform NMMD refinement using GENESIS """
-    _label = 'NMMD refine'
+    """ Protocol to perform MDSPACE using GENESIS """
+    _label = 'MDSPACE'
 
     def __init__(self, **kwargs):
-        ProtGenesis.__init__(self, **kwargs)
+        FlexProtGenesis.__init__(self, **kwargs)
         self._iter = 0
         self._missing_pdbs = None
 
         # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
-        form.addSection(label='Refinement')
+        form.addSection(label='MDSPACE Refinement')
 
         form.addParam('numberOfIter', params.IntParam, label="Number of iterations", default=3,
-                      help="TODO", important=True)
+                      help="Number of round of fitting for MDSPACE", important=True)
 
         form.addParam('numberOfPCA', params.IntParam, label="Number of PCA component", default=5,
-                      help="TODO", important=True)
+                      help="Number of principal component to keep at each round", important=True)
 
-        ProtGenesis._defineParams(self, form)
+        FlexProtGenesis._defineParams(self, form)
 
 
     def _insertAllSteps(self):
+        # make path
+        self._insertFunctionStep("makePathStep")
+
         # Convert input PDB
         self._insertFunctionStep("convertInputPDBStep")
 
@@ -79,7 +87,7 @@ class ProtNMMDRefine(ProtGenesis):
                     self.warning("Warning : Can not use parallel computation for GENESIS,"
                                         " please install \"GNU parallel\". Running in linear mode.")
                 for i in range(self.getNumberOfSimulation()):
-                    inp_file = self._getExtraPath("INP_%s" % str(i + 1).zfill(6))
+                    inp_file = self.getGenesisInputFile(i)
                     outPref = self.getOutputPrefix(i)
                     self._insertFunctionStep("runSimulation", inp_file, outPref)
 
@@ -89,19 +97,13 @@ class ProtNMMDRefine(ProtGenesis):
 
             self._insertFunctionStep("updateAlignementStep")
 
-            if self.numberOfIter.get()-1 > iter_global:
+            self._insertFunctionStep("PCAStep")
 
-                self._insertFunctionStep("newIterationStep")
+            self._insertFunctionStep("runMinimizationStep")
 
-                self._insertFunctionStep("PCAStep")
-
-                self._insertFunctionStep("runMinimizationStep")
-
-
-        self._insertFunctionStep("prepareOutputStep")
+            self._insertFunctionStep("newIterationStep")
 
         self._insertFunctionStep("createOutputStep")
-
 
     def pdb2dcdStep(self):
         pdbs_matrix = []
@@ -157,37 +159,25 @@ class ProtNMMDRefine(ProtGenesis):
             alignXMD.setValue(md.MDL_IMAGE, "", index)
 
         numpyArr2dcd(arrDCD, self._getExtraPath("coords.dcd"))
-        alignXMD.write(self.getAlignementprefix())
+        alignXMD.write(self.getTransformation())
 
     def updateAlignementStep(self):
 
-        if self.EMfitChoice.get() == EMFIT_VOLUMES:
-            if self._iter == 0:
-                inputSet = self.inputVolume.get()
-            else:
-                inputSet = self._createSetOfVolumes("inputSet")
-                readSetOfVolumes(self.getAlignementprefix(self._iter-1), inputSet)
-                inputSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
-
-            inputAlignement = self._createSetOfVolumes("inputAlignement")
-            readSetOfVolumes(self.getAlignementprefix(), inputAlignement)
-            alignedSet = self._createSetOfVolumes("alignedSet")
+        if self._iter == 0:
+            inputSet = self.inputImage.get()
         else:
-            if self._iter == 0:
-                inputSet = self.inputImage.get()
-            else:
-                inputSet = self._createSetOfParticles("inputSet")
-                readSetOfParticles(self.getAlignementprefix(self._iter-1), inputSet)
-                inputSet.setSamplingRate(self.inputImage.get().getSamplingRate())
+            inputSet = self._createSetOfParticles("inputSet")
+            readSetOfParticles(self.getAlignementPrefix(self._iter-1), inputSet)
+            inputSet.setSamplingRate(self.inputImage.get().getSamplingRate())
 
-            inputAlignement = self._createSetOfParticles("inputAlignement")
-            readSetOfParticles(self.getAlignementprefix(), inputAlignement)
-            alignedSet = self._createSetOfParticles("alignedSet")
+        inputTransformation = self._createSetOfParticles("inputTransformation")
+        readSetOfParticles(self.getTransformation(), inputTransformation)
+        alignedSet = self._createSetOfParticles("alignedSet")
 
         alignedSet.setSamplingRate(inputSet.getSamplingRate())
         alignedSet.setAlignment(ALIGN_PROJ)
         iter1 = inputSet.iterItems()
-        iter2 = inputAlignement.iterItems()
+        iter2 = inputTransformation.iterItems()
         for i in range(self.getNumberOfSimulation()):
             p1 = iter1.__next__()
             r1 = p1.getTransform()
@@ -206,22 +196,8 @@ class ProtNMMDRefine(ProtGenesis):
             p1.setTransform(r1)
             alignedSet.append(p1)
 
-        if isinstance(inputSet, SetOfVolumes):
-            writeSetOfVolumes(alignedSet, self.getAlignementprefix())
-        else:
-            writeSetOfParticles(alignedSet, self.getAlignementprefix())
-
-        self._inputEMMetadata = md.MetaData(self.getAlignementprefix())
-
-    def newIterationStep(self):
-        inputPref = self.getInputPDBprefix()
-        self._iter += 1
-        if self._iter < self.numberOfIter.get():
-            inputPref_incr = self.getInputPDBprefix()
-            if self.getForceField() == FORCEFIELD_CHARMM:
-                runCommand("cp %s.psf %s.psf" % (inputPref, inputPref_incr))
-            elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
-                runCommand("cp %s.top %s.top" % (inputPref, inputPref_incr))
+        writeSetOfParticles(alignedSet, self.getAlignementPrefix())
+        self._inputEMMetadata = md.MetaData(self.getAlignementPrefix())
 
     def PCAStep(self):
 
@@ -234,56 +210,42 @@ class ProtNMMDRefine(ProtGenesis):
         pca = decomposition.PCA(n_components=numberOfPCA)
         Y = pca.fit_transform(pdbs_matrix)
 
-        pdb = ContinuousFlexPDBHandler(self.getPDBRef())
+        pdb = ContinuousFlexPDBHandler(self.getInputPDBprefix()+".pdb")
         pdb.coords = pca.mean_.reshape(pdbs_matrix.shape[1] // 3, 3)
 
         matrix = pca.components_.reshape(numberOfPCA,pdbs_matrix.shape[1]//3,3)
 
         # SAVE NEW inputs
-        pdb.write_pdb(self.getInputPDBprefix()+".pdb")
-        nm_file = self.getInputPDBprefix()+".nma"
+        pca_prefix = self.getPCAPrefix()
+        pdb.write_pdb(pca_prefix+".pdb")
+        nm_file = pca_prefix+".nma"
+        np.savetxt(pca_prefix+"_matrix.txt", Y)
         with open(nm_file, "w") as f:
             for i in range(numberOfPCA):
                 f.write(" VECTOR    %i       VALUE  0.0\n" % (i + 1))
                 f.write(" -----------------------------------\n")
                 for j in range(matrix.shape[1]):
-                    f.write(" %e   %e   %e\n" %  (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 1]))
-
-    def prepareOutputStep(self):
-        for i in range(self.getNumberOfSimulation()):
-            outPref = self._getExtraPath("output_%s"% str(i+1).zfill(6))
-            cat = "cat "
-            for j in range(self.numberOfIter.get()):
-                logfile =  self.getOutputPrefix(i,j)+".log"
-                if os.path.isfile(logfile):
-                    cat += logfile + " "
-            runCommand("%s > %s.log"%(cat, outPref))
-
-            dcdfile = self.getOutputPrefix(i,0) + ".dcd"
-            if os.path.isfile(dcdfile):
-                dcdarr= dcd2numpyArr(dcdfile)
-                for j in range(1,self.numberOfIter.get()):
-                    dcdfile = self.getOutputPrefix(i,j) + ".dcd"
-                    if os.path.isfile(dcdfile):
-                        try :
-                            dcdarr = np.concatenate((dcdarr, dcd2numpyArr(dcdfile)), axis=0)
-                        except ValueError:
-                            print("Incomplete DCD file")
-                numpyArr2dcd(dcdarr,outPref+ ".dcd")
-
-            pdbfile = self.getOutputPrefix(i)+".pdb"
-            if os.path.isfile(pdbfile):
-                runCommand("cp %s %s.pdb" % (pdbfile, outPref))
+                    f.write(" %e   %e   %e\n" %  (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 2]))
 
     def runMinimizationStep(self):
 
         # INP file name
-        inp_file = self._getExtraPath("INP_min")
-        outPref = self.getInputPDBprefix()+"_min"
+        inp_file = "%s/INP_min"%self.getGenFiles()
 
-        # Inputs files
+        # copy inputs
+        pcapref = self.getPCAPrefix()
+        tmppref = self._getExtraPath("tmp")
+        runCommand("cp %s.pdb %s.pdb"%(pcapref, tmppref))
+        runCommand("cp %s.nma %s.nma"%(pcapref, tmppref))
+        if self.getForceField() == FORCEFIELD_CHARMM:
+            runCommand("cp %s.psf %s.psf"%(self.getInputPDBprefix(), tmppref))
+        else:
+            runCommand("cp %s.top %s.top"%(self.getInputPDBprefix(), tmppref))
+
+        # Set Inputs files
         args = self.getDefaultArgs()
-        args["outputPrefix"]  = outPref
+        args["inputPDBprefix"]  = tmppref
+        args["outputPrefix"]  = self.getInputPDBprefix()+"_min"
         args["simulationType"]  = SIMULATION_MIN
         args["inputType"]  = INPUT_NEW_SIM
         args["n_steps"]  = 10000
@@ -293,12 +255,48 @@ class ProtNMMDRefine(ProtGenesis):
         createGenesisInput(inp_file, **args)
 
         # Run minimization
-        env = self.getGenesisEnv()
-        env.set("OMP_NUM_THREADS", str(self.numberOfThreads.get()))
-        runCommand("atdyn %s > %s.log"%(inp_file, outPref), env=env)
+        self.runSimulation(inp_file, self.getInputPDBprefix()+"_min")
 
-        # Copy output pdb
-        runCommand("cp %s.pdb %s.pdb"%(outPref, self.getInputPDBprefix()))
+    def newIterationStep(self):
+        for i in range(self.getNumberOfSimulation()):
+            outpref = self._getExtraPath("output_%s" % str(i + 1).zfill(6))
+            outpref_itr =self.getOutputPrefix(i)
+            runCommand("cat %s.log >> %s.log" % (outpref_itr,outpref))
+
+            dcdfile_itr = outpref_itr+ ".dcd"
+            if os.path.isfile(dcdfile_itr):
+                dcdfile = outpref+".dcd"
+                if os.path.isfile(dcdfile):
+                    try:
+                        dcdarr = np.concatenate((dcd2numpyArr(dcdfile),dcd2numpyArr(dcdfile_itr)), axis=0)
+                        numpyArr2dcd(dcdarr, dcdfile)
+                    except ValueError:
+                        print("Incomplete DCD file")
+                else:
+                    runCommand("cp %s %s"%(dcdfile_itr, dcdfile))
+
+            pdbfile = outpref_itr+".pdb"
+            if os.path.isfile(pdbfile):
+                runCommand("cp %s %s.pdb" % (pdbfile, outpref))
+
+        inputPref = self.getInputPDBprefix()
+        pcaPref = self.getPCAPrefix()
+
+        ############# INCREMENT ITERATION ###################
+        if self._iter < self.numberOfIter.get()-1:
+            self._iter += 1
+            print("New Iteration %i"%self._iter)
+            ###################################################
+
+            inputPref_incr = self.getInputPDBprefix()
+
+            runCommand("cp %s_min.pdb %s.pdb"%(inputPref, inputPref_incr))
+            runCommand("cp %s_min.rst %s.rst"%(inputPref, inputPref_incr))
+            runCommand("cp %s.nma %s.nma"%(pcaPref, inputPref_incr))
+            if self.getForceField() == FORCEFIELD_CHARMM:
+                runCommand("cp %s.psf %s.psf" % (inputPref, inputPref_incr))
+            elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
+                runCommand("cp %s.top %s.top" % (inputPref, inputPref_incr))
 
     def createGenesisInputStep(self):
         """
@@ -306,7 +304,7 @@ class ProtNMMDRefine(ProtGenesis):
         :return None:
         """
         for indexFit in range(self.getNumberOfSimulation()):
-            inp_file = self._getExtraPath("INP_%s" % str(indexFit + 1).zfill(6))
+            inp_file = self.getGenesisInputFile(indexFit)
             args = self.getDefaultArgs(indexFit)
             if self._iter != 0 :
                 args["inputType"] = INPUT_NEW_SIM
@@ -317,23 +315,62 @@ class ProtNMMDRefine(ProtGenesis):
             createGenesisInput(inp_file, **args)
 
     def createOutputStep(self):
-        ProtGenesis.createOutputStep(self)
+        FlexProtGenesis.createOutputStep(self)
 
-    def getPDBRef(self):
-        return self._getExtraPath("inputPDB_000001_iter_001.pdb")
+        runCommand("cp %s.pdb %s"%(self.getPCAPrefix(), self.getPath("atoms.pdb")))
+        pdb = AtomStruct(self._getPath("atoms.pdb"))
+        natoms = ContinuousFlexPDBHandler(self._getPath("atoms.pdb")).n_atoms
+        self._defineOutputs(outputMean=pdb)
+
+        makePath(self._getPath("modes"))
+        pc_file = self.getPCAPrefix()+".nma"
+        with open(pc_file, "r") as f:
+            for i in range(self.numberOfPCA.get()):
+                f.readline()
+                f.readline()
+                modefile = self._getPath("modes", "vec.%d" % (i + 1))
+                with open(modefile, "w") as fout:
+                    for j in range(natoms):
+                        fout.write(f.readline())
+        mdOut = MetaData()
+        for i in range(self.numberOfPCA.get()):
+            objId = mdOut.addObject()
+            modefile = self._getPath("modes", "vec.%d" % (i + 1))
+            mdOut.setValue(MDL_NMA_MODEFILE, modefile, objId)
+            mdOut.setValue(MDL_ORDER, i + 1, objId)
+            mdOut.setValue(MDL_ENABLED, 1, objId)
+        mdOut.write(self._getPath("modes.xmd"))
+        pcSet = SetOfNormalModes(filename=self._getPath("modes.sqlite"))
+        row = XmippMdRow()
+        for objId in mdOut:
+            row.readFromMd(mdOut, objId)
+            pcSet.append(rowToMode(row))
+        pcSet.setPdb(pdb)
+        self._defineOutputs(outputPCA=pcSet)
+
+    def getOutputPrefix(self, index=0):
+        return self._getExtraPath("output_%s_iter_%s" % (str(index + 1).zfill(6),str(self._iter+1).zfill(3)))
 
     def getInputPDBprefix(self, index=0):
-        return ProtGenesis.getInputPDBprefix(self) + "_iter_%s"% str(self._iter+1).zfill(3)
+        """
+        Get the input PDB prefix of the specified index
+        :param int index: index of input PDB
+        :return str: Input PDB prefix
+        """
+        prefix = self._getExtraPath("inputPDB_%s_iter_%s")
+        if self.getNumberOfInputPDB() == 1:
+            return prefix % (str(1).zfill(6),str(self._iter+1).zfill(3))
+        else:
+            return prefix % (str(index + 1).zfill(6),str(self._iter+1).zfill(3))
+    def getPCAPrefix(self):
+        return self._getExtraPath("pca_iter_%s" % (str(self._iter+1).zfill(3)))
 
-    def getOutputPrefix(self, index=0, itr=None):
+    def getAlignementPrefix(self, itr=None):
         if itr is None : itr = self._iter
-        prefix = self._getExtraPath("output_%s_iter_%s"%(
-            str(index+1).zfill(6), str(itr+1).zfill(3)))
-        return prefix
-
-    def getAlignementprefix(self, itr=None):
+        return "%s/alignement_iter_%s.xmd"%(self.getEmdFiles(),str(itr+1).zfill(3))
+    def getTransformation(self, itr=None):
         if itr is None : itr = self._iter
-        return self._getExtraPath("alignement_iter_%s.xmd"%str(itr+1).zfill(3))
+        return "%s/transformation_iter_%s.xmd"%(self.getEmdFiles(),str(itr+1).zfill(3))
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):
@@ -345,7 +382,7 @@ class ProtNMMDRefine(ProtGenesis):
         return errors
 
     def _citations(self):
-        return ['harastani2022continuousflex','vuillemot2022NMMD']
+        return ['vuillemot2023mdspace','vuillemot2022NMMD','harastani2022continuousflex']
 
     def _methods(self):
         return []

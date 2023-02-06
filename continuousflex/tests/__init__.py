@@ -5,6 +5,7 @@ from .test_structure_mapping import *
 from .test_workflow_subtomogram_synthesize import *
 from .test_workflow_TomoFlow import *
 from .test_workflow_GENESIS import *
+from .test_workflow_Deep_HEMNMA import *
 from pyworkflow.tests import DataSet
 
 files_dictionary = {'pdb': 'pdb/AK.pdb', 'particles': 'particles/img.stk', 'vol': 'volumes/AK_LP10.vol',

@@ -431,9 +431,9 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
             subtomogramMD.setValue(md.MDL_NMA, list(deformations), i+1)
 
         subtomogramMD.write(deformationFile)
-
     def copy_deformations(self):
         pdbs_list = [f for f in glob.glob(self.pdbs_path.get())]
+        pdbs_list.sort()
         # print(pdbs_list)
         # saving the list
         dump(pdbs_list, self._getExtraPath('pdb_list.pkl'))
@@ -442,7 +442,7 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         for pdbfn in pdbs_list:
             i += 1
             createLink(pdbfn, self._getExtraPath(str(i).zfill(5)+'_df.pdb'))
-            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i).zfill(5)+'_subtomogram'+'.vol'),
+            subtomogramMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i).zfill(5)+'_projected'+'.spi'),
                                    subtomogramMD.addObject())
         subtomogramMD.write(self._getExtraPath('GroundTruth.xmd'))
 

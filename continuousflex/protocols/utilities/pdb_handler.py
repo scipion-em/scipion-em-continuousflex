@@ -30,6 +30,7 @@ class ContinuousFlexPDBHandler:
         resAlter = []
         chainName = []
         resNum = []
+        insertion = []
         coords = []
         occ = []
         temp = []
@@ -42,7 +43,7 @@ class ContinuousFlexPDBHandler:
                 if len(spl) > 0:
                     if (spl[0] == 'ATOM'):  # or (hetatm and spl[0] == 'HETATM'):
                         l = [line[:6], line[6:11], line[12:16], line[16], line[17:21], line[21], line[22:26],
-                             line[30:38],
+                             line[26], line[30:38],
                              line[38:46], line[46:54], line[54:60], line[60:66], line[72:76], line[76:78]]
                         l = [i.strip() for i in l]
                         atom.append(l[0])
@@ -52,11 +53,12 @@ class ContinuousFlexPDBHandler:
                         resName.append(l[4])
                         chainName.append(l[5])
                         resNum.append(l[6])
-                        coords.append([float(l[7]), float(l[8]), float(l[9])])
-                        occ.append(l[10])
-                        temp.append(l[11])
-                        chainID.append(l[12])
-                        elemName.append(l[13])
+                        insertion.append(l[7])
+                        coords.append([float(l[8]), float(l[9]), float(l[10])])
+                        occ.append(l[11])
+                        temp.append(l[12])
+                        chainID.append(l[13])
+                        elemName.append(l[14])
 
         atomNum = np.array(atomNum)
         atomNum[np.where(atomNum == "*****")[0]] = "-1"
@@ -69,6 +71,7 @@ class ContinuousFlexPDBHandler:
         self.resAlter = np.array(resAlter, dtype='<U1')
         self.chainName = np.array(chainName, dtype='<U1')
         self.resNum = np.array(resNum).astype(int)
+        self.insertion = np.array(insertion, dtype='<U1')
         self.coords = np.array(coords).astype(float)
         self.occ = np.array(occ).astype(float)
         self.temp = np.array(temp).astype(float)
@@ -105,6 +108,7 @@ class ContinuousFlexPDBHandler:
                 resName = self.resName[i].ljust(4)  # resname#1s
                 chainName = self.chainName[i].rjust(1)  # Astring
                 resNum = str(self.resNum[i]).rjust(4)  # resnum
+                insertion = self.insertion[i].ljust(1)  # resnum
                 coordx = str('%8.3f' % (float(self.coords[i][0]))).rjust(8)  # x
                 coordy = str('%8.3f' % (float(self.coords[i][1]))).rjust(8)  # y
                 coordz = str('%8.3f' % (float(self.coords[i][2]))).rjust(8)  # z\
@@ -112,9 +116,9 @@ class ContinuousFlexPDBHandler:
                 temp = str('%6.2f' % self.temp[i]).rjust(6)  # temp
                 chainID = str(self.chainID[i]).ljust(4)  # elname
                 elemName = str(self.elemName[i]).rjust(2)  # elname
-                file.write("%s%s %s%s%s%s%s    %s%s%s%s%s      %s%s\n" % (
+                file.write("%s%s %s%s%s%s%s%s   %s%s%s%s%s      %s%s\n" % (
                 atom, atomNum, atomName, resAlter, resName, chainName, resNum,
-                coordx, coordy, coordz, occ, temp, chainID, elemName))
+                insertion, coordx, coordy, coordz, occ, temp, chainID, elemName))
             file.write("END\n")
         print("\t Done \n")
 
@@ -133,19 +137,25 @@ class ContinuousFlexPDBHandler:
             chain_name_list1 = self.get_chain_list(chainType=0)
             chain_name_list2 = reference_pdb.get_chain_list(chainType=0)
             n_matching_chain_names = sum([i in chain_name_list2 for i in chain_name_list1])
+            print("Chains list 1  : "+str(chain_name_list1))
+            print("Chains list 1  : "+str(chain_name_list2))
+            print("Number of match : "+str(n_matching_chain_names))
 
             chain_id_list1 = self.get_chain_list(chainType=1)
             chain_id_list2 = reference_pdb.get_chain_list(chainType=1)
             n_matching_chain_ids = sum([i in chain_id_list2 for i in chain_id_list1])
+            print("Seg list 1  : "+str(chain_id_list1))
+            print("Seg list 1  : "+str(chain_id_list1))
+            print("Number of match : "+str(n_matching_chain_ids))
 
-            if n_matching_chain_ids >n_matching_chain_names:
+            if n_matching_chain_ids == 0 and n_matching_chain_names == 0 :
+                raise RuntimeError("No matching chains")
+            elif n_matching_chain_ids >=n_matching_chain_names:
                 matchingType = 1
                 print("\t Matching segments %s ... "%n_matching_chain_ids)
             elif  n_matching_chain_ids < n_matching_chain_names:
                 matchingType = 0
                 print("\t Matching chains %s ... "%n_matching_chain_names)
-            else:
-                raise RuntimeError("No matching chains")
 
 
         ids = []
@@ -235,6 +245,7 @@ class ContinuousFlexPDBHandler:
         self.resAlter = self.resAlter[idx]
         self.chainName = self.chainName[idx]
         self.resNum = self.resNum[idx]
+        self.insertion = self.insertion[idx]
         self.elemName = self.elemName[idx]
         self.occ = self.occ[idx]
         self.temp = self.temp[idx]
@@ -353,6 +364,7 @@ class ContinuousFlexPDBHandler:
                 new_idx += list(chain_idx[idx])
         self.select_atoms(np.array(new_idx))
 
+
     def atom_res_reorder(self):
         chains = list(set(self.chainID))
         chains.sort()
@@ -360,16 +372,21 @@ class ContinuousFlexPDBHandler:
         # reorder atoms and res
         for c in chains:
             chain_idx = self.get_chain(c)
-            past_resNum = self.resNum[chain_idx[0]]
             resNum = 1
+            previousRes = str(self.resNum[chain_idx[0]]) + self.insertion[chain_idx[0]]
             for i in range(len(chain_idx)):
-                if self.resNum[chain_idx[i]] != past_resNum:
-                    if self.resNum[chain_idx[i]] != past_resNum+1:
-                        print("ERROR : non sequential residue number in one segment")
-                    past_resNum = self.resNum[chain_idx[i]]
-                    resNum += 1
+                currentRes = str(self.resNum[chain_idx[i]]) + self.insertion[chain_idx[i]]
+
+                if currentRes != previousRes:
+                    previousRes = currentRes
+                    resNum +=1
                 self.resNum[chain_idx[i]] = resNum
                 self.atomNum[chain_idx[i]] = i + 1
+
+        #remove insertions :
+        for i in range(self.n_atoms) :
+            self.insertion[i] = " "
+
 
     def allatoms2ca(self):
         new_idx = []

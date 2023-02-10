@@ -314,16 +314,19 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             classDict = {}
             count = 0 #CLUSTERINGTAG
             for p in self.trajectoriesWindow.data:
-                clsId = str(int(p._weight)) #CLUSTERINGTAG
+                clsId = int(p._weight) #CLUSTERINGTAG
                 if clsId in classDict:
                     classDict[clsId].append(count)
                 else:
                     classDict[clsId] = [count]
                 count += 1
 
+            keys = list(classDict.keys())
+            keys.sort()
+
             if animtype == ANIMATION_AVG:
                 # compute avg
-                for i in classDict:
+                for i in keys:
                     coord_avg = np.mean(coords[np.array(classDict[i])], axis=0)
                     coords_list.append(coord_avg.reshape((initPDB.n_atoms, 3)))
 

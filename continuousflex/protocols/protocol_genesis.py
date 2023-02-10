@@ -42,7 +42,7 @@ from pyworkflow.utils.path import makePath
 import pwem.emlib.metadata as md
 import re
 
-class ProtGenesis(EMProtocol):
+class FlexProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
     _label = 'MD-NMMD-Genesis'
 
@@ -69,8 +69,8 @@ class ProtGenesis(EMProtocol):
 
         # INPUT_RESTART
         form.addParam('restartProt', params.PointerParam, label="Input GENESIS protocol",
-                      pointerClass="ProtGenesis",
-                       help='Provide a GENESIS protocol to restart.', condition="inputType==%i"%INPUT_RESTART)
+                      pointerClass="FlexProtGenesis",
+                       help='Provide a MD-NMMD-GENESIS protocol to restart.', condition="inputType==%i"%INPUT_RESTART)
 
         # INPUT_NEW_SIM
         form.addParam('inputPDB', params.PointerParam,
@@ -148,10 +148,11 @@ class ProtGenesis(EMProtocol):
                       help="Update frequency of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
 
-        group = form.addGroup('NMMD parameters', condition="simulationType==2 or simulationType==4")
+        group = form.addGroup('NMMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_NMMD,
+                               SIMULATION_RENMMD))
         group.addParam('inputModes', params.PointerParam, pointerClass="SetOfNormalModes", label='Input Modes',
-                       default=None,
-                       help="Input set of normal modes", condition="simulationType==2 or simulationType==4")
+                       default=None, allowsNull = True,
+                       help="Input set of normal modes")
         group.addParam('modeList', params.NumericRangeParam, expertLevel=params.LEVEL_ADVANCED,
                       label="Modes selection", allowsNull = True, default="",
                       help='Select the normal modes that will be used for analysis. \n'
@@ -167,15 +168,17 @@ class ProtGenesis(EMProtocol):
                            "to accelerate NM integration, however can make the simulation unstable.",
                        condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
-                      help="Mass value of Normal modes for NMMD", condition="simulationType==2 or simulationType==4",
-                      expertLevel=params.LEVEL_ADVANCED)
-        # group.addParam('nm_init', params.FileParam, label='NM init', default=None,
-        #               help="TODO", condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
-        group = form.addGroup('REMD parameters', condition="simulationType==3 or simulationType==4")
+                      help="Mass value of Normal modes for NMMD. Lower values accelerate the fitting but can make the "
+                           "simulation unstable",   expertLevel=params.LEVEL_ADVANCED)
+        group = form.addGroup('REMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
+                               SIMULATION_RENMMD))
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="Number of MD steps between replica exchanges", condition="simulationType==3 or simulationType==4")
+                      help="Number of MD steps between replica exchanges",
+                       condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
+                               SIMULATION_RENMMD))
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="Number of replicas for REMD", condition="simulationType==3 or simulationType==4")
+                      help="Number of replicas for REMD", condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
+                               SIMULATION_RENMMD))
 
         # MD params =================================================================================================
         form.addSection(label='MD parameters')
@@ -190,11 +193,11 @@ class ProtGenesis(EMProtocol):
                       help="Type of boundary condition. In case of implicit solvent, "
                            " GO models or vaccum simulation, choose No boundary")
         group.addParam('box_size_x', params.FloatParam, label='Box size X',
-                      help="Box size along the x dimension", condition="boundary==1")
+                      help="Box size along the x dimension", condition="boundary==%i"%BOUNDARY_PBC)
         group.addParam('box_size_y', params.FloatParam, label='Box size Y',
-                      help="Box size along the y dimension", condition="boundary==1")
+                      help="Box size along the y dimension", condition="boundary==%i"%BOUNDARY_PBC)
         group.addParam('box_size_z', params.FloatParam, label='Box size Z',
-                      help="Box size along the z dimension", condition="boundary==1")
+                      help="Box size along the z dimension", condition="boundary==%i"%BOUNDARY_PBC)
 
         group.addParam('electrostatics', params.EnumParam, label="Non-bonded interactions", default=1,
                       choices=['PME', 'Cutoff'],
@@ -230,9 +233,9 @@ class ProtGenesis(EMProtocol):
         group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
                       help="Initial and target temperature")
         group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
-                      help="Target pressure in the NPT ensemble", condition="ensemble==2")
+                      help="Target pressure in the NPT ensemble", condition="ensemble==%i"%ENSEMBLE_NPT)
 
-        group = form.addGroup('Contraints', condition="simulationType==1 or simulationType==3")
+        group = form.addGroup('Contraints', condition="simulationType==%i or simulationType==%i"%(SIMULATION_MD,SIMULATION_REMD))
         group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
                       default=False,
                       help="Turn on or off the SHAKE/RATTLE algorithms for covalent bonds involving hydrogen. "
@@ -274,41 +277,41 @@ class ProtGenesis(EMProtocol):
                        condition="EMfitChoice!=0", expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
-        group = form.addGroup('Volume Parameters', condition="EMfitChoice==1")
+        group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
         group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
                       label="Input volume", help='Select the target EM density volume',
-                      condition="EMfitChoice==1", important=True)
+                      condition="EMfitChoice==%i"%EMFIT_VOLUMES, important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==1")
+                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
         group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
-                      help="Center the volume to the origin", condition="EMfitChoice==1")
+                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
         group.addParam('origin_x', params.FloatParam, default=0, label="Origin X",
                       help="Origin of the first voxel in X direction (in Angstrom) ",
-                      condition="EMfitChoice==1 and not centerOrigin")
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
         group.addParam('origin_y', params.FloatParam, default=0, label="Origin Y",
                       help="Origin of the first voxel in Y direction (in Angstrom) ",
-                      condition="EMfitChoice==1 and not centerOrigin")
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
         group.addParam('origin_z', params.FloatParam, default=0, label="Origin Z",
                       help="Origin of the first voxel in Z direction (in Angstrom) ",
-                      condition="EMfitChoice==1 and not centerOrigin")
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
 
         # Images
-        group = form.addGroup('Image Parameters', condition="EMfitChoice==2")
+        group = form.addGroup('Image Parameters', condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('inputImage', params.PointerParam, pointerClass="SetOfParticles",
                       label="Input images ", help='Select the target image set',
-                      condition="EMfitChoice==2", important=True)
+                      condition="EMfitChoice==%i"%EMFIT_IMAGES, important=True)
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
-                      help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==2")
+                      help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleChoice', params.EnumParam, default=0, label='Projection angles',
                        choices=['same as image set', 'from xmipp file', 'from other set'],
                       help="Source of projection angles to align the input PDB with the set of images",
-                       condition="EMfitChoice==2")
+                       condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
                       help="Xmipp metadata file with projection alignement parameters ",
-                       condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_XMIPP))
+                       condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_XMIPP))
         group.addParam('projectAngleImage', params.PointerParam, pointerClass="SetOfParticles",
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
-                      condition="EMfitChoice==2 and projectAngleChoice==%i"%(PROJECTION_ANGLE_IMAGE))
+                      condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
 
         form.addParallelSection(threads=1, mpi=NUMBER_OF_CPU)
         # --------------------------- INSERT steps functions --------------------------------------------
@@ -594,9 +597,6 @@ class ProtGenesis(EMProtocol):
         Create output PDB or set of PDBs
         :return None:
         """
-        # if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
-        #     self.convertReusOutputDcd()
-
         # Extract the pdb from the DCD file in case of SPDYN
         if self.md_program.get() == PROGRAM_SPDYN:
             for i in range(self.getNumberOfSimulation()):
@@ -922,54 +922,6 @@ class ProtGenesis(EMProtocol):
         else:
             return None,None,None
 
-    # def convertReusOutputDcd(self):
-    #
-    #     for i in range(self.getNumberOfSimulation()):
-    #         remdPrefix = self._getExtraPath("output_%s_remd" % str(i + 1).zfill(6))
-    #         tmpPrefix =  self._getExtraPath("output_%s_tmp" % str(i + 1).zfill(6))
-    #         inp_file = self._getExtraPath("INP_tmp")
-    #
-    #         with open(inp_file, "w") as f:
-    #             f.write("\n[INPUT]\n")
-    #             f.write("reffile = %s.pdb # PDB file\n" % self.getInputPDBprefix(i))
-    #             f.write("remfile = %s{}.rem  # REMD parameter ID file\n" % remdPrefix)
-    #             f.write("dcdfile = %s{}.dcd  # DCD file\n" % remdPrefix)
-    #             f.write("logfile = %s{}.log  # REMD energy log file\n" % remdPrefix)
-    #
-    #             f.write("\n[OUTPUT]\n")
-    #             f.write("trjfile = %s{}.dcd  # coordinates sorted by temperature\n"% tmpPrefix)
-    #             f.write("logfile = %s{}.log  # energy log sorted by temperature\n"% tmpPrefix)
-    #
-    #             f.write("\n[SELECTION]\n")
-    #             f.write("group1 = all  # selection group 1\n")
-    #
-    #             f.write("\n[FITTING]\n")
-    #             f.write("fitting_method = NO  # [NO,TR,TR+ROT,TR+ZROT,XYTR,XYTR+ZROT]\n")
-    #             f.write("mass_weight = NO  # mass-weight is not applied\n")
-    #
-    #             f.write("\n[OPTION]\n")
-    #             f.write("check_only = NO\n")
-    #             f.write("convert_type = PARAMETER  # (REPLICA/PARAMETER)\n")
-    #             f.write("num_replicas = %i  # total number of replicas used in the simulation\n"% self.nreplica.get())
-    #             f.write("convert_ids =  # selected index (empty = all)(example: 1 2 5-10)\n")
-    #             f.write("nsteps = %i  # nsteps in [DYNAMICS]\n" % self.n_steps.get())
-    #             f.write("exchange_period = %i  # exchange_period in [REMD]\n" % self.exchange_period.get())
-    #             f.write("crdout_period = %i  # crdout_period in [DYNAMICS]\n" % self.eneout_period.get() )
-    #             f.write("eneout_period = %i  # eneout_period in [DYNAMICS]\n" % self.crdout_period.get() )
-    #             f.write("trjout_format = DCD  # (PDB/DCD)\n")
-    #             f.write("trjout_type = COOR+BOX  # (COOR/COOR+BOX)\n")
-    #             f.write("trjout_atom = 1  # atom group\n")
-    #             f.write("centering = NO\n")
-    #             f.write("pbc_correct = NO\n")
-    #
-    #         runCommand("remd_convert %s"%inp_file, env=self.getGenesisEnv())
-    #         for j in range(self.nreplica.get()):
-    #             repPrefix = self._getExtraPath("output_%s_remd%i" % (str(i + 1).zfill(6), j+1))
-    #             reptmpPrefix = self._getExtraPath("output_%s_tmp%i" % (str(i + 1).zfill(6), j+1))
-    #             runCommand("mv %s.dcd %s.dcd"%(reptmpPrefix,repPrefix))
-    #             runCommand("mv %s.log %s.log"%(reptmpPrefix,repPrefix))
-
-
 def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMprefix="", rstFile="", nm_number=0,
                        rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputRTF=None, inputPRM=None,
                        inputSTR=None, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
@@ -1054,8 +1006,6 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
         s += "nm_number = %i \n" % nm_number
         s += "nm_mass = %f \n" % nm_mass
         s += "nm_file = %s.nma \n" % inputPDBprefix
-        # if self.nm_init.get() is not None and self.nm_init.get() != "":
-        #     s += "nm_init = %s \n" % " ".join([str(i) for i in np.loadtxt(self.nm_init.get())[indexFit]])
         if nm_dt is None:
             s += "nm_dt = %f \n" % time_step
         else:

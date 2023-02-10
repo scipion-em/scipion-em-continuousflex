@@ -25,10 +25,13 @@ from pwem.protocols import ProtImportPdb
 from pwem.tests.workflows import TestWorkflow
 from pyworkflow.tests import setupTestProject, DataSet
 
-from continuousflex.protocols.protocol_mdspace import ProtMDSPACE
-from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages
-from continuousflex.viewers.viewer_genesis import *
+from continuousflex.protocols.protocol_mdspace import FlexProtMDSPACE
+from continuousflex.protocols import FlexProtNMA, NMA_CUTOFF_ABS, FlexProtSynthesizeImages, \
+    FlexProtDimredPdb, FlexProtAlignPdb,FlexProtGenesis
+from continuousflex.protocols.utilities.genesis_utilities import *
 
+from continuousflex.protocols.protocol_align_pdbs import PDB_SOURCE_OBJECT
+from continuousflex.protocols.protocol_pdb_dimred import PDB_SOURCE_ALIGNED, REDUCE_METHOD_PCA, REDUCE_METHOD_UMAP
 
 class TestMDSPACE(TestWorkflow):
     """ Test Class for MDSPACE. """
@@ -49,7 +52,7 @@ class TestMDSPACE(TestWorkflow):
         self.launchProtocol(protPdb4ake)
         # ------------------------- Genesis Min prot --------------------------------
 
-        protGenesisMin = self.newProtocol(ProtGenesis,
+        protGenesisMin = self.newProtocol(FlexProtGenesis,
                                           inputPDB=protPdb4ake.outputPdb,
                                           forcefield=FORCEFIELD_CAGO,
                                           inputType=INPUT_NEW_SIM,
@@ -96,20 +99,20 @@ class TestMDSPACE(TestWorkflow):
         self.launchProtocol(target_images)
 
         # ------------------------- MDSPACE --------------------------------
-        protMDSPACE = self.newProtocol(ProtMDSPACE,
+        protMDSPACE = self.newProtocol(FlexProtMDSPACE,
 
                                                  inputType=INPUT_RESTART,
                                                  restartProt=protGenesisMin,
 
-                                                 simulationType=SIMULATION_MD,
+                                                 simulationType=SIMULATION_NMMD,
                                                  time_step=0.001,
                                                  n_steps=5000,
                                                  eneout_period=100,
                                                  crdout_period=100,
                                                  nbupdate_period=10,
-                                                 # nm_number=6,
-                                                 # nm_mass=1.0,
-                                                 # inputModes=protNMA.outputModes,
+                                                 nm_number=6,
+                                                 nm_mass=1.0,
+                                                 inputModes=protNMA.outputModes,
 
                                                  implicitSolvent=IMPLICIT_SOLVENT_NONE,
                                                  electrostatics=ELECTROSTATICS_CUTOFF,
@@ -137,3 +140,27 @@ class TestMDSPACE(TestWorkflow):
 
         # Launch Fitting
         self.launchProtocol(protMDSPACE)
+
+        # ------------------------- align pdbs --------------------------------
+        alignPDBs = self.newProtocol(FlexProtAlignPdb,
+                                     pdbSource = PDB_SOURCE_OBJECT,
+                                     setOfPDBs = protMDSPACE.outputPDBs,
+                                     alignRefPDB=protGenesisMin.outputPDB,
+                                     createOutput=False)
+        alignPDBs.setObjLabel('Align output PDBs')
+        self.launchProtocol(alignPDBs)
+
+        # ------------------------- PCA --------------------------------
+        protPca = self.newProtocol(FlexProtDimredPdb,
+                                   pdbSource=PDB_SOURCE_ALIGNED,
+                                   alignPdbProt=alignPDBs,
+                                   method=REDUCE_METHOD_PCA)
+        protPca.setObjLabel('PCA')
+        self.launchProtocol(protPca)
+        # ------------------------- UMAP --------------------------------
+        protUmap = self.newProtocol(FlexProtDimredPdb,
+                                   pdbSource=PDB_SOURCE_ALIGNED,
+                                   alignPdbProt=alignPDBs,
+                                   method=REDUCE_METHOD_UMAP)
+        protUmap.setObjLabel('UMAP')
+        self.launchProtocol(protUmap)

@@ -43,6 +43,7 @@ from continuousflex.protocols.protocol_pdb_dimred import REDUCE_METHOD_PCA, REDU
 from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClusterSet
 from .plotter import FlexPlotter
 import os
+from matplotlib.ticker import MaxNLocator
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -72,10 +73,10 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def _defineParams(self, form):
         form.addSection(label='Visualization')
 
-        group = form.addGroup("Display Singular Values")
-        group.addParam('displayPcaSingularValues', LabelParam,
-                      label="Display singular values",
-                      help="The values should help you see how many dimensions are in the data ",
+        group = form.addGroup("Display Explained Variance")
+        group.addParam('displayPcaExplainedVariance', LabelParam,
+                      label="Display Explained Variance",
+                      help="Display the amount of variance explained by each PCA component. ",
                       condition=self.protocol.method.get()==REDUCE_METHOD_PCA)
 
         group = form.addGroup("Display PCA")
@@ -94,8 +95,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                        label='Axes to display' )
         group.addParam('freeEnergySize', IntParam, default=100,
                        label='Sampling size' )
-        group.addParam('freeEnergyInterpolation', StringParam, default="bilinear",
-                       label='Interpolation method' )
 
         group = form.addGroup("Animation tool")
 
@@ -107,10 +106,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         group.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
                       label='(Optional) Em data for cluster animation',  allowsNull=True,
                       help="Provide a EM data set that match the PDB data set to visualize animation on 3D reconstructions")
-
-
-        # form.addParam("dataSet", StringParam, default= "", label="Data set label")
-
 
         group = form.addGroup("Figure parameters")
 
@@ -158,7 +153,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                 'displayPCA': self._displayPCA,
                 'displayFreeEnergy': self._displayFreeEnergy,
                 'displayAnimationtool': self._displayAnimationtool,
-                'displayPcaSingularValues': self.viewPcaSinglularValues,
+                'displayPcaExplainedVariance': self.viewPcaExplainedVariance,
                 }
 
     def _displayPCA(self, paramName):
@@ -198,7 +193,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         data = np.array([p.getData()[axes] for p in self.getData()])
         size =self.freeEnergySize.get()
-        interp =self.freeEnergyInterpolation.get()
         xmin = np.min(data[:,0])
         xmax = np.max(data[:,0])
         ymin = np.min(data[:,1])
@@ -215,9 +209,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("Free energy", "component "+axes_str[0],
                                         "component " + axes_str[1])
-        im = ax.imshow(img.T[::-1,:],
-                   cmap = "jet", interpolation=interp,
-                   extent=[xmin,xmax,ymin,ymax])
+        # im = ax.imshow(img.T[::-1,:],
+        #            cmap = "jet", interpolation=interp,
+        #            extent=[xmin,xmax,ymin,ymax])
+
+        xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
+        im = ax.contourf(xx, yy, img, cmap='jet')
         cbar = plotter.figure.colorbar(im)
         cbar.set_label("$\Delta G / k_{B}T$")
         plotter.show()
@@ -249,11 +246,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         return [self.trajectoriesWindow]
 
 
-    def viewPcaSinglularValues(self, paramName):
+    def viewPcaExplainedVariance(self, paramName):
         pca = load(self.protocol._getExtraPath('pca_pickled.joblib'))
-        fig = plt.figure('PCA singlular values')
-        plt.stem(np.arange(1, len(pca.singular_values_)+1), pca.singular_values_)
-        plt.show()
+        plotter = FlexPlotter()
+        ax = plotter.createSubPlot("Explained variance","PCA component", "EV (%)")
+        ax.stem(np.arange(1, len(pca.explained_variance_ratio_)+1), 100*pca.explained_variance_ratio_)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plotter.show()
         pass
 
     def getData(self):
@@ -264,18 +263,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
     def loadData(self):
         data = Data()
         pdb_matrix = np.loadtxt(self.protocol.getOutputMatrixFile())
-
-        # dataSet = self.dataSet.get().split(";")
-        # n_data = len(dataSet)
-        # if n_data >1:
-        #     weights = []
-        #     for i in range(n_data):
-        #         if dataSet[i] != '':
-        #             for j in range(int(dataSet[i])):
-        #                 weights.append(i/n_data)
-        #
-        # else:
-        #
         weights = [0 for i in range(pdb_matrix.shape[0])]
 
         for i in range(pdb_matrix.shape[0]):

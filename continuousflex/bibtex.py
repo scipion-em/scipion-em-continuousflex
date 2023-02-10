@@ -126,6 +126,15 @@ url = {https://www.sciencedirect.com/science/article/pii/S0022283622000523},
 author = {Rémi Vuillemot and Osamu Miyashita and Florence Tama and Isabelle Rouiller and Slavica Jonic}
 }
 
+@article{vuillemot2023mdspace,
+  title={MDSPACE: Extracting continuous conformational landscapes from cryo-EM single particle datasets using 3D-to-2D flexible fitting based on Molecular Dynamics simulation},
+  author={Vuillemot, R{\'e}mi and Mirzaei, Alex and Harastani, Mohamad and Hamitouche, Ilyes and Fr{\'e}chin, L{\'e}o and Klaholz, Bruno P and Miyashita, Osamu and Tama, Florence and Rouiller, Isabelle and Jonic, Slavica},
+  journal={Journal of Molecular Biology},
+  pages={167951},
+  year={2023},
+  publisher={Elsevier}
+}
+
 @article{kobayashi2017genesis,
 author = {Kobayashi, Chigusa and Jung, Jaewoon and Matsunaga, Yasuhiro and Mori, Takaharu and Ando, Tadashi and Tamura, Koichi and Kamiya, Motoshi and Sugita, Yuji},
 title = {GENESIS 1.1: A hybrid-parallel molecular dynamics simulator with enhanced sampling algorithms on multiple computational platforms},

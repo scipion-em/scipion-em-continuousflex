@@ -64,7 +64,7 @@ class TestGENESIS(TestWorkflow):
 
 
         # Energy min
-        protGenesisMin = self.newProtocol(ProtGenesis,
+        protGenesisMin = self.newProtocol(FlexProtGenesis,
             inputType = INPUT_TOPOLOGY,
             topoProt = protGenTopo,
 
@@ -98,11 +98,11 @@ class TestGENESIS(TestWorkflow):
         potential_ene = readLogFile(log_file)["POTENTIAL_ENE"]
 
         # Assert that the potential energy is decreasing
-        print("\n\n//////////////////////////////////////////////")
-        print(protGenesisMin.getObjLabel())
-        print("Initial potential energy : %.2f kcal/mol"%potential_ene[0])
-        print("Final potential energy : %.2f kcal/mol"%potential_ene[-1])
-        print("//////////////////////////////////////////////\n\n")
+        # print("\n\n//////////////////////////////////////////////")
+        # print(protGenesisMin.getObjLabel())
+        # print("Initial potential energy : %.2f kcal/mol"%potential_ene[0])
+        # print("Final potential energy : %.2f kcal/mol"%potential_ene[-1])
+        # print("//////////////////////////////////////////////\n\n")
 
         assert(potential_ene[0] > potential_ene[-1])
 
@@ -114,7 +114,7 @@ class TestGENESIS(TestWorkflow):
         protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
 
-        protGenesisFitNMMD = self.newProtocol(ProtGenesis,
+        protGenesisFitNMMD = self.newProtocol(FlexProtGenesis,
           inputType=INPUT_RESTART,
           restartProt = protGenesisMin,
 
@@ -170,13 +170,13 @@ class TestGENESIS(TestWorkflow):
         rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
-        print("\n\n//////////////////////////////////////////////")
-        print(protGenesisFitNMMD.getObjLabel())
-        print("Initial CC : %.2f"%cc[0])
-        print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd_inp)
-        print("Final rmsd : %.2f Ang"%rmsd_out)
-        print("//////////////////////////////////////////////\n\n")
+        # print("\n\n//////////////////////////////////////////////")
+        # print(protGenesisFitNMMD.getObjLabel())
+        # print("Initial CC : %.2f"%cc[0])
+        # print("Final CC : %.2f"%cc[-1])
+        # print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        # print("Final rmsd : %.2f Ang"%rmsd_out)
+        # print("//////////////////////////////////////////////\n\n")
 
         assert(cc[0] < cc[-1])
         assert(rmsd_inp >rmsd_out)
@@ -190,7 +190,7 @@ class TestGENESIS(TestWorkflow):
         self.launchProtocol(protPdb4ake)
 
 
-        protGenesisMin = self.newProtocol(ProtGenesis,
+        protGenesisMin = self.newProtocol(FlexProtGenesis,
             inputPDB = protPdb4ake.outputPdb,
             forcefield = FORCEFIELD_CAGO,
             inputType = INPUT_NEW_SIM,
@@ -223,7 +223,7 @@ class TestGENESIS(TestWorkflow):
         protNMA.setObjLabel('NMA')
         self.launchProtocol(protNMA)
 
-        protGenesisFitMD = self.newProtocol(ProtGenesis,
+        protGenesisFitMD = self.newProtocol(FlexProtGenesis,
 
                                             inputType=INPUT_RESTART,
                                             restartProt=protGenesisMin,
@@ -277,20 +277,20 @@ class TestGENESIS(TestWorkflow):
         rmsd_out = out.getRMSD(reference_pdb=ref,idx_matching_atoms=matchingAtoms,align=True)
 
         # Assert that the CC is increasing and  the RMSD is decreasing
-        print("\n\n//////////////////////////////////////////////")
-        print(protGenesisFitMD.getObjLabel())
-        print("Initial CC : %.2f"%cc[0])
-        print("Final CC : %.2f"%cc[-1])
-        print("Initial rmsd : %.2f Ang"%rmsd_inp)
-        print("Final rmsd : %.2f Ang"%rmsd_out)
-        print("//////////////////////////////////////////////\n\n")
+        # print("\n\n//////////////////////////////////////////////")
+        # print(protGenesisFitMD.getObjLabel())
+        # print("Initial CC : %.2f"%cc[0])
+        # print("Final CC : %.2f"%cc[-1])
+        # print("Initial rmsd : %.2f Ang"%rmsd_inp)
+        # print("Final rmsd : %.2f Ang"%rmsd_out)
+        # print("//////////////////////////////////////////////\n\n")
         assert (cc[0] < cc[-1])
         assert (rmsd_inp > rmsd_out)
 
 
         # Need at least 4 cores
         if NUMBER_OF_CPU >= 4:
-            protGenesisFitREUS = self.newProtocol(ProtGenesis,
+            protGenesisFitREUS = self.newProtocol(FlexProtGenesis,
 
                                                   inputType=INPUT_RESTART,
                                                   restartProt=protGenesisMin,
@@ -354,18 +354,16 @@ class TestGENESIS(TestWorkflow):
             rmsd_out1 = out1.getRMSD(reference_pdb=ref, idx_matching_atoms=matchingAtoms, align=True)
 
             # Assert that the CCs are increasing
-            print("\n\n//////////////////////////////////////////////")
-            print(protGenesisFitREUS.getObjLabel())
-            print("Initial CC : [%.2f , %.2f]" % (cc1[0],cc2[0]))
-            print("Final CC :[%.2f , %.2f]" % (cc1[-1],cc2[-1]))
-            print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd_inp,rmsd_inp))
-            print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd_out1,rmsd_out2))
-            print("//////////////////////////////////////////////\n\n")
+            # print("\n\n//////////////////////////////////////////////")
+            # print(protGenesisFitREUS.getObjLabel())
+            # print("Initial CC : [%.2f , %.2f]" % (cc1[0],cc2[0]))
+            # print("Final CC :[%.2f , %.2f]" % (cc1[-1],cc2[-1]))
+            # print("Initial rmsd : [%.2f , %.2f] Ang" % (rmsd_inp,rmsd_inp))
+            # print("Final rmsd : [%.2f , %.2f] Ang" % (rmsd_out1,rmsd_out2))
+            # print("//////////////////////////////////////////////\n\n")
 
             assert (cc1[0] < cc1[-1])
             assert (cc2[0] < cc2[-1])
             assert (rmsd_inp> rmsd_out1)
-            # assert (rmsd1[-1] < 3.0)
             assert (rmsd_inp > rmsd_out2)
-            # assert (rmsd2[-1] < 3.0)
 

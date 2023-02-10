@@ -33,6 +33,8 @@ getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 import datetime
 from scipion.install.funcs import VOID_TGZ
 import continuousflex
+import subprocess
+import re
 
 _logo = "logo.png"
 
@@ -169,9 +171,15 @@ class Plugin(pwem.Plugin):
                        default=True)
 
         target_branch = "merge_genesis_1.4"
+        output = subprocess.getoutput("gfortran --version")
+        gfotran_version = int(re.search(r'\d+', output).group())
+        if gfotran_version >= 10 :
+            FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
+        else:
+            FFLAGS = "-ffree-line-length-none"
         cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
-                      ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"-fallow-argument-mismatch -ffree-line-length-none\";' \
-                      ' make install;' % (target_branch, lib_path)
+                      ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
+                      ' make install;' % (target_branch, lib_path, FFLAGS)
         env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MD-NMMD-Genesis', tar="void.tgz",
                        commands=[(cmd , ["bin/atdyn"])],

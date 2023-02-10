@@ -34,27 +34,27 @@ from pwem.objects import SetOfNormalModes
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
 
-class ProtMDSPACE(ProtGenesis):
+class FlexProtMDSPACE(FlexProtGenesis):
 
-    """ Protocol to perform NMMD refinement using GENESIS """
-    _label = 'NMMD refine'
+    """ Protocol to perform MDSPACE using GENESIS """
+    _label = 'MDSPACE'
 
     def __init__(self, **kwargs):
-        ProtGenesis.__init__(self, **kwargs)
+        FlexProtGenesis.__init__(self, **kwargs)
         self._iter = 0
         self._missing_pdbs = None
 
         # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
-        form.addSection(label='Refinement')
+        form.addSection(label='MDSPACE Refinement')
 
         form.addParam('numberOfIter', params.IntParam, label="Number of iterations", default=3,
-                      help="TODO", important=True)
+                      help="Number of round of fitting for MDSPACE", important=True)
 
         form.addParam('numberOfPCA', params.IntParam, label="Number of PCA component", default=5,
-                      help="TODO", important=True)
+                      help="Number of principal component to keep at each round", important=True)
 
-        ProtGenesis._defineParams(self, form)
+        FlexProtGenesis._defineParams(self, form)
 
 
     def _insertAllSteps(self):
@@ -163,23 +163,6 @@ class ProtMDSPACE(ProtGenesis):
 
     def updateAlignementStep(self):
 
-        # if self.EMfitChoice.get() == EMFIT_VOLUMES:
-        #     if self._iter == 0:
-        #         inputSet = self.inputVolume.get()
-        #     else:
-        #         inputSet = self._createSetOfVolumes("inputSet")
-        #         readSetOfVolumes(self.getAlignementPrefix(self._iter-1), inputSet)
-        #         inputSet.setSamplingRate(self.inputVolume.get().getSamplingRate())
-        #
-        #     inputAlignement = self._createSetOfVolumes("inputAlignement")
-        #     readSetOfVolumes(self.getAlignementPrefix(), inputAlignement)
-        #     alignedSet = self._createSetOfVolumes("alignedSet")
-        # else:
-
-        print("Reading previous alignement : %s" % self.getAlignementPrefix(self._iter - 1))
-        print("Reading new transformation : %s" % self.getTransformation())
-
-
         if self._iter == 0:
             inputSet = self.inputImage.get()
         else:
@@ -213,11 +196,7 @@ class ProtMDSPACE(ProtGenesis):
             p1.setTransform(r1)
             alignedSet.append(p1)
 
-        # if isinstance(inputSet, SetOfVolumes):
-        #     writeSetOfVolumes(alignedSet, self.getAlignementPrefix())
-        # else:
         writeSetOfParticles(alignedSet, self.getAlignementPrefix())
-
         self._inputEMMetadata = md.MetaData(self.getAlignementPrefix())
 
     def PCAStep(self):
@@ -336,7 +315,7 @@ class ProtMDSPACE(ProtGenesis):
             createGenesisInput(inp_file, **args)
 
     def createOutputStep(self):
-        ProtGenesis.createOutputStep(self)
+        FlexProtGenesis.createOutputStep(self)
 
         runCommand("cp %s.pdb %s"%(self.getPCAPrefix(), self.getPath("atoms.pdb")))
         pdb = AtomStruct(self._getPath("atoms.pdb"))
@@ -368,6 +347,7 @@ class ProtMDSPACE(ProtGenesis):
             pcSet.append(rowToMode(row))
         pcSet.setPdb(pdb)
         self._defineOutputs(outputPCA=pcSet)
+
     def getOutputPrefix(self, index=0):
         return self._getExtraPath("output_%s_iter_%s" % (str(index + 1).zfill(6),str(self._iter+1).zfill(3)))
 
@@ -402,7 +382,7 @@ class ProtMDSPACE(ProtGenesis):
         return errors
 
     def _citations(self):
-        return ['harastani2022continuousflex','vuillemot2022NMMD']
+        return ['vuillemot2023mdspace','vuillemot2022NMMD','harastani2022continuousflex']
 
     def _methods(self):
         return []

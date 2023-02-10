@@ -44,8 +44,6 @@ You should also consider having VMD on your system for visualization.
 We assume that VMD is installed on your system in "/usr/local/lib/vmd".
 If VMD is installed but does not work, you may run the command "scipion3 config" and look for VMD_HOME in the config file (the config file is usually at ~/scipion3/config/scipion.conf)
 
-Note: GENESIS is not installed by default in continuousflex. To install GENESIS, you can use the Plugin Manager, or run the command line "scipion3 installb MD-NMMD-Genesis-1.0"
-
 Note: Matlab with its image processing toolbox is optional. It will only be needed if missing-wedge correction using Monte Carlo or volume denoising using BM4D are to be used
 We assume that Matlab is installed on your system in "~/programs/Matlab".
 If Matlab is installed but does not work, you may run the command "scipion3 config" and look for MATLAB_HOME in the config file (the config file is usually at ~/scipion3/config/scipion.conf)
@@ -57,17 +55,18 @@ versions > 3.3.0
 Protocols
 ---------
 
-* HEMNMA: Hybrid Electron Microscopy Normal Mode Analysis method to interpret heterogeneity of a set of single particle cryo-EM images in terms of continuous macromolecular conformational transitions, based on normal mode analysis [1-3]
-* StructMap: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions, based on normal mode analysis [4]
-* HEMNMA-3D: Extension of HEMNMA to continuous conformational variability analysis of macromolecules in cryo-ET subtomograms (in vitro and in situ) [5]
-* TomoFlow: Method for analyzing continuous conformational variability of macromolecules in cryo-ET subtomograms (in vitro and in situ) based on 3D dense optical flow [6]
-* NMMD: Software to perform cryo-EM flexible fitting using a combination of Normal Mode (NM) analysis and Molecular Dynamics (MD) simulations  implemented in GENESIS [7]
-* DeepHEMNMA: A deep learning extension of HEMNMA  [8]
+* **HEMNMA**: Hybrid Electron Microscopy Normal Mode Analysis method to interpret heterogeneity of a set of single particle cryo-EM images in terms of continuous macromolecular conformational transitions, based on normal mode analysis [1-3]
+* **StructMap**: Structural Mapping method to interpret heterogeneity of a set of single particle cryo-EM maps in terms of continuous conformational transitions, based on normal mode analysis [4]
+* **HEMNMA-3D**: Extension of HEMNMA to continuous conformational variability analysis of macromolecules in cryo-ET subtomograms (in vitro and in situ) [5]
+* **TomoFlow**: Method for analyzing continuous conformational variability of macromolecules in cryo-ET subtomograms (in vitro and in situ) based on 3D dense optical flow [6]
+* **NMMD**: Software to perform cryo-EM flexible fitting using a combination of Normal Mode (NM) analysis and Molecular Dynamics (MD) simulations  implemented in GENESIS [7]
+* **DeepHEMNMA**: A deep learning extension of HEMNMA  [8]
+* **MDSPACE**: Approach for extracting atomic-resolution landscapes of continuous conformational variability of biomolecular complexes from cryo electron microscopy (cryo-EM) single particle images based on a new 3D-to-2D flexible fitting method, which uses molecular dynamics (MD) simulation and is embedded in an iterative conformational-landscape refinement scheme. [11]
 
 Notes:
 
 * The plugin additionally provides the test data and automated tests of the protocols in Scipion 3. The following two types of tests of HEMNMA and HEMNMA-3D can be produced by running, in the terminal, "scipion3 tests continuousflex.tests.test_workflow_HEMNMA" and “scipion3 tests continuousflex.tests.test_workflow_HEMNMA3D”, respectively: (1) tests of the entire protocol with the flexible references coming from an atomic structure and from an EM map; and (2) test of the alignment module (test run using 5 MPI threads). The automated tests of the TomoFlow method are also available and can be run using scipion3 tests continuousflex.tests.test_workflow_TomoFlow. 
-* GENESIS is not installed by default in continuousflex. To install GENESIS, go to the plugin manager and, under continuousflex plugin, and check install GENESIS. The automated tests of GENESIS provide an example of cryo-EM flexible fitting of an atomic model into a 3D density map using NMMD for CHARMM and C-Alpha Go model. The tests can be produced by running "scipion3 tests continuousflex.tests.test_workflow_GENESIS" (you need at least 2 MPI cores for these tests).
+* The automated tests of GENESIS provide an example of cryo-EM flexible fitting of an atomic model into a 3D density map using NMMD for CHARMM and C-Alpha Go model. The tests can be produced by running "scipion3 tests continuousflex.tests.test_workflow_GENESIS" (you need at least 2 MPI cores for these tests).
 * HEMNMA additionally provides tools for synthesizing noisy and CTF-affected single particle cryo-EM images with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [9-10].
 * HEMNMA-3D additionally provides tools for synthesizing noisy, CTF and missing wedge affected cryo-ET tomograms and single particle subtomograms with flexible or rigid biomolecular conformations, for several types of conformational distributions, from a given atomic structure or an EM map. One part of the noise is applied on the ideal projections before and the other after the CTF, as described in [9-10].
 * A reproduction of some utility codes with their corresponding licenses are contained in this plugin for subtomogram averaging, missing wedge correction, denoising and data reading. These codes are not used in the methods above, but they are made optional for data preprocessing and visualization.
@@ -96,6 +95,8 @@ References
 [9] C.O.S. Sorzano, S. Jonic, R. Núñez-Ramírez, N. Boisset, J.M. Carazo: Fast, robust, and accurate determination of transmission electron microscopy contrast transfer function. Journal of Structural Biology 2007, 160: 249-262. `[Journal] <https://doi.org/10.1016/j.jsb.2007.08.013>`__
 
 [10] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Journal] <https://www.sciencedirect.com/science/article/pii/S0304399105000173>`__
+
+[11] Vuillemot R, Mirzaei A, Harastani M, Hamitouche I, Fréchin L, Klaholz BP, Miyashita O, Tama F, Rouiller I, Jonic S. MDSPACE: Extracting continuous conformational landscapes from cryo-EM single particle datasets using 3D-to-2D flexible fitting based on Molecular Dynamics simulation. Journal of Molecular Biology. 2023 Jan 10:167951. `[Journal] <https://www.sciencedirect.com/science/article/abs/pii/S0022283623000074>`__
 
 Citation
 ----------

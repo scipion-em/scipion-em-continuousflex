@@ -24,22 +24,20 @@
 import joblib
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
-from pyworkflow.utils.path import makePath, copyFile
+from pyworkflow.utils.path import makePath
 from pyworkflow.protocol import params
 from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
 from pwem.objects import SetOfNormalModes, AtomStruct
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
-from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
+from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd,dcd2numpyArr
 
 import numpy as np
 import glob
 from sklearn import decomposition
 from joblib import dump
 
-from .utilities.genesis_utilities import dcd2numpyArr
 from .utilities.pdb_handler import ContinuousFlexPDBHandler
-import pwem.emlib.metadata as md
 import continuousflex
 from continuousflex import Plugin
 from subprocess import check_call

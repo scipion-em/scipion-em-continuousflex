@@ -40,6 +40,9 @@ PDB_SOURCE_PATTERN = 0
 PDB_SOURCE_OBJECT = 1
 PDB_SOURCE_TRAJECT = 2
 
+MATCHING_PDB_NONE = 0
+MATCHING_PDB_CHAIN = 1
+MATCHING_PDB_SEG = 2
 
 class FlexProtAlignPdb(ProtAnalysis3D):
     """ Protocol to perform rigid body alignement on a set of PDB files. """
@@ -48,7 +51,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
-        form.addParam('pdbSource', EnumParam, default=0,
+        form.addParam('pdbSource', EnumParam, default=PDB_SOURCE_PATTERN,
                       label='Source of PDBs',
                       choices=['File pattern', 'Object', 'Trajectory Files'],
                       help='Use the file pattern as file location with /*.pdb')
@@ -83,12 +86,10 @@ class FlexProtAlignPdb(ProtAnalysis3D):
                       label="Step of the trajectory",
                       help='Step to skip points in the trajectory', expertLevel=params.LEVEL_ADVANCED)
 
-
-
         form.addParam('alignRefPDB', params.PointerParam, pointerClass='AtomStruct',
                       label="Alignement Reference PDB",
                       help='Reference PDB to align the PDBs with')
-        form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=0,
+        form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=MATCHING_PDB_NONE,
                       choices=['All PDBs are matching', 'Match chain name + residue no',
                                'Match segment name + residue no'],
                       help="Method to find atomic coordinates correspondence between the pdb set "
@@ -163,10 +164,10 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         alignXMD = md.MetaData()
 
         # find matching index between reference and pdbs
-        if self.matchingType.get() == 1:
+        if self.matchingType.get() == MATCHING_PDB_CHAIN:
             idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=refPDB, matchingType=0)
             refPDB.select_atoms(idx_matching_atoms[:, 1])
-        elif self.matchingType.get() == 2:
+        elif self.matchingType.get() == MATCHING_PDB_SEG:
             idx_matching_atoms = inputPDB.matchPDBatoms(reference_pdb=refPDB, matchingType=1)
             refPDB.select_atoms(idx_matching_atoms[:, 1])
         else:
@@ -177,7 +178,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             print("Aligning PDB %i ... " %i)
 
             # rotate
-            if self.matchingType.get() != 0 :
+            if self.matchingType.get() != MATCHING_PDB_NONE :
                 coord = arrDCD[i][idx_matching_atoms[:, 0]]
             else:
                 coord = arrDCD[i]

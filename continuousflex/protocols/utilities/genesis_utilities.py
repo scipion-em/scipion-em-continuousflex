@@ -87,7 +87,6 @@ def readLogFile(log_file):
                     for i in range(1,len(header)):
                         dic[header[i]] = []
                 else:
-                    print(line)
                     splitline = line.split()
                     if len(splitline) >= len(header):
                         for i in range(1,len(header)):

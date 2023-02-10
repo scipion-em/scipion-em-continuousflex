@@ -34,7 +34,7 @@ from .viewer_nma_dimred_vol import FlexDimredNMAVolViewer
 from .viewer_image_synthesize import FlexProtSynthesizeImageViewer
 from .viewer_heteroflow_dimred import FlexDimredHeteroFlowViewer
 from .viewer_heteroflow import FlexHeteroFlowViewer
-from .viewer_mdspace import MDSPACEViewer
-from .viewer_genesis import GenesisViewer
+from .viewer_mdspace import FlexMDSPACEViewer
+from .viewer_genesis import FlexGenesisViewer
 from .viewer_deephemnma_train import FlexDeepHEMNMAViewer
 from .viewer_deephemnma_infer import FlexDeepHEMNMAinferViewer

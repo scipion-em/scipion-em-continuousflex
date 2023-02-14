@@ -148,20 +148,16 @@ class FlexProtGenesis(EMProtocol):
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
                       help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
-                           "to accelerate NM integration, however can make the simulation unstable.",
-                       condition="simulationType==2 or simulationType==4")
+                           "to accelerate NM integration, however can make the simulation unstable.")
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD. Lower values accelerate the fitting but can make the "
                            "simulation unstable")
         group = form.addGroup('REMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
                                SIMULATION_RENMMD))
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="Number of MD steps between replica exchanges",
-                       condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
-                               SIMULATION_RENMMD))
+                      help="Number of MD steps between replica exchanges")
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="Number of replicas for REMD", condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
-                               SIMULATION_RENMMD))
+                      help="Number of replicas for REMD")
 
         # MD params =================================================================================================
         form.addSection(label='MD parameters')
@@ -235,7 +231,7 @@ class FlexProtGenesis(EMProtocol):
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
 
-        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
                            " This parameters must be tuned with caution : "
@@ -245,19 +241,19 @@ class FlexProtGenesis(EMProtocol):
                            " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
-                      , condition="EMfitChoice!=0")
+                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=0")
+                      condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         " than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=0")
+                      condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
                        help="Number of MD iteration every which the EM poential is updated",
-                       condition="EMfitChoice!=0")
+                       condition="EMfitChoice!=%i"%EMFIT_NONE)
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)

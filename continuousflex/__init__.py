@@ -59,7 +59,7 @@ class Plugin(pwem.Plugin):
         cls._defineVar(MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR, cls.getActivationCmd(CF_VERSION))
         cls._defineEmVar(CONTINUOUSFLEX_HOME, continuousflex.__path__[0])
         cls._defineEmVar(NMA_HOME,'nma')
-        cls._defineEmVar(GENESIS_HOME, 'MD-NMMD-Genesis-'+MD_NMMD_GENESIS_VERSION)
+        cls._defineEmVar(GENESIS_HOME, 'MDTools-'+MD_NMMD_GENESIS_VERSION)
         cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
         cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
@@ -177,10 +177,10 @@ class Plugin(pwem.Plugin):
             FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
         else:
             FFLAGS = "-ffree-line-length-none"
-        cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf -fi ;' \
+        cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf -fi ;' \
                       ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
                       ' make install;' % (target_branch, lib_path, FFLAGS)
-        env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
-                       buildDir='MD-NMMD-Genesis', tar="void.tgz",
+        env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
+                       buildDir='MDTools', tar="void.tgz",
                        commands=[(cmd , ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)

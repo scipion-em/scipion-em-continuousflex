@@ -28,13 +28,13 @@
 import os
 import pwem
 from continuousflex.constants import *
-import pyworkflow.utils as pwutils
-getXmippPath = pwem.Domain.importFromPlugin("xmipp3.base", 'getXmippPath')
 import datetime
 from scipion.install.funcs import VOID_TGZ
 import continuousflex
 import subprocess
 import re
+import pyworkflow.utils as pwutils
+
 
 _logo = "logo.png"
 
@@ -43,45 +43,30 @@ MD_NMMD_GENESIS_VERSION = "1.1"
 MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
-CF_VERSION = 'git'
 
-__version__ = "3.3.0"
+__version__ = "3.3.14"
+
 
 class Plugin(pwem.Plugin):
     _homeVar = CONTINUOUSFLEX_HOME
     _pathVars = [CONTINUOUSFLEX_HOME]
-    _supportedVersions = [VV]
+    # We only support our latest release, we can't afford supporting previous releases
+    _supportedVersions = [__version__]
     _url = CONTINUOUSFLEX_URL
 
     @classmethod
     def _defineVariables(cls):
         cls._defineVar(MODEL_CONTINUOUSFLEX_ACTIVATION_VAR, '')
-        cls._defineVar(MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR, cls.getActivationCmd(CF_VERSION))
-        cls._defineEmVar(CONTINUOUSFLEX_HOME, continuousflex.__path__[0])
-        cls._defineEmVar(NMA_HOME,'nma')
-        cls._defineEmVar(GENESIS_HOME, 'MDTools-'+MD_NMMD_GENESIS_VERSION)
-        cls._defineVar(VMD_HOME,'/usr/local/lib/vmd')
+        cls._defineEmVar(CONTINUOUSFLEX_HOME, 'ContinuousFlex-' + __version__)
+        cls._defineVar(MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR, cls.getActivationCmd(__version__))
+        cls._defineEmVar(NMA_HOME, 'nma')
+        cls._defineEmVar(GENESIS_HOME, 'MDTools-' + MD_NMMD_GENESIS_VERSION)
+        cls._defineVar(VMD_HOME, '/usr/local/lib/vmd')
         cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
-    # TODO: These were copied from Xmipp, and we need to review if they are still needed here
     @classmethod
-    def getEnviron(cls, xmippFirst=True):
-        """ Create the needed environment for Xmipp programs. """
+    def getEnviron(cls):
         environ = pwutils.Environ(os.environ)
-        pos = pwutils.Environ.BEGIN if xmippFirst else pwutils.Environ.END
-        environ.update({
-            'PATH': getXmippPath('bin'),
-            'LD_LIBRARY_PATH': getXmippPath('lib'),
-            'PYTHONPATH': getXmippPath('pylib')
-        }, position=pos)
-
-        # environ variables are strings not booleans
-        if os.environ.get('CUDA', 'False') != 'False':
-            environ.update({
-                'PATH': os.environ.get('CUDA_BIN', ''),
-                'LD_LIBRARY_PATH': os.environ.get('NVCC_LIBDIR', '')
-            }, position=pos)
-
         return environ
 
     @classmethod
@@ -96,11 +81,15 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def getActivationCmd(cls, version):
-        return 'conda activate continuousflex-' + version
+        return 'conda activate {}'.format(cls.getVar(CONTINUOUSFLEX_HOME))
 
     @classmethod
     def isVersionActive(cls):
-        return cls.getActiveVersion().startswith(VV)
+        return cls.getActiveVersion().startswith(__version__)
+
+    @classmethod
+    def getCondaLibPath(cls):
+        return cls.getVar(CONTINUOUSFLEX_HOME) + '/lib'
 
     @classmethod
     def defineBinaries(cls, env):
@@ -110,77 +99,48 @@ class Plugin(pwem.Plugin):
             installed = "last-pull-%s.txt" % datetime.datetime.now().strftime("%y%h%d-%H%M%S")
 
             cf_commands = []
-            cf_commands.append((getCondaInstallation(version), 'env-created.txt'))
+            cf_commands.append((getCondaInstallation(version, installed), installed))
 
-            env.addPackage('continuousflex', version=version,
+            env.addPackage('ContinuousFlex', version=version,
                            commands=cf_commands,
                            tar=VOID_TGZ,
                            default=True)
 
-        def getCondaInstallation(version):
+        def getCondaInstallation(version, txtfile):
             installationCmd = cls.getCondaActivationCmd()
-            installationCmd += 'conda create -y -n continuousflex-' + version + ' --clone scipion3 && '
-            installationCmd += cls.getActivationCmd(version) + ' && '
-            installationCmd += 'conda install -y -c conda-forge arpack lapack && '
-            installationCmd += 'pip install umap-learn && '
-            installationCmd += 'touch env-created.txt'
+            # If nvcc is not in the path, don't install Optical Flow or DeepLearning Libraries
+            if os.popen('which nvcc').read() == "":
+                config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
+            else:
+                config_path = continuousflex.__path__[0] + '/conda.yaml'
+            installationCmd += 'conda env create -f {} --prefix .'.format(config_path)
+            installationCmd += ' && touch {}'.format(txtfile)
             return installationCmd
 
-        # Install the conda environment with lapack and arpack
-        defineCondaInstallation(CF_VERSION)
-
-
-        # Cleaning the nma binaries files and folder before expanding
-        if os.path.exists(env.getEmFolder() + '/nma*.tgz'):
-            os.system('rm ' + env.getEmFolder() + '/nma*.tgz')
-
-
-        cmd_1 = cls.getCondaActivationCmd() + ' ' + cls.getActivationCmd(CF_VERSION)
-        cmd = cmd_1  + ' && cd ElNemo; make; mv nma_* ..'
-
-        lib_path = os.environ['CONDA_PYTHON_EXE'][:-10] + 'envs/continuousflex-' + CF_VERSION + '/lib'
-        # linking blas, arpack and lapack libraries to scipion lin
-        os.system('ln -f -s ' + lib_path + '/libopenblas* ' + env.getLibFolder())
-        os.system('ln -f -s ' + lib_path + '/libarpack* ' + env.getLibFolder())
-        os.system('ln -f -s ' + lib_path + '/liblapack* ' + env.getLibFolder())
+        # Install the conda environment followed by the binaries
+        defineCondaInstallation(__version__)
         env.addPackage('nma', version='3.1',
                        url='https://github.com/continuousflex-org/NMA_basic_code/raw/master/nma_v5.tar',
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
-                       commands=[(cmd ,'nma_elnemo_pdbmat'),
+                       commands=[('cd ElNemo; make; mv nma_* ..', 'nma_elnemo_pdbmat'),
                                  ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
-                                  % lib_path, 'nma_diag_arpack')],
+                                  % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
-
-        cmd = cmd_1 + ' && pip install -U torch==1.10.1 torchvision==0.11.2 tensorboard==2.8.0 tqdm==4.64.0' \
-                      ' protobuf==3.20.3' \
-                      ' && touch DeepLearning_Installed'
-        env.addPackage('DeepLearning', version='1.0',
-                       tar='void.tgz',
-                       buildDir='DeepLearning',
-                       commands=[(cmd ,'DeepLearning_Installed')],
-                       default=True)
-
-        cmd = cmd_1 + ' && pip install -U setuptools==63.4.3 pycuda==2020.1 farneback3d==0.1.3' \
-                      ' && touch OpticalFlow_Installed'
-        env.addPackage('OpticalFlow', version='1.0',
-                       tar='void.tgz',
-                       commands=[(cmd,'OpticalFlow_Installed')],
-                       neededProgs=[''],
-                       default=True)
 
         target_branch = "merge_genesis_1.4"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
-        if gfotran_version >= 10 :
+        if gfotran_version >= 10:
             FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
         else:
             FFLAGS = "-ffree-line-length-none"
-        cmd = cmd_1 + ' && git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf -fi ;' \
-                      ' ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\";' \
-                      ' make install;' % (target_branch, lib_path, FFLAGS)
+
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
-                       commands=[(cmd , ["bin/atdyn"])],
+                       commands=[(
+                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf '
+                           '-fi ; ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\"; make install;'
+                           % (target_branch, cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)

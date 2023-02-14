@@ -37,6 +37,7 @@ import pwem.emlib.metadata as md
 from xmipp3.convert import (createItemMatrix, setXmippAttributes)
 from pyworkflow import BETA
 from continuousflex import Plugin
+from pwem.utils import runProgram
 
 OPTION_NMA = 0
 OPTION_ANGLES = 1
@@ -132,7 +133,7 @@ class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
         fn_infer = self._getExtraPath('infer.xmd')
         fn_combined = self._getExtraPath('images.xmd')
         args = '-i %(fn_train)s -o %(fn_combined)s --set union %(fn_infer)s' % locals()
-        self.runJob('xmipp_metadata_utilities', args)
+        runProgram('xmipp_metadata_utilities', args)
 
 
     #--------------------------- INFO functions --------------------------------------------

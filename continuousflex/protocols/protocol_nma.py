@@ -41,6 +41,7 @@ from pwem.objects import SetOfNormalModes
 from xmipp3.base import XmippMdRow
 from .protocol_nma_base import FlexProtNMABase, NMA_CUTOFF_REL
 from .convert import rowToMode, getNMAEnviron
+from pwem import Domain
 
 
 class FlexProtNMA(FlexProtNMABase):
@@ -119,14 +120,16 @@ class FlexProtNMA(FlexProtNMABase):
             if self.cutoffMode == NMA_CUTOFF_REL:
                 params = '-i %s --operation distance_histogram %s' \
                          % (localFn, self._getExtraPath('pseudoatoms_distance.hist'))
-                self._insertRunJobStep("xmipp_pdb_analysis", params)
+                self._insertFunctionStep('analyzePdbStep', params)
+
             self._insertFunctionStep('computeModesStep', localFn, n, cutoffStr)
             self._insertFunctionStep('reformatOutputStep', "pseudoatoms.pdb")
         else:
             if self.cutoffMode == NMA_CUTOFF_REL:
                 params = '-i %s --operation distance_histogram %s' % (
                 localFn, self._getExtraPath('atoms_distance.hist'))
-                self._insertRunJobStep("xmipp_pdb_analysis", params)
+                self._insertFunctionStep('analyzePdbStep', params)
+
             self._insertFunctionStep('computePdbModesStep', n,
                                      self.rtbBlockSize.get(),
                                      cutoffStr)
@@ -186,6 +189,10 @@ class FlexProtNMA(FlexProtNMABase):
                     newlines.append(line)
         with open(localFn, mode='w') as f:
             f.writelines(newlines)
+
+    def analyzePdbStep(self, params):
+        self.runJob("xmipp_pdb_analysis", params, env=Domain.importFromPlugin('xmipp3').Plugin.getEnviron())
+
 
     def computePdbModesStep(self, numberOfModes, RTBblockSize, cutoffStr):
         rc = self._getRc(self._getExtraPath('atoms_distance.hist'))

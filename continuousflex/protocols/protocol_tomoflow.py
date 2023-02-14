@@ -178,7 +178,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
         # just in case the reference is in MRC format:
         path_vol0 = self._getExtraPath('reference.spi')
         params = '-i ' + STAVolume + ' -o ' + path_vol0 + ' --type vol'
-        self.runJob('xmipp_image_convert', params)
+        runProgram('xmipp_image_convert', params)
 
         pyr_scale = self.pyr_scale.get()
         levels = self.levels.get()
@@ -309,7 +309,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             # getting a copy converted to spider format to solve the problem with stacks or mrc files
             tmp = self._getTmpPath('tmp.spi')
-            self.runJob('xmipp_image_convert', '-i ' + imgPath + ' -o ' + tmp + ' --type vol')
+            runProgram('xmipp_image_convert', '-i ' + imgPath + ' -o ' + tmp + ' --type vol')
             # vol_i = open_volume(tmp)
             vol_i = ImageHandler().read(tmp).getData()
 
@@ -330,7 +330,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             out_mdfn = self._getExtraPath('volumes_out.xmd')
             pattern = '"' + self._getExtraPath() + '/estimated_volumes/*.spi"'
             command = '-p ' + pattern + ' -o ' + out_mdfn
-            self.runJob('xmipp_metadata_selfile_create',command)
+            runProgram('xmipp_metadata_selfile_create',command)
             # now creating the output set of volumes:
             partSet = self._createSetOfVolumes('Warped')
             xmipp3.convert.readSetOfVolumes(out_mdfn, partSet)

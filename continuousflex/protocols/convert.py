@@ -31,9 +31,10 @@ from pyworkflow.utils import Environ
 from pwem.objects import NormalMode
 
 from xmipp3.convert import rowToObject, objectToRow
-from xmipp3.constants import NMA_HOME
+from continuousflex.constants import NMA_HOME
 import numpy as np
 import math
+
             
 MODE_DICT = OrderedDict([ 
        ("_modeFile", MDL_NMA_MODEFILE),
@@ -58,9 +59,10 @@ def modeToRow(mode, row):
     
 def getNMAEnviron():
     """ Create the needed environment for NMA programs. """
-    from xmipp3 import Plugin
+    from continuousflex import Plugin
     environ = Plugin.getEnviron()
     environ.update({'PATH': Plugin.getVar(NMA_HOME)}, position=Environ.BEGIN)
+    environ.update({'LD_LIBRARY_PATH': Plugin.getCondaLibPath()}, position=Environ.BEGIN)
     return environ
 
 

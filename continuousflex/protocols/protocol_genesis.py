@@ -912,6 +912,7 @@ class FlexProtGenesis(EMProtocol):
         environ = pwutils.Environ(os.environ)
         environ.set('PATH', os.path.join(Plugin.getVar("GENESIS_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
+        environ.update({'LD_LIBRARY_PATH': Plugin.getCondaLibPath()}, position=pwutils.Environ.BEGIN)
         return environ
 
     def getRestartFile(self, index=0):

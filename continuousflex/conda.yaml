@@ -1,0 +1,21 @@
+dependencies:
+  - conda-forge::arpack
+  - conda-forge::lapack
+  - pip
+  - python=3.8
+  - pip:
+      - setuptools==59.5.0
+      - torch==1.10.1
+      - starfile
+      - matplotlib
+      - mrcfile
+      - umap-learn
+      - torchvision==0.11.2
+      - tensorboard==2.8.0
+      - tqdm==4.64.0
+      - protobuf==3.20.3
+      - pycuda==2020.1
+      - git+https://github.com/scipion-em/scipion-pyworkflow.git@devel
+      - scipion-em
+      - numpy==1.23.0
+      - git+https://github.com/MohamadHarastani/farneback3d.git

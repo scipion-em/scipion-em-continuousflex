@@ -652,7 +652,8 @@ class FlexProtGenesis(EMProtocol):
         if self.mpirun_arguments.get() != "":
             cmd += "--mpi_argument \'%s\' "%self.mpirun_arguments.get()
 
-        print("Running command : %s "% cmd)
+        with open(self._getExtraPath("mpi_command"), "w") as f:
+            f.write(cmd)
 
         runCommand(cmd)
 

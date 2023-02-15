@@ -628,7 +628,7 @@ class FlexProtGenesis(EMProtocol):
                     fi.write(self.getGenesisInputFile(i)+"\n")
                     fo.write(self.getOutputPrefix(i)+".log\n")
 
-        script = os.path.join(Plugin.getVar("CONTINUOUSFLEX_HOME"), "protocols/utilities/mpigenesis.py")
+        script = os.path.join(Plugin.getVar("GENESIS_HOME"), "mpigenesis.py")
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         if self.use_parallelCmd.get() or self.use_rankfiles.get():
             mpi_command = self._stepsExecutor.hostConfig.mpiCommand.get() % \

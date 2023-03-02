@@ -15,7 +15,7 @@ dependencies:
       - tqdm==4.64.0
       - protobuf==3.20.3
       - pycuda==2020.1
-      - git+https://github.com/scipion-em/scipion-pyworkflow.git@devel
+      - git+https://github.com/scipion-em/scipion-pyworkflow.git@master
       - scipion-em
       - numpy==1.23.0
       - git+https://github.com/MohamadHarastani/farneback3d.git

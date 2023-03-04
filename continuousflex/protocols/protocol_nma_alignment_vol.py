@@ -123,22 +123,21 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
                       help='niter should be big enough to guarantee that the search converges to the '
                            'right set of nma deformation amplitudes')
         form.addParam('frm_freq', params.FloatParam, default=0.25,
-                      expertLevel=params.LEVEL_ADVANCED,
+                      # expertLevel=params.LEVEL_ADVANCED,
                       label='Maximum cross correlation frequency',
                       help='The normalized frequency should be between 0 and 0.5 \n'
                            'The larger it is, the bigger the search frequency is, the more time it demands. '
                            'Keeping it as default is recommended.')
         form.addParam('frm_maxshift', params.IntParam, default=10,
-                      expertlevel=params.LEVEL_ADVANCED,
+                      # expertlevel=params.LEVEL_ADVANCED,
                       label='Maximum shift for rigid body alignment (in pixels)',
                       help='The maximum shift is a number between 1 and half the size of your volume. '
                            'It represents the maximum distance searched in x, y and z directions. Keep as default'
                            ' if your target is near the center in your subtomograms')
-        form.addParam('frm_maskradius', params.IntParam, default=-1,
+        form.addParam('frm_maskradius', params.IntParam, default=20,
                       expertlevel=params.LEVEL_ADVANCED,
                       label='Spherical mask radius (in pixels)',
-                      help='If negative, the mask radius that will be used is the size of the volume minus the given '
-                           'value. If positive, the value given will be used as radius of a spherical mask during '
+                      help='The value given will be used as radius of a spherical mask during '
                            'volume alingmnet.')
         form.addParallelSection(threads=0, mpi=multiprocessing.cpu_count()//2-1)
 
@@ -273,7 +272,7 @@ class FlexProtAlignmentNMAVol(ProtAnalysis3D):
         imgFn = self.imgsFn
         frm_freq = self.frm_freq.get()
         frm_maxshift = self.frm_maxshift.get()
-        frm_maskradius = self.frm_maskradius.get()
+        frm_maskradius = -self.frm_maskradius.get()
         rhoStartBase = self.rhoStartBase.get()
         rhoEndBase = self.rhoEndBase.get()
         niter = self.niter.get()

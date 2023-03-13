@@ -60,7 +60,7 @@ class Plugin(pwem.Plugin):
         cls._defineEmVar(CONTINUOUSFLEX_HOME, 'ContinuousFlex-' + __version__)
         cls._defineVar(MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR, cls.getActivationCmd(__version__))
         cls._defineEmVar(NMA_HOME, 'nma')
-        cls._defineEmVar(GENESIS_HOME, 'MD-NMMD-Genesis-' + MD_NMMD_GENESIS_VERSION)
+        cls._defineEmVar(GENESIS_HOME, 'MDTools-' + MD_NMMD_GENESIS_VERSION)
         cls._defineVar(VMD_HOME, '/usr/local/lib/vmd')
         cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
@@ -129,17 +129,18 @@ class Plugin(pwem.Plugin):
                                   % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "merge_genesis_1.4"
+        target_branch = "master"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
         if gfotran_version >= 10:
             FFLAGS = "-fallow-argument-mismatch -ffree-line-length-none"
         else:
             FFLAGS = "-ffree-line-length-none"
-        env.addPackage('MD-NMMD-Genesis', version=MD_NMMD_GENESIS_VERSION,
-                       buildDir='MD-NMMD-Genesis', tar="void.tgz",
+
+        env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
+                       buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/continuousflex-org/MD-NMMD-Genesis.git . ; autoreconf '
+                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf '
                            '-fi ; ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\"; make install;'
                            % (target_branch, cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)

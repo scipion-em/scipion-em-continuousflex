@@ -108,23 +108,6 @@ class FlexProtGenesis(EMProtocol):
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
                       default=False, help="Center the input PDBs with the center of mass")
 
-        group = form.addGroup('Execution Parameters',expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('disableParallelSim', params.BooleanParam, label="Disable parallelisation over the EM data ?", default=False,
-                      help="Disabel parallel processing of simualtions over EM input data. Instead, each simulation is run linearly"
-                           "with internal parallelization with the specified number of MPI. Running parallel simulation is activated by default "
-                           " when using multiple EM data. Running parallel simulation is not available for REUS."
-                           "",expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('raiseError', params.BooleanParam, label="Stop execution if fails ?", default=True,
-                      help="Stop execution if GENESIS program fails",expertLevel=params.LEVEL_ADVANCED)
-        group.addParam('md_program', params.EnumParam, label="MD program", default=PROGRAM_ATDYN,
-                      choices=['ATDYN', 'SPDYN'],
-                      help="SPDYN (Spatial decomposition dynamics) and ATDYN (Atomic decomposition dynamics)"
-                    " share almost the same data structures, subroutines, and modules, but differ in"
-                    " their parallelization schemes. In SPDYN, the spatial decomposition scheme is implemented with new"
-                    " parallel algorithms and GPGPU calculation. In ATDYN, the atomic decomposition scheme"
-                    " is introduced for simplicity. The performance of ATDYN is not comparable to SPDYN due to the"
-                    " simple parallelization scheme but contains new methods and features. NMMD is available only for ATDYN.",
-                      expertLevel=params.LEVEL_ADVANCED)
 
         # Simulation =================================================================================================
         form.addSection(label='Simulation')
@@ -141,11 +124,11 @@ class FlexProtGenesis(EMProtocol):
         group.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
                       help="Total number of steps in one MD run")
         group.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
-                      help="Output frequency for the energy data")
+                      help="Output period for the energy data")
         group.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
-                      help="Output frequency for the coordinates data")
+                      help="Output period for the coordinates data")
         group.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
-                      help="Update frequency of the non-bonded pairlist",
+                      help="Update period of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
 
         group = form.addGroup('NMMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_NMMD,
@@ -153,10 +136,10 @@ class FlexProtGenesis(EMProtocol):
         group.addParam('inputModes', params.PointerParam, pointerClass="SetOfNormalModes", label='Input Modes',
                        default=None, allowsNull = True,
                        help="Input set of normal modes")
-        group.addParam('modeList', params.NumericRangeParam, expertLevel=params.LEVEL_ADVANCED,
+        group.addParam('modeList', params.NumericRangeParam,
                       label="Modes selection", allowsNull = True, default="",
                       help='Select the normal modes that will be used for analysis. \n'
-                           'If you leave this field empty, all computed modes will be selected for simulation.\n'
+                           'If you leave this field empty, all the computed modes will be selected for simulation.\n'
                            'You have several ways to specify the modes.\n'
                            '   Examples:\n'
                            ' "7,8-10" -> [7,8,9,10]\n'
@@ -165,20 +148,16 @@ class FlexProtGenesis(EMProtocol):
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
                       help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
-                           "to accelerate NM integration, however can make the simulation unstable.",
-                       condition="simulationType==2 or simulationType==4",expertLevel=params.LEVEL_ADVANCED)
+                           "to accelerate NM integration, however can make the simulation unstable.")
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD. Lower values accelerate the fitting but can make the "
-                           "simulation unstable",   expertLevel=params.LEVEL_ADVANCED)
+                           "simulation unstable")
         group = form.addGroup('REMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
                                SIMULATION_RENMMD))
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
-                      help="Number of MD steps between replica exchanges",
-                       condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
-                               SIMULATION_RENMMD))
+                      help="Number of MD steps between replica exchanges")
         group.addParam('nreplica', params.IntParam, default=1, label='Number of replicas',
-                      help="Number of replicas for REMD", condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
-                               SIMULATION_RENMMD))
+                      help="Number of replicas for REMD")
 
         # MD params =================================================================================================
         form.addSection(label='MD parameters')
@@ -248,33 +227,33 @@ class FlexProtGenesis(EMProtocol):
 
         # Experiments =================================================================================================
         form.addSection(label='EM data')
-        # form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
-        #               choices=['None', 'Volume'], important=True,
-        #               help="Type of cryo-EM data to be processed")
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
 
-        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=0")
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
-                      help="Force constant in Eem = k*(1 - c.c.). Note that in the case of REUS, the number of "
+                      help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
+                           " This parameters must be tuned with caution : "
+                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
                            " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
-                      , condition="EMfitChoice!=0")
-        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM Fit Sigma",
+                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
+                      condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         " than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=0",expertLevel=params.LEVEL_ADVANCED)
+                      condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
                        help="Number of MD iteration every which the EM poential is updated",
-                       condition="EMfitChoice!=0", expertLevel=params.LEVEL_ADVANCED)
+                       condition="EMfitChoice!=%i"%EMFIT_NONE)
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
@@ -313,6 +292,53 @@ class FlexProtGenesis(EMProtocol):
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
                       condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
 
+        form.addSection(label='MPI parallelization')
+
+        form.addParam('parallelType', params.EnumParam, label="How to process EM data ?", default=PARALLEL_MPI,
+                      choices=['parallel (MPI)', 'parallel (GNU parallel)', "serial"], important=True,
+                      help="Defines how the program will parallelize the MD simulations. If \"parallel (MPI)\" is selected, each simulation "
+                      "is distributed on a single core. This settings should work on most local machines and clusters."
+                           "Note that on clusters with multiple nodes, the user can chose to use rankfiles options (mpirun only) "
+                           " to distribute efficiently each simulations on the available cores. If mpirun  mpirun is not"
+                           "available, one might have to edit the PARALLEL_COMMAND in host.conf file (for instance, for a cluster "
+                           "using SLURM queuing system, one should use srun --exact --nodes 1) and chose \"use parallel command\"."
+                           " If \"parallel (GNU parallel)\" is selected, each simulation is distributed on a single core and use "
+                           " GNU parallel to distributed each simulation in parallel. This option might solve some issues of distrbuting"
+                           "the simulation to each cores on some clusters architectures. If \"seriel\" is selected, "
+                           "the MD simulation are exectuted one after the other (serial) and are using the maximum number of cores"
+                           " available (the performance are not comparable to MPI or GNU parallel and can be suitable only "
+                           "for very small datasets) ")
+        form.addParam('use_parallelCmd', params.BooleanParam, default=False, label="Use parallel command ? ",
+                      help="If yes, will use the parallel command set in host.conf to run the simulations. "
+                           "This option may be required to run on clusters with mulitple nodes.",
+                      condition="parallelType==%i"%PARALLEL_MPI)
+        form.addParam('use_rankfiles', params.BooleanParam, default=False, label="Use rankfiles ? ",
+                      help="If yes, will use rankfiles to attribute a core to each simulation. This option should be use on "
+                           "cluster systems with multiple nodes. Note that the parallel command in host.conf must be mpirun",
+                      condition="parallelType==%i"%PARALLEL_MPI)
+        form.addParam('num_core_per_node', params.IntParam, default=0, label="Number of cores per node",
+                      help="The number of MPI cores per node. If set to 0, will use number_of_mpi / number_of_nodes ",
+                      condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
+        form.addParam('num_socket_per_node', params.IntParam, default=1, label="Number of socket per node",
+                      help="The number of sockets present on each nodes ",
+                      condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
+        form.addParam('num_node', params.IntParam, default=1, label="Number of node",
+                      help="The number of nodes available ",
+                      condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
+        form.addParam('localhost', params.BooleanParam, default=False, label="Run as local host ? ",
+                      help="If yes, will execute one single host (localhost), otherwise will use relative host for MPI.",
+                      condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
+        form.addParam('mpirun_arguments', params.StringParam, default="", label="Additional arguments for mpirun",
+                      help="Additional arguments to pass to mpirun",
+                      condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
+
+        form.addParam('md_program', params.EnumParam, label="MD program", default=PROGRAM_ATDYN,
+                      choices=['ATDYN', 'SPDYN'],
+                      help="ADTYN is recommanded. The performance of ATDYN is not comparable to SPDYN due to the"
+                    " simple parallelization scheme but contains new methods and features such as normal-mode empowered "
+                           "dynamics used in MDSPACE",
+                      expertLevel=params.LEVEL_ADVANCED)
+
         form.addParallelSection(threads=1, mpi=NUMBER_OF_CPU)
         # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -335,18 +361,13 @@ class FlexProtGenesis(EMProtocol):
             self._insertFunctionStep("convertInputEMStep")
 
         # RUN simulation
-        if not self.disableParallelSim.get() and  \
-            self.getNumberOfSimulation() >1  and  existsCommand("parallel") :
+        if self.parallelType.get() == PARALLEL_MPI and self.getNumberOfSimulation() >1:
+            self._insertFunctionStep("runSimulationMPI")
+        elif self.parallelType.get() == PARALLEL_GNU and self.getNumberOfSimulation() >1 and  existsCommand("parallel") :
             self._insertFunctionStep("runSimulationParallel")
         else:
-            if not self.disableParallelSim.get() and  \
-                self.getNumberOfSimulation() >1  and  not existsCommand("parallel"):
-                self.warning("Warning : Can not use parallel computation for GENESIS,"
-                                    " please install \"GNU parallel\". Running in linear mode.")
             for i in range(self.getNumberOfSimulation()):
-                inp_file = self.getGenesisInputFile(i)
-                outPref = self.getOutputPrefix(i)
-                self._insertFunctionStep("runSimulation", inp_file, outPref)
+                self._insertFunctionStep("runSimulation", self.getGenesisInputFile(i), self.getOutputPrefix(i))
 
         # Create output data
         self._insertFunctionStep("createOutputStep")
@@ -589,6 +610,52 @@ class FlexProtGenesis(EMProtocol):
             print("Warning : Some processes returned with errors")
 
 
+
+    def runSimulationMPI(self):
+        """
+        Run multiple GENESIS simulations in parallel using MPI
+        :return None:
+        """
+
+        if self.simulationType.get() == SIMULATION_REMD or self.simulationType.get() == SIMULATION_RENMMD:
+            raise RuntimeError("REMD simulation should be run using the GNU parallel option")
+
+        mpi_inputs = self._getExtraPath("mpi_inputs")
+        mpi_outputs = self._getExtraPath("mpi_outputs")
+        with open(mpi_inputs,"w") as fi:
+            with open(mpi_outputs,"w") as fo:
+                for i in range(self.getNumberOfSimulation()):
+                    fi.write(self.getGenesisInputFile(i)+"\n")
+                    fo.write(self.getOutputPrefix(i)+".log\n")
+
+        script = os.path.join(Plugin.getVar("GENESIS_HOME"), "mpigenesis.py")
+        programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
+        if self.use_parallelCmd.get() or self.use_rankfiles.get():
+            mpi_command = self._stepsExecutor.hostConfig.mpiCommand.get() % \
+                      {'JOB_NODES': 1,'COMMAND': ""}
+        else:
+            mpi_command = ""
+
+        if self.num_core_per_node.get() == 0:
+            num_core_per_node = self.numberOfMpi.get()
+        else:
+            num_core_per_node =  self.num_core_per_node.get()
+        cmd = "python %s " %script
+        cmd += "--mpi_command \'%s\' --num_mpi %s --num_threads %s --inputs %s --outputs %s --executable %s "%(
+            mpi_command, self.numberOfMpi.get(), self.numberOfThreads.get(),mpi_inputs, mpi_outputs, programname)
+        if self.use_rankfiles.get():
+            cmd += "--num_core_per_node %s --num_socket_per_node %s --num_node %s " \
+                "--rankdir %s "% (num_core_per_node , self.num_socket_per_node.get(),
+                                  self.num_node.get(),self._getExtraPath("rankfiles"))
+            if self.localhost.get() :
+                cmd += "--localhost "
+        if self.mpirun_arguments.get() != "":
+            cmd += "--mpi_argument \'%s\' "%self.mpirun_arguments.get()
+
+        with open(self._getExtraPath("mpi_command"), "w") as f:
+            f.write(cmd)
+
+        runCommand(cmd)
 
     # --------------------------- Create output step --------------------------------------------
 

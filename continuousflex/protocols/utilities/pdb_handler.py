@@ -365,8 +365,11 @@ class ContinuousFlexPDBHandler:
         self.select_atoms(np.array(new_idx))
 
 
-    def atom_res_reorder(self):
-        chains = list(set(self.chainID))
+    def atom_res_reorder(self, chainType=0):
+        if chainType ==0:
+            chains = list(set(self.chainName))
+        else:
+            chains = list(set(self.chainID))
         chains.sort()
 
         # reorder atoms and res

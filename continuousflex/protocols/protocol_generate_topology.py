@@ -60,8 +60,6 @@ class ProtGenerateTopology(EMProtocol):
                             " Go model topology based on the output CHARMM all-atom PDB model."
                             " This will ensure that residue sequences are consecutive and TER statements are present in PDB."
                             " CHARMM requires VMD psfgen installed. Go models requires SMOG 2 installed. ")
-        group.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=NUCLEIC_NO,
-                       choices=['No', 'RNA', 'DNA'], help="Specify if the generator should consider nucleic residues as DNA or RNA")
 
         group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file (prm)",
                        condition="forcefield==%i"%FORCEFIELD_CHARMM,
@@ -82,6 +80,15 @@ class ProtGenerateTopology(EMProtocol):
                             "https://smog-server.org/cgi-bin/GenTopGro.pl (Recommended to run the protocol with empty smog_dir,"
                             " when the protocol fails, get the input.pdb file generate in the extra directory as input of SMOG server)",
                        condition="(forcefield==%i or forcefield==%i)"%(FORCEFIELD_CAGO, FORCEFIELD_AAGO))
+
+        form.addParam('reorderResidues', params.BooleanParam, label="Reorder residues and remove insertions", default=False,
+                       help='Remove insertion code in the PDB and reorder residues accordingly')
+
+        form.addParam('reorderType', params.BooleanParam, label="Reorder based on segement name ?",
+                       default=False, condition="reorderResidues",
+                       help='If yes reorder the residues within a segement, otherwise, reorder residues within a chains')
+        form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=NUCLEIC_NO,
+                       choices=['No', 'RNA', 'DNA'], help="Specify if the generator should consider nucleic residues as DNA or RNA")
 
     def _insertAllSteps(self):
         ff = self.forcefield.get()
@@ -116,82 +123,29 @@ class ProtGenerateTopology(EMProtocol):
 
     def preparePSF(self):
         inputPDB = self._getExtraPath("input.pdb")
-        inputTopo = self.inputRTF.get()
-        outputPrefix = self._getExtraPath("output")
-        nucleicChoice = self.nucleicChoice.get()
+        mol = ContinuousFlexPDBHandler(inputPDB)
 
-        fnPSFgen = self._getExtraPath("psfgen.tcl")
-        with open(fnPSFgen, "w") as psfgen:
-            psfgen.write("mol load pdb %s\n" % inputPDB)
-            psfgen.write("\n")
-            psfgen.write("package require psfgen\n")
-            psfgen.write("topology %s\n" % inputTopo)
-            psfgen.write("pdbalias residue HIS HSE\n")
-            psfgen.write("pdbalias residue MSE MET\n")
-            psfgen.write("pdbalias atom ILE CD1 CD\n")
-            if nucleicChoice == NUCLEIC_RNA:
-                psfgen.write("pdbalias residue A ADE\n")
-                psfgen.write("pdbalias residue G GUA\n")
-                psfgen.write("pdbalias residue C CYT\n")
-                psfgen.write("pdbalias residue U URA\n")
-            elif nucleicChoice == NUCLEIC_DNA:
-                psfgen.write("pdbalias residue DA ADE\n")
-                psfgen.write("pdbalias residue DG GUA\n")
-                psfgen.write("pdbalias residue DC CYT\n")
-                psfgen.write("pdbalias residue DT THY\n")
-            psfgen.write("\n")
-            if nucleicChoice == NUCLEIC_RNA or nucleicChoice == NUCLEIC_DNA:
-                psfgen.write("set nucleic [atomselect top nucleic]\n")
-                psfgen.write("set chains [lsort -unique [$nucleic get chain]] ;\n")
-                psfgen.write("foreach chain $chains {\n")
-                psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
-                psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
-                psfgen.write("    segment N${chain} { pdb %s_tmp.pdb }\n" % outputPrefix)
-                psfgen.write("    coordpdb %s_tmp.pdb N${chain}\n" % outputPrefix)
-                if nucleicChoice == NUCLEIC_DNA:
-                    psfgen.write("    set resids [lsort -unique [$sel get resid]]\n")
-                    psfgen.write("    foreach r $resids {\n")
-                    psfgen.write("        patch DEOX N${chain}:$r\n")
-                    psfgen.write("    }\n")
-                psfgen.write("}\n")
-                if nucleicChoice == NUCLEIC_DNA:
-                    psfgen.write("regenerate angles dihedrals\n")
-                psfgen.write("\n")
-            psfgen.write("set protein [atomselect top protein]\n")
-            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
-            psfgen.write("foreach chain $chains {\n")
-            psfgen.write("    set sel [atomselect top \"protein and pfrag $chain\"]\n")
-            psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
-            psfgen.write("    segment P${chain} {pdb %s_tmp.pdb}\n" % outputPrefix)
-            psfgen.write("    coordpdb %s_tmp.pdb P${chain}\n" % outputPrefix)
-            psfgen.write("}\n")
-            psfgen.write("rm -f %s_tmp.pdb\n" % outputPrefix)
-            psfgen.write("\n")
-            psfgen.write("guesscoord\n")
-            psfgen.write("writepdb %s.pdb\n" % outputPrefix)
-            psfgen.write("writepsf %s.psf\n" % outputPrefix)
-            psfgen.write("exit\n")
+        mol.alias_res("HIS", "HSE")
+        mol.alias_res("MSE", "MET")
+        mol.alias_atom("CD1", "CD", "ILE")
+        if self.nucleicChoice.get() == NUCLEIC_RNA:
+            mol.alias_res("A", "ADE")
+            mol.alias_res("G", "GUA")
+            mol.alias_res("C", "CYT")
+            mol.alias_res("U", "URA")
+        elif self.nucleicChoice.get() == NUCLEIC_DNA:
+            mol.alias_res("DA", "ADE")
+            mol.alias_res("DG", "GUA")
+            mol.alias_res("DC", "CYT")
+            mol.alias_res("DT", "THY")
 
-    def checkPDB(self):
-        outPDB = self._getExtraPath("output.pdb")
+        if self.reorderResidues.get():
+            if self.reorderType.get() :
+                mol.atom_res_reorder(chainType=1)
+            else:
+                mol.atom_res_reorder(chainType=0)
 
-        # Check PDB
-        if not os.path.isfile(outPDB) :
-            raise RuntimeError("Can not locate output PDB file %s, check log files for more details " % outPDB)
-        if os.path.getsize(outPDB) ==0 :
-            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
-
-        outMol = ContinuousFlexPDBHandler(outPDB)
-        if outMol.n_atoms == 0:
-            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
-
-    def runPSF(self):
-        fnPSFgen = self._getExtraPath("psfgen.tcl")
-        outputPrefix = self._getExtraPath("output")
-
-        # Run VMD PSFGEN
-        runCommand("vmd -dispdev text -e %s > %s.log " % (fnPSFgen, outputPrefix))
-
+        mol.write_pdb(inputPDB)
 
     def prepareGROTOP(self):
         inputPDB = self._getExtraPath("input.pdb")
@@ -232,8 +186,62 @@ class ProtGenerateTopology(EMProtocol):
         mol.alias_atom("C5'", "C5*")
         mol.alias_atom("C5M", "C7")
         mol.add_terminal_res()
-        mol.atom_res_reorder()
+        if self.reorderResidues.get():
+            if self.reorderType.get() :
+                mol.atom_res_reorder(chainType=1)
+            else:
+                mol.atom_res_reorder(chainType=0)
         mol.write_pdb(inputPDB)
+
+    def runPSF(self):
+        inputPDB = self._getExtraPath("input.pdb")
+        inputTopo = self.inputRTF.get()
+        outputPrefix = self._getExtraPath("output")
+        nucleicChoice = self.nucleicChoice.get()
+
+        fnPSFgen = self._getExtraPath("psfgen.tcl")
+        with open(fnPSFgen, "w") as psfgen:
+            psfgen.write("mol load pdb %s\n" % inputPDB)
+            psfgen.write("\n")
+            psfgen.write("package require psfgen\n")
+            psfgen.write("topology %s\n" % inputTopo)
+            psfgen.write("\n")
+            if nucleicChoice == NUCLEIC_RNA or nucleicChoice == NUCLEIC_DNA:
+                psfgen.write("set nucleic [atomselect top nucleic]\n")
+                psfgen.write("set chains [lsort -unique [$nucleic get chain]] ;\n")
+                psfgen.write("foreach chain $chains {\n")
+                psfgen.write("    set sel [atomselect top \"nucleic and chain $chain\"]\n")
+                psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
+                psfgen.write("    segment N${chain} { pdb %s_tmp.pdb }\n" % outputPrefix)
+                psfgen.write("    coordpdb %s_tmp.pdb N${chain}\n" % outputPrefix)
+                if nucleicChoice == NUCLEIC_DNA:
+                    psfgen.write("    set resids [lsort -unique [$sel get resid]]\n")
+                    psfgen.write("    foreach r $resids {\n")
+                    psfgen.write("        patch DEOX N${chain}:$r\n")
+                    psfgen.write("    }\n")
+                psfgen.write("}\n")
+                if nucleicChoice == NUCLEIC_DNA:
+                    psfgen.write("regenerate angles dihedrals\n")
+                psfgen.write("\n")
+            psfgen.write("set protein [atomselect top protein]\n")
+            psfgen.write("set chains [lsort -unique [$protein get pfrag]]\n")
+            psfgen.write("foreach chain $chains {\n")
+            psfgen.write("    set sel [atomselect top \"protein and pfrag $chain\"]\n")
+            psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
+            psfgen.write("    segment P${chain} {pdb %s_tmp.pdb}\n" % outputPrefix)
+            psfgen.write("    coordpdb %s_tmp.pdb P${chain}\n" % outputPrefix)
+            psfgen.write("}\n")
+            psfgen.write("rm -f %s_tmp.pdb\n" % outputPrefix)
+            psfgen.write("\n")
+            psfgen.write("guesscoord\n")
+            psfgen.write("writepdb %s.pdb\n" % outputPrefix)
+            psfgen.write("writepsf %s.psf\n" % outputPrefix)
+            psfgen.write("exit\n")
+        fnPSFgen = self._getExtraPath("psfgen.tcl")
+        outputPrefix = self._getExtraPath("output")
+
+        # Run VMD PSFGEN
+        runCommand("vmd -dispdev text -e %s > %s.log " % (fnPSFgen, outputPrefix))
 
     def runGROTOP(self):
         outputPrefix = self._getExtraPath("output")
@@ -277,6 +285,21 @@ class ProtGenerateTopology(EMProtocol):
             mol.write_pdb(outputPrefix + ".pdb")
         else:
             runCommand("cp %s %s"%(inputPDB,outputPrefix + ".pdb"))
+
+
+
+    def checkPDB(self):
+        outPDB = self._getExtraPath("output.pdb")
+
+        # Check PDB
+        if not os.path.isfile(outPDB) :
+            raise RuntimeError("Can not locate output PDB file %s, check log files for more details " % outPDB)
+        if os.path.getsize(outPDB) ==0 :
+            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
+
+        outMol = ContinuousFlexPDBHandler(outPDB)
+        if outMol.n_atoms == 0:
+            raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):

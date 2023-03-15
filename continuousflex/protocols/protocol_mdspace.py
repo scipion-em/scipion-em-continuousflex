@@ -78,18 +78,14 @@ class FlexProtMDSPACE(FlexProtGenesis):
             self._insertFunctionStep("createGenesisInputStep")
 
             # RUN simulation
-            if not self.disableParallelSim.get() and  \
-                self.getNumberOfSimulation() >1  and  existsCommand("parallel") :
+            if self.parallelType.get() == PARALLEL_MPI and self.getNumberOfSimulation() > 1:
+                self._insertFunctionStep("runSimulationMPI")
+            elif self.parallelType.get() == PARALLEL_GNU and self.getNumberOfSimulation() > 1 and existsCommand(
+                    "parallel"):
                 self._insertFunctionStep("runSimulationParallel")
             else:
-                if not self.disableParallelSim.get() and  \
-                    self.getNumberOfSimulation() >1  and  not existsCommand("parallel"):
-                    self.warning("Warning : Can not use parallel computation for GENESIS,"
-                                        " please install \"GNU parallel\". Running in linear mode.")
                 for i in range(self.getNumberOfSimulation()):
-                    inp_file = self.getGenesisInputFile(i)
-                    outPref = self.getOutputPrefix(i)
-                    self._insertFunctionStep("runSimulation", inp_file, outPref)
+                    self._insertFunctionStep("runSimulation", self.getGenesisInputFile(i), self.getOutputPrefix(i))
 
             self._insertFunctionStep("pdb2dcdStep")
 

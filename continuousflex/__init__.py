@@ -144,3 +144,8 @@ class Plugin(pwem.Plugin):
                            '-fi ; ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\"; make install;'
                            % (target_branch, cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)
+
+        env.addPackage('Smog', version="2.4.5",
+                       buildDir='Smog', url="https://smog-server.org/smog2/code/smog-2.4.5.tgz",
+                       commands=[("", ["bin/smog2"])], default=False)
+

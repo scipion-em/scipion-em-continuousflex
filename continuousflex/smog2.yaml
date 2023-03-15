@@ -1,0 +1,10 @@
+channels:
+  - bioconda
+  - eumetsat
+
+dependencies:
+  - perl 
+  - perl-xml-simple
+  - perl-xml-libxml 
+  - java-jdk 
+  - perl-pdl

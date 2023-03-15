@@ -29,7 +29,8 @@ from .utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.utils import runCommand
 import os
 from pwem.convert.atom_struct import cifToPdb
-
+import pyworkflow.utils as pwutils
+from continuousflex import Plugin
 
 NUCLEIC_NO = 0
 NUCLEIC_RNA =1
@@ -74,12 +75,6 @@ class ProtGenerateTopology(EMProtocol):
                        help='CHARMM stream file containing both topology information and parameters. '
                             'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
 
-        group.addParam('smog_dir', params.FileParam, label="SMOG 2 install directory",
-                       help="Path to SMOG2 install directory (For SMOG2 installation, see "
-                            "https://smog-server.org/smog2/). If SMOG2 is not installed, you can use the web GUI instead "
-                            "https://smog-server.org/cgi-bin/GenTopGro.pl (Recommended to run the protocol with empty smog_dir,"
-                            " when the protocol fails, get the input.pdb file generate in the extra directory as input of SMOG server)",
-                       condition="(forcefield==%i or forcefield==%i)"%(FORCEFIELD_CAGO, FORCEFIELD_AAGO))
 
         form.addParam('reorderResidues', params.BooleanParam, label="Reorder residues and remove insertions", default=False,
                        help='Remove insertion code in the PDB and reorder residues accordingly')
@@ -248,10 +243,13 @@ class ProtGenerateTopology(EMProtocol):
         inputPDB = self._getExtraPath("input.pdb")
 
         # Run Smog2
-        runCommand("%s/bin/smog2" % self.smog_dir.get() + \
-                   " -i %s -dname %s -%s -limitbondlength -limitcontactlength > %s.log" %
+        environ = pwutils.Environ(os.environ)
+        environ.set('PATH', os.path.join(Plugin.getVar("SMOG_HOME"), 'bin'),
+                    position=pwutils.Environ.BEGIN)
+        cmd = "smog2 -i %s -dname %s -%s -limitbondlength -limitcontactlength > %s.log" %\
                    (inputPDB, outputPrefix,
-                    "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA", outputPrefix))
+                    "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA", outputPrefix)
+        runCommand(cmd, env=environ)
 
         # ADD CHARGE TO TOP FILE
         grotopFile = outputPrefix + ".top"

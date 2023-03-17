@@ -31,6 +31,7 @@ import os
 from pwem.convert.atom_struct import cifToPdb
 import pyworkflow.utils as pwutils
 from continuousflex import Plugin
+import continuousflex
 
 NUCLEIC_NO = 0
 NUCLEIC_RNA =1
@@ -43,7 +44,7 @@ FORCEFIELD_CAGO = 2
 
 class ProtGenerateTopology(EMProtocol):
     """ Protocol to generate topology files for GENESIS simulations """
-    _label = 'generate topology'
+    _label = 'generate topology model'
 
     def _defineParams(self, form):
 
@@ -53,27 +54,13 @@ class ProtGenerateTopology(EMProtocol):
                       pointerClass='AtomStruct', label="Input PDB",
                       help='Select the input PDB.', important=True)
 
-        group = form.addGroup('Forcefield Inputs')
-        group.addParam('forcefield', params.EnumParam, label="Forcefield type", default=FORCEFIELD_CHARMM, important=True,
+        form.addParam('forcefield', params.EnumParam, label="Forcefield type", default=FORCEFIELD_CHARMM, important=True,
                        choices=['CHARMM', 'All-atom Go model', 'C-Alpha Go model'],
                        help="Type of the force field used for energy and force calculation. For Go models, it is strongly"
-                            " recommended to first generate topology using CHARMM, then create a new protocol to generate"
+                            " recommended to first generate a topology model using CHARMM, then create a new protocol to generate"
                             " Go model topology based on the output CHARMM all-atom PDB model."
                             " This will ensure that residue sequences are consecutive and TER statements are present in PDB."
                             " CHARMM requires VMD psfgen installed. Go models requires SMOG 2 installed. ")
-
-        group.addParam('inputPRM', params.FileParam, label="CHARMM parameter file (prm)",
-                       condition="forcefield==%i"%FORCEFIELD_CHARMM,
-                       help='CHARMM parameter file containing force field parameters, e.g. force constants and librium'
-                            ' geometries. Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
-        group.addParam('inputRTF', params.FileParam, label="CHARMM topology file (rtf)",
-                       condition="forcefield==%i"%FORCEFIELD_CHARMM,
-                       help='CHARMM topology file containing information about atom connectivity of residues and'
-                            ' other molecules. Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
-        group.addParam('inputSTR', params.FileParam, label="CHARMM stream file (str, optional)",
-                       condition="forcefield==%i"%FORCEFIELD_CHARMM, default="",
-                       help='CHARMM stream file containing both topology information and parameters. '
-                            'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
 
         form.addParam('reorderResidues', params.BooleanParam, label="Reorder residues and remove insertions", default=False,
                        help='Remove insertion code in the PDB and reorder residues accordingly')
@@ -189,7 +176,7 @@ class ProtGenerateTopology(EMProtocol):
 
     def runPSF(self):
         inputPDB = self._getExtraPath("input.pdb")
-        inputTopo = self.inputRTF.get()
+        inputTopo = self.getCHARMMInputs()[0]
         outputPrefix = self._getExtraPath("output")
         nucleicChoice = self.nucleicChoice.get()
 
@@ -232,10 +219,9 @@ class ProtGenerateTopology(EMProtocol):
             psfgen.write("writepsf %s.psf\n" % outputPrefix)
             psfgen.write("exit\n")
         fnPSFgen = self._getExtraPath("psfgen.tcl")
-        outputPrefix = self._getExtraPath("output")
 
         # Run VMD PSFGEN
-        runCommand("vmd -dispdev text -e %s > %s.log " % (fnPSFgen, outputPrefix))
+        runCommand("vmd -dispdev text -e %s" % (fnPSFgen))
 
     def runGROTOP(self):
         outputPrefix = self._getExtraPath("output")
@@ -245,9 +231,9 @@ class ProtGenerateTopology(EMProtocol):
         environ = pwutils.Environ(os.environ)
         environ.set('PATH', os.path.join(Plugin.getVar("SMOG_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
-        cmd = "smog2 -i %s -dname %s -%s -limitbondlength -limitcontactlength > %s.log" %\
+        cmd = "smog2 -i %s -dname %s -%s -limitbondlength -limitcontactlength" %\
                    (inputPDB, outputPrefix,
-                    "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA", outputPrefix)
+                    "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA")
         runCommand(cmd, env=environ)
 
         # ADD CHARGE TO TOP FILE
@@ -297,6 +283,12 @@ class ProtGenerateTopology(EMProtocol):
         outMol = ContinuousFlexPDBHandler(outPDB)
         if outMol.n_atoms == 0:
             raise RuntimeError("PDB file %s is empty, check log files for more details " % outPDB)
+
+
+    def getCHARMMInputs(self):
+        return continuousflex.__path__[0] + '/protocols/utilities/charmm/top_all36_prot_na.rtf',\
+         continuousflex.__path__[0] + '/protocols/utilities/charmm/par_all36_prot_na.prm',\
+         continuousflex.__path__[0] + '/protocols/utilities/charmm/toppar_water_ions.str'
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):

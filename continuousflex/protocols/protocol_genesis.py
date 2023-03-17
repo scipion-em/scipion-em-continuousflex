@@ -56,8 +56,8 @@ class FlexProtGenesis(EMProtocol):
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
 
-        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_NEW_SIM,
-                      choices=['New simulation from topology protocol', 'Restart previous GENESIS simulation', "New simulation from files"],
+        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_TOPOLOGY,
+                      choices=['New simulation from topology model', 'Restart previous simulation', "New simulation from files"],
                       help="Chose the type of input for your simulation",
                       important=True)
 
@@ -106,7 +106,8 @@ class FlexProtGenesis(EMProtocol):
                            'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
 
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
-                      default=False, help="Center the input PDBs with the center of mass")
+                      default=False, help="Center the input PDBs with the center of mass",
+                      expertLevel=params.LEVEL_ADVANCED)
 
 
         # Simulation =================================================================================================
@@ -118,15 +119,18 @@ class FlexProtGenesis(EMProtocol):
         group = form.addGroup('Simulation parameters')
         group.addParam('integrator', params.EnumParam, label="Integrator", default=0,
                       choices=['Velocity Verlet', 'Leapfrog', ''],
-                      help="Type of integrator for the simulation", condition="simulationType!=0")
-        group.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="Time step in the MD run", condition="simulationType!=0")
+                      help="Type of integrator for the simulation", condition="simulationType!=0",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
                       help="Total number of steps in one MD run")
+        group.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
+                      help="Time step in the MD run", condition="simulationType!=0")
         group.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
-                      help="Output period for the energy data")
+                      help="Output period for the energy data",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
-                      help="Output period for the coordinates data")
+                      help="Output period for the coordinates data",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
                       help="Update period of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
@@ -148,10 +152,12 @@ class FlexProtGenesis(EMProtocol):
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
                       help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
-                           "to accelerate NM integration, however can make the simulation unstable.")
+                           "to accelerate NM integration, however can make the simulation unstable.",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD. Lower values accelerate the fitting but can make the "
-                           "simulation unstable")
+                           "simulation unstable",
+                      expertLevel=params.LEVEL_ADVANCED)
         group = form.addGroup('REMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
                                SIMULATION_RENMMD))
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
@@ -161,13 +167,30 @@ class FlexProtGenesis(EMProtocol):
 
         # MD params =================================================================================================
         form.addSection(label='MD parameters')
+
+        group = form.addGroup('Ensemble', condition="simulationType!=0")
+
+        group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
+                      help="Initial and target temperature", important=True)
+        group.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
+                      choices=['NVT', 'NVE', 'NPT'],
+                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
+                           " NPT: Isothermal-isobaric ensemble")
+        group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
+                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
+                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
+                           " Leapfrog : BERENDSEN, LANGEVIN;  Velocity Verlet : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           " NMMD : LANGEVIN (NVT only)")
+        group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
+                      help="Target pressure in the NPT ensemble", condition="ensemble==%i"%ENSEMBLE_NPT)
+
         group = form.addGroup('Energy')
         group.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
                       help="Turn on Generalized Born/Solvent accessible surface area model (Implicit Solvent). Boundary condition must be NO."
                            " ATDYN only.")
 
-        group.addParam('boundary', params.EnumParam, label="Boundary", default=0,
+        group.addParam('boundary', params.EnumParam, label="Boundary", default=BOUNDARY_NOBC,
                       choices=['No boundary', 'Periodic Boundary Condition'],
                       help="Type of boundary condition. In case of implicit solvent, "
                            " GO models or vaccum simulation, choose No boundary")
@@ -184,7 +207,8 @@ class FlexProtGenesis(EMProtocol):
                            " CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
                            " truncated at cutoffdist; "
                            " PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
-                            " This option is only availabe in the periodic boundary condition")
+                            " This option is only availabe in the periodic boundary condition",
+                       condition="boundary==%i"%BOUNDARY_PBC)
         group.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
                       help="This paramter determines whether the force switch function for van der Waals interactions is"
                         " employed or not. The users must take care about this parameter, when the CHARMM"
@@ -198,21 +222,6 @@ class FlexProtGenesis(EMProtocol):
         group.addParam('pairlist_dist', params.FloatParam, default=15.0, label='Pairlist Distance',
                       help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
                             " must be larger than cutoffdist")
-
-        group = form.addGroup('Ensemble', condition="simulationType!=0")
-        group.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
-                      choices=['NVT', 'NVE', 'NPT'],
-                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
-                           " NPT: Isothermal-isobaric ensemble")
-        group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
-                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
-                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
-                           " Leapfrog : BERENDSEN, LANGEVIN;  Velocity Verlet : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
-                           " NMMD : LANGEVIN (NVT only)")
-        group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
-                      help="Initial and target temperature")
-        group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
-                      help="Target pressure in the NPT ensemble", condition="ensemble==%i"%ENSEMBLE_NPT)
 
         group = form.addGroup('Contraints', condition="simulationType==%i or simulationType==%i"%(SIMULATION_MD,SIMULATION_REMD))
         group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
@@ -230,31 +239,6 @@ class FlexProtGenesis(EMProtocol):
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
-
-        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
-                      help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
-                           " This parameters must be tuned with caution : "
-                           "to high values will deform the structure and overfit the data, to low values will not "
-                           "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
-                           " force constant value must be equal to the number of replicas, for example for 4 replicas,"
-                           " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
-                           " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
-                           " to each replica."
-                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
-                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
-                        " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
-                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
-                        " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
-                        " than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
-                       help="Number of MD iteration every which the EM poential is updated",
-                       condition="EMfitChoice!=%i"%EMFIT_NONE)
-
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
         group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
@@ -292,6 +276,33 @@ class FlexProtGenesis(EMProtocol):
                       label="projection angle image set  ", help='Image set containing projection alignement parameters',
                       condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
 
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
+                      help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
+                           " This parameters must be tuned with caution : "
+                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
+                           " force constant value must be equal to the number of replicas, for example for 4 replicas,"
+                           " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
+                           " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
+                           " to each replica."
+                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
+                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
+                        " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
+                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
+                        " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        " than 0.1% of the maximum value. Smaller value requires large computational cost",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
+                       help="Number of MD iteration every which the EM poential is updated",
+                       condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
+
         form.addSection(label='MPI parallelization')
 
         form.addParam('parallelType', params.EnumParam, label="How to process EM data ?", default=PARALLEL_MPI,
@@ -308,14 +319,16 @@ class FlexProtGenesis(EMProtocol):
                            "the MD simulation are exectuted one after the other (serial) and are using the maximum number of cores"
                            " available (the performance are not comparable to MPI or GNU parallel and can be suitable only "
                            "for very small datasets) ")
-        form.addParam('use_parallelCmd', params.BooleanParam, default=False, label="Use parallel command ? ",
-                      help="If yes, will use the parallel command set in host.conf to run the simulations. "
-                           "This option may be required to run on clusters with mulitple nodes.",
-                      condition="parallelType==%i"%PARALLEL_MPI)
-        form.addParam('use_rankfiles', params.BooleanParam, default=False, label="Use rankfiles ? ",
+
+        form.addParam('use_rankfiles', params.BooleanParam, default=False, label="Running on cluster ? ",
                       help="If yes, will use rankfiles to attribute a core to each simulation. This option should be use on "
                            "cluster systems with multiple nodes. Note that the parallel command in host.conf must be mpirun",
                       condition="parallelType==%i"%PARALLEL_MPI)
+        form.addParam('use_parallelCmd', params.BooleanParam, default=False, label="Use parallel command ? ",
+                      help="If yes, will use the parallel command set in host.conf to run the simulations. "
+                           "This option may be required to run on clusters with mulitple nodes.",
+                      condition="parallelType==%i" % PARALLEL_MPI,
+                      expertLevel=params.LEVEL_ADVANCED)
         form.addParam('num_core_per_node', params.IntParam, default=0, label="Number of cores per node",
                       help="The number of MPI cores per node. If set to 0, will use number_of_mpi / number_of_nodes ",
                       condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
@@ -984,7 +997,7 @@ class FlexProtGenesis(EMProtocol):
             if self.inputType.get() == INPUT_RESTART:
                 return self.restartProt.get().getCHARMMInputs()
             elif  self.inputType.get() == INPUT_TOPOLOGY:
-                return self.topoProt.get().inputRTF.get(),self.topoProt.get().inputPRM.get(), self.topoProt.get().inputSTR.get()
+                return self.topoProt.get().getCHARMMInputs()
             elif  self.inputType.get() == INPUT_NEW_SIM:
                 return self.inputRTF.get(),self.inputPRM.get(), self.inputSTR.get()
         else:
@@ -1153,13 +1166,13 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
             s += "emfit_shift_x = %f\n" % rigid_body_params[3]
             s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
-        if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
-            s += "\n[REMD] \n"  # -----------------------------------------------------------
-            s += "dimension = 1 \n"
-            s += "exchange_period = %i \n" % exchange_period
-            s += "type1 = RESTRAINT \n"
-            s += "nreplica1 = %i \n" % nreplica
-            s += "rest_function1 = 1 \n"
+    if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
+        s += "\n[REMD] \n"  # -----------------------------------------------------------
+        s += "dimension = 1 \n"
+        s += "exchange_period = %i \n" % exchange_period
+        s += "type1 = RESTRAINT \n"
+        s += "nreplica1 = %i \n" % nreplica
+        s += "rest_function1 = 1 \n"
 
     with open(inp_file, "w") as f:
         f.write(s)

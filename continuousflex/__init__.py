@@ -38,7 +38,7 @@ import pyworkflow.utils as pwutils
 
 _logo = "logo.png"
 
-MD_NMMD_GENESIS_VERSION = "1.1"
+MD_NMMD_GENESIS_VERSION = "2.1"
 # Use this variable to activate an environment from the Scipion conda
 MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
@@ -130,7 +130,7 @@ class Plugin(pwem.Plugin):
                                   % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "master"
+        target_branch = "main"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
         if gfotran_version >= 10:
@@ -141,7 +141,7 @@ class Plugin(pwem.Plugin):
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf '
+                           'git clone -b %s https://github.com/mms29/Genesis2.git . ; autoreconf '
                            '-fi ; ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\"; make install;'
                            % (target_branch, cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)

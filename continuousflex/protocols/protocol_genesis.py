@@ -688,16 +688,16 @@ class FlexProtGenesis(EMProtocol):
                             inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
         # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
-        if self.getForceField() == FORCEFIELD_CAGO:
-            input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
-            for i in range(self.getNumberOfSimulation()):
-                outputPrefix = self.getOutputPrefixAll(i)
-                for j in outputPrefix:
-                    fn_output = j + ".pdb"
-                    if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
-                        output = ContinuousFlexPDBHandler(fn_output)
-                        input.coords = output.coords
-                        input.write_pdb(j + ".pdb")
+        # if self.getForceField() == FORCEFIELD_CAGO:
+        #     input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
+        #     for i in range(self.getNumberOfSimulation()):
+        #         outputPrefix = self.getOutputPrefixAll(i)
+        #         for j in outputPrefix:
+        #             fn_output = j + ".pdb"
+        #             if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
+        #                 output = ContinuousFlexPDBHandler(fn_output)
+        #                 input.coords = output.coords
+        #                 input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\

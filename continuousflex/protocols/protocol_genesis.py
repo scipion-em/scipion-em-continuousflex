@@ -38,7 +38,7 @@ from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes
 from pwem.convert.atom_struct import cifToPdb
 from continuousflex import Plugin
 from pyworkflow.utils.path import makePath
-
+import continuousflex
 import pwem.emlib.metadata as md
 import re
 
@@ -664,7 +664,7 @@ class FlexProtGenesis(EMProtocol):
                     fi.write(self.getGenesisInputFile(i)+"\n")
                     fo.write(self.getOutputPrefix(i)+".log\n")
 
-        script = os.path.join(Plugin.getVar("GENESIS_HOME"), "mpigenesis.py")
+        script = os.path.join(continuousflex.__path__[0], "protocols/utilities/mpi_genesis.py")
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         if self.use_parallelCmd.get() or self.use_rankfiles.get():
             mpi_command = self._stepsExecutor.hostConfig.mpiCommand.get() % \
@@ -711,16 +711,16 @@ class FlexProtGenesis(EMProtocol):
                             inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
         # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
-        if self.getForceField() == FORCEFIELD_CAGO:
-            input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
-            for i in range(self.getNumberOfSimulation()):
-                outputPrefix = self.getOutputPrefixAll(i)
-                for j in outputPrefix:
-                    fn_output = j + ".pdb"
-                    if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
-                        output = ContinuousFlexPDBHandler(fn_output)
-                        input.coords = output.coords
-                        input.write_pdb(j + ".pdb")
+        # if self.getForceField() == FORCEFIELD_CAGO:
+        #     input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
+        #     for i in range(self.getNumberOfSimulation()):
+        #         outputPrefix = self.getOutputPrefixAll(i)
+        #         for j in outputPrefix:
+        #             fn_output = j + ".pdb"
+        #             if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
+        #                 output = ContinuousFlexPDBHandler(fn_output)
+        #                 input.coords = output.coords
+        #                 input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\

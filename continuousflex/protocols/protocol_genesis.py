@@ -38,7 +38,7 @@ from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes
 from pwem.convert.atom_struct import cifToPdb
 from continuousflex import Plugin
 from pyworkflow.utils.path import makePath
-
+import continuousflex
 import pwem.emlib.metadata as md
 import re
 
@@ -641,7 +641,7 @@ class FlexProtGenesis(EMProtocol):
                     fi.write(self.getGenesisInputFile(i)+"\n")
                     fo.write(self.getOutputPrefix(i)+".log\n")
 
-        script = os.path.join(Plugin.getVar("GENESIS_HOME"), "mpigenesis.py")
+        script = os.path.join(continuousflex.__path__[0], "protocols/utilities/mpi_genesis.py")
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         if self.use_parallelCmd.get() or self.use_rankfiles.get():
             mpi_command = self._stepsExecutor.hostConfig.mpiCommand.get() % \

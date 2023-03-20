@@ -56,7 +56,7 @@ class FlexProtGenesis(EMProtocol):
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
 
-        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_NEW_SIM,
+        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_TOPOLOGY,
                       choices=['New simulation from topology protocol', 'Restart previous GENESIS simulation', "New simulation from files"],
                       help="Chose the type of input for your simulation",
                       important=True)
@@ -242,37 +242,38 @@ class FlexProtGenesis(EMProtocol):
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
                       , condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="Gaussian kernels variance",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         " than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_period', params.IntParam, default=10, label='Update period',
                        help="Number of MD iteration every which the EM poential is updated",
-                       condition="EMfitChoice!=%i"%EMFIT_NONE)
+                       condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
-                      label="Input volume", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+                      label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==%i"%EMFIT_VOLUMES, important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
-                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+                      help="Voxel size in Angstrom of the target volume (s)", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES,
+                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_x', params.FloatParam, default=0, label="Origin X",
                       help="Origin of the first voxel in X direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_y', params.FloatParam, default=0, label="Origin Y",
                       help="Origin of the first voxel in Y direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_z', params.FloatParam, default=0, label="Origin Z",
                       help="Origin of the first voxel in Z direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
 
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==%i"%EMFIT_IMAGES)
@@ -281,16 +282,13 @@ class FlexProtGenesis(EMProtocol):
                       condition="EMfitChoice==%i"%EMFIT_IMAGES, important=True)
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==%i"%EMFIT_IMAGES)
-        group.addParam('projectAngleChoice', params.EnumParam, default=0, label='Projection angles',
-                       choices=['same as image set', 'from xmipp file', 'from other set'],
+        group.addParam('projectAngleChoice', params.EnumParam, default=PROJECTION_ANGLE_SAME, label='Projection angles',
+                       choices=['same as image set', 'from xmipp file'],
                       help="Source of projection angles to align the input PDB with the set of images",
                        condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
                       help="Xmipp metadata file with projection alignement parameters ",
                        condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_XMIPP))
-        group.addParam('projectAngleImage', params.PointerParam, pointerClass="SetOfParticles",
-                      label="projection angle image set  ", help='Image set containing projection alignement parameters',
-                      condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
 
         form.addSection(label='MPI parallelization')
 
@@ -965,8 +963,6 @@ class FlexProtGenesis(EMProtocol):
                     inputEMMetadata.setValue(md.MDL_SHIFT_X, shx, i)
                     inputEMMetadata.setValue(md.MDL_SHIFT_Y, shy, i)
                 inputEMMetadata.write(nameMd)
-            elif self.projectAngleChoice.get() == PROJECTION_ANGLE_IMAGE:
-                raise RuntimeError("projection angles from other image set error : Not implemented")
 
         elif self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), Volume):

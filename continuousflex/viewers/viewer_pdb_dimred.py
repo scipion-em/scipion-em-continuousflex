@@ -23,7 +23,7 @@
 # **************************************************************************
 
 import numpy as np
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam, BooleanParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pwem.viewers import ChimeraView
 from pwem.objects.data import SetOfParticles,SetOfVolumes
@@ -479,6 +479,9 @@ class VolumeTrajectoryViewer(ProtocolViewer):
         form.addParam('displayTrajectories', LabelParam,
                       label='ChimeraX',
                       help='Open the trajectory in ChimeraX.')
+        form.addParam('morph', BooleanParam,
+                      label='morph volumes ?',
+                      help='If set, will use morphing of volumes in ChimeraX')
     def _getVisualizeDict(self):
         return {
                 'displayTrajectories': self._visualize,
@@ -486,19 +489,25 @@ class VolumeTrajectoryViewer(ProtocolViewer):
 
     def _visualize(self, obj, **kwargs):
         """visualisation for volumes set"""
-        volNames = ""
+        volNames = []
         for i in self.protocol:
             i.setSamplingRate(self.protocol.getSamplingRate())
             vol = ImageHandler().read(i)
             volName = os.path.abspath(self._getPath("tmp%i.vol"%i.getObjId()))
             vol.write(volName)
-            volNames += volName+" "
+            volNames.append(volName)
         # Show Chimera
         tmpChimeraFile = self._getPath("chimera.cxc")
         with open(tmpChimeraFile, "w") as f:
-            f.write("open %s vseries true \n" % volNames)
-            # f.write("volume #1 style surface level 0.5")
-            f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
+            if self.morph.get():
+                for n in volNames:
+                    f.write("open %s\n"%n)
+                f.write("color #1-%i lightgrey\n"%len(volNames))
+                f.write("volume morph #1-%i\n"%len(volNames))
+            else:
+                f.write("open %s vseries true \n" % " ".join(volNames))
+                # f.write("volume #1 style surface level 0.5")
+                f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
 
         cv = ChimeraView(tmpChimeraFile)
         return [cv]

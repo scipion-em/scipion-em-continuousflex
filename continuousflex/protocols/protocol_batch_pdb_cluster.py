@@ -61,7 +61,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
         for i in inputClasses:
             if i.getObjId() != 0:
-                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
+                classFile = self._getExtraPath("class%s.xmd" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     writeSetOfParticles(i, classFile)
                 else:
@@ -69,8 +69,8 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
         for i in inputClasses:
             if i.getObjId() != 0:
-                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
-                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                classFile = self._getExtraPath("class%s.xmd" % str(i.getObjId()).zfill(6))
+                classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     args = "-i %s -o %s " % (classFile, classVol)
                     if self.numberOfMpi.get() > 1 :
@@ -88,7 +88,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
         inputClasses = self.inputSet.get()
         for i in inputClasses:
             if i.getObjId() != 0:
-                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 index = outputMd.addObject()
                 outputMd.setValue(md.MDL_IMAGE, classVol, index)
                 outputMd.setValue(md.MDL_ITEM_ID, i.getObjId(), index)

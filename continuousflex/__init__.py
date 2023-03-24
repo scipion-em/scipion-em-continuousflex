@@ -38,7 +38,7 @@ import pyworkflow.utils as pwutils
 
 _logo = "logo.png"
 
-MD_NMMD_GENESIS_VERSION = "1.1"
+MD_NMMD_GENESIS_VERSION = "2.1"
 # Use this variable to activate an environment from the Scipion conda
 MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
@@ -61,6 +61,7 @@ class Plugin(pwem.Plugin):
         cls._defineVar(MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR, cls.getActivationCmd(__version__))
         cls._defineEmVar(NMA_HOME, 'nma')
         cls._defineEmVar(GENESIS_HOME, 'MDTools-' + MD_NMMD_GENESIS_VERSION)
+        cls._defineEmVar(SMOG_HOME, 'smog-2.4.5')
         cls._defineVar(VMD_HOME, '/usr/local/lib/vmd')
         cls._defineVar(MATLAB_HOME, '~/programs/Matlab')
 
@@ -96,7 +97,7 @@ class Plugin(pwem.Plugin):
         os.environ['PATH'] += os.pathsep + env.getBinFolder()
 
         def defineCondaInstallation(version):
-            installed = "last-pull-%s.txt" % datetime.datetime.now().strftime("%y%h%d-%H%M%S")
+            installed = "last-pull-%s.txt" % __version__
 
             cf_commands = []
             cf_commands.append((getCondaInstallation(version, installed), installed))
@@ -113,7 +114,7 @@ class Plugin(pwem.Plugin):
                 config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
             else:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-            installationCmd += 'conda env create -f {} --prefix .'.format(config_path)
+            installationCmd += 'conda env create -f {} --prefix . --force'.format(config_path)
             installationCmd += ' && touch {}'.format(txtfile)
             return installationCmd
 
@@ -129,7 +130,7 @@ class Plugin(pwem.Plugin):
                                   % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "master"
+        target_branch = "main"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
         if gfotran_version >= 10:
@@ -140,7 +141,24 @@ class Plugin(pwem.Plugin):
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . ; autoreconf '
-                           '-fi ; ./configure LDFLAGS=-L\"%s\" FFLAGS=\"%s\"; make install;'
-                           % (target_branch, cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
+                           'git clone -b %s https://github.com/mms29/Genesis2.git . &&'
+                           'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
+                           ' autoreconf -fi && ./configure LDFLAGS=-L\"lib\" FFLAGS=\"%s\" && make install;'
+                           % (target_branch, cls.getCondaLibPath(),
+                              cls.getCondaLibPath(),cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)
+
+
+        env.addPackage('smog', version="2.4.5",
+                       buildDir='smog-2.4.5', url="https://smog-server.org/smog2/code/smog-2.4.5.tgz",
+                       target="smog-2.4.5",
+                       commands=[( "mkdir -p smogenv && cd smogenv && %s conda env create -f %s/smog2.yaml --force --prefix . " 
+                                  "&& cd .. && %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
+                                  "export perl4smog=\"%s/smog-2.4.5/smogenv/bin/perl\" && "
+                                  "echo -n '#!/bin/bash' > configure && "
+                                  "echo "" >> configure &&"
+                                  "cat configure.smog2 >> configure &&"
+                                  "chmod 777 configure &&"
+                                  "./configure"%
+                                  (cls.getCondaActivationCmd(),continuousflex.__path__[0], env.getEmFolder(), env.getEmFolder()),
+                                   ["bin/smog2"])], default=True)

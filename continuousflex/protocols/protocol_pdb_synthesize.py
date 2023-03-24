@@ -145,6 +145,17 @@ class FlexProtSynthesizePDBs(ProtAnalysis3D):
 
         # iterate over the number of outputs (if mesh, this has to be calculated)
         numberOfPDBs = self.getNumberOfPdbs()
+        def readModes(fnIn):
+            modesMD = md.MetaData(fnIn)
+            vectors = []
+            for objId in modesMD:
+                vecFn = modesMD.getValue(md.MDL_NMA_MODEFILE, objId)
+                vec = np.loadtxt(vecFn)
+                vectors.append(vec)
+            return vectors
+
+        pdb = ContinuousFlexPDBHandler(fnPDB)
+        modes = readModes(fnModeList)
 
         for i in range(numberOfPDBs):
             deformations = np.zeros(numberOfModes)
@@ -186,7 +197,7 @@ class FlexProtSynthesizePDBs(ProtAnalysis3D):
             # we won't keep the first 6 modes
             deformations = deformations[6:]
 
-            self.nma_deform_pdb(fnPDB, fnModeList, self._getExtraPath(str(i + 1).zfill(5) + '_df.pdb'), deformations)
+            self.nma_deform_pdb(pdb.copy(), modes, self._getExtraPath(str(i + 1).zfill(5) + '_df.pdb'), deformations)
 
             pdbMD.setValue(md.MDL_IMAGE, self._getExtraPath(str(i + 1).zfill(5) + '_df.pdb'),
                            pdbMD.addObject())
@@ -194,19 +205,7 @@ class FlexProtSynthesizePDBs(ProtAnalysis3D):
 
         pdbMD.write(deformationFile)
 
-    def nma_deform_pdb(self, fnPDB, fnModeList, fnOut, deformList):
-
-        def readModes(fnIn):
-            modesMD = md.MetaData(fnIn)
-            vectors = []
-            for objId in modesMD:
-                vecFn = modesMD.getValue(md.MDL_NMA_MODEFILE, objId)
-                vec = np.loadtxt(vecFn)
-                vectors.append(vec)
-            return vectors
-
-        pdb = ContinuousFlexPDBHandler(fnPDB)
-        modes = readModes(fnModeList)
+    def nma_deform_pdb(self, pdb, modes, fnOut, deformList):
         for i in range(len(deformList)):
             pdb.coords += deformList[i] * modes[7 - 1 + i]
         pdb.write_pdb(fnOut)

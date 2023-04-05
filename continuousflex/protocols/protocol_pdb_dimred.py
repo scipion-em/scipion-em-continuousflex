@@ -108,7 +108,12 @@ class FlexProtDimredPdb(ProtAnalysis3D):
 
         form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
                       choices=['PCA', 'UMAP'],help="")
-
+        form.addParam('n_neigbors', params.IntParam, label="n_neigbors", condition="method==%i"%REDUCE_METHOD_UMAP,
+                      default=15,help="", expertLevel=params.LEVEL_ADVANCED)
+        form.addParam('n_epocks', params.IntParam, label="n_epocks", condition="method==%i"%REDUCE_METHOD_UMAP,
+                      default=1000,help="", expertLevel=params.LEVEL_ADVANCED)
+        form.addParam('low_memory', params.BooleanParam, label="low_memory", condition="method==%i"%REDUCE_METHOD_UMAP,
+                      default=False,help="", expertLevel=params.LEVEL_ADVANCED)
         form.addParam('reducedDim', IntParam, default=10,
                       label='Number of Principal Components')
 
@@ -174,8 +179,8 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             pdbs_dump = self._getTmpPath('pdbs_dump.pkl')
             joblib.dump(pdbs_matrix, pdbs_dump)
             Y_dump = self._getTmpPath('Y_dump.pkl')
-            args = "%d %d %d %s %s %s" % (self.reducedDim.get(), 15, 1000,
-                                       pdbs_dump, self._getExtraPath('pca_pickled.joblib'), Y_dump)
+            args = "%d %d %d %s %s %s %s" % (self.reducedDim.get(), self.n_neigbors.get(), self.n_epocks.get(),
+                                       pdbs_dump, self._getExtraPath('pca_pickled.joblib'), Y_dump, str(self.low_memory.get()))
             script_path = continuousflex.__path__[0] + '/protocols/utilities/umap_run.py '
             command = "python " + script_path + args
             command = Plugin.getContinuousFlexCmd(command)

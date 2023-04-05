@@ -134,13 +134,16 @@ class TestMDTOMO(TestWorkflow):
         protPca = self.newProtocol(FlexProtDimredPdb,
                                    pdbSource=PDB_SOURCE_ALIGNED,
                                    alignPdbProt=alignPDBs,
-                                   method=REDUCE_METHOD_PCA)
+                                   method=REDUCE_METHOD_PCA,
+                                   reducedDim=3
+                                   )
         protPca.setObjLabel('PCA')
         self.launchProtocol(protPca)
         # ------------------------- UMAP --------------------------------
         protUmap = self.newProtocol(FlexProtDimredPdb,
                                    pdbSource=PDB_SOURCE_ALIGNED,
                                    alignPdbProt=alignPDBs,
-                                   method=REDUCE_METHOD_UMAP)
+                                   method=REDUCE_METHOD_UMAP,
+                                    reducedDim=3)
         protUmap.setObjLabel('UMAP')
         self.launchProtocol(protUmap)

@@ -30,8 +30,9 @@ from os.path import basename
 from pwem.utils import runProgram
 
 
-REFERENCE_EXT = 0
-REFERENCE_STA = 1
+REFERENCE_SET = 0
+REFERENCE_EXT = 1
+REFERENCE_STA = 2
 
 
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
@@ -46,7 +47,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                       label="Input volume(s)", important=True,
                       help='Select volumes')
         form.addParam('AlignmentParameters', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
+                      choices=['same as volume set', 'from input file', 'from STA run'],
                       default=REFERENCE_EXT,
                       label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
                       help='either an external metadata file containing alignment parameters or STA run')
@@ -64,7 +65,8 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                       default=True,
                       label='Are those parameters come from Scipion/Xmipp?',
                       help='If the original alignment was done on Dynamo or if the alignment was done '
-                           'without missing wedge compensation, switch this to no')
+                           'without missing wedge compensation, switch this to no',
+                      condition = 'AlignmentParameters==%d or AlignmentParameters==%d '%(REFERENCE_EXT, REFERENCE_STA))
 
 
     # --------------------------- INSERT steps functions --------------------------------------------
@@ -74,7 +76,8 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
         self.imgsFn = self._getExtraPath('volumes.xmd')
 
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('prepareMetaData')
+        if self.AlignmentParameters.get() != REFERENCE_SET:
+            self._insertFunctionStep('prepareMetaData')
         self._insertFunctionStep('applyAlignment')
         self._insertFunctionStep('createOutputStep')
 

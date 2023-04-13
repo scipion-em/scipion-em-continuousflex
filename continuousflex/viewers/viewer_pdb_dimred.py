@@ -95,6 +95,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                        label='Axes to display' )
         group.addParam('freeEnergySize', IntParam, default=100,
                        label='Sampling size' )
+        group.addParam('freeEnergyCmap', StringParam, default="jet",
+                       label='Colormap' , help="See matplotlib colormaps for available colormaps")
 
         group = form.addGroup("Animation tool")
 
@@ -214,7 +216,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         #            extent=[xmin,xmax,ymin,ymax])
 
         xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
-        im = ax.contourf(xx, yy, img, cmap='jet')
+        im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get())
         cbar = plotter.figure.colorbar(im)
         cbar.set_label("$\Delta G / k_{B}T$")
         plotter.show()

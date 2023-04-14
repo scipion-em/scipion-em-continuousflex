@@ -27,6 +27,7 @@ from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
+from pwem.utils import runProgram
 
 
 class FlexBatchProtTomoFlowCluster(BatchProtocol):
@@ -81,17 +82,17 @@ class FlexBatchProtTomoFlowCluster(BatchProtocol):
             extra = self._getExtraPath()
 
             params = '-i %(imgPath)s -o %(tempVol)s --type vol ' % locals()
-            self.runJob('xmipp_image_convert',params)
+            runProgram('xmipp_image_convert',params)
 
             if counter == 1 :
                 os.system("mv %(tempVol)s %(outputVol)s" % locals())
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
-                self.runJob('xmipp_image_operate', params)
+                runProgram('xmipp_image_operate', params)
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
-        self.runJob('xmipp_image_operate', params)
+        runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
 
 

@@ -97,6 +97,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                        label='Sampling size' )
         group.addParam('freeEnergyCmap', StringParam, default="jet",
                        label='Colormap' , help="See matplotlib colormaps for available colormaps")
+        group.addParam('freeEnergyInterpolate', BooleanParam, default=False,
+                       label='Interpolate contours ?' )
 
         group = form.addGroup("Animation tool")
 
@@ -199,6 +201,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         xmax = np.max(data[:,0])
         ymin = np.min(data[:,1])
         ymax = np.max(data[:,1])
+        xm = (xmax-xmin)*0.1
+        ym = (ymax-ymin)*0.1
+        xmin -= xm
+        xmax += xm
+        ymin -= ym
+        ymax += ym
         x = np.linspace(xmin, xmax, size)
         y = np.linspace(ymin, ymax, size)
         count = np.zeros((size, size))
@@ -211,12 +219,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("Free energy", "component "+axes_str[0],
                                         "component " + axes_str[1])
-        # im = ax.imshow(img.T[::-1,:],
-        #            cmap = "jet", interpolation=interp,
-        #            extent=[xmin,xmax,ymin,ymax])
-
-        xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
-        im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get())
+        if self.freeEnergyInterpolate.get():
+            im = ax.imshow(img.T[::-1,:],
+                       cmap = self.freeEnergyCmap.get(), interpolation="bicubic",
+                       extent=[xmin,xmax,ymin,ymax])
+        else:
+            xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
+            im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get(),levels=12)
         cbar = plotter.figure.colorbar(im)
         cbar.set_label("$\Delta G / k_{B}T$")
         plotter.show()
@@ -481,9 +490,12 @@ class VolumeTrajectoryViewer(ProtocolViewer):
         form.addParam('displayTrajectories', LabelParam,
                       label='ChimeraX',
                       help='Open the trajectory in ChimeraX.')
-        form.addParam('morph', BooleanParam,
+        form.addParam('morph', BooleanParam, default=True,
                       label='morph volumes ?',
                       help='If set, will use morphing of volumes in ChimeraX')
+        form.addParam('rock', BooleanParam, default=True,
+                      label='rock trajectory ?', condition="morph",
+                      help='If set, will loop the trajectory back and forth')
     def _getVisualizeDict(self):
         return {
                 'displayTrajectories': self._visualize,
@@ -502,6 +514,10 @@ class VolumeTrajectoryViewer(ProtocolViewer):
         tmpChimeraFile = self._getPath("chimera.cxc")
         with open(tmpChimeraFile, "w") as f:
             if self.morph.get():
+                if self.rock.get():
+                    nvol = len(volNames)
+                    for i in range(nvol):
+                        volNames.append(volNames[nvol-i-1])
                 for n in volNames:
                     f.write("open %s\n"%n)
                 f.write("color #1-%i lightgrey\n"%len(volNames))

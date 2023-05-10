@@ -286,9 +286,9 @@ class ProtGenerateTopology(EMProtocol):
 
 
     def getCHARMMInputs(self):
-        return continuousflex.__path__[0] + '/protocols/utilities/charmm/top_all36_prot_na.rtf',\
-         continuousflex.__path__[0] + '/protocols/utilities/charmm/par_all36_prot_na.prm',\
-         continuousflex.__path__[0] + '/protocols/utilities/charmm/toppar_water_ions.str'
+        return continuousflex.__path__[0] + '/protocols/utilities/top_all36_prot_na.rtf',\
+         continuousflex.__path__[0] + '/protocols/utilities/par_all36_prot_na.prm',\
+         continuousflex.__path__[0] + '/protocols/utilities/toppar_water_ions.str'
 
     # --------------------------- INFO functions --------------------------------------------
     def _summary(self):

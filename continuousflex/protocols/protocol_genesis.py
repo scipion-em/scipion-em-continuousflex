@@ -233,6 +233,8 @@ class FlexProtGenesis(EMProtocol):
                       help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
         group.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
                       help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
+        group.addParam('posi_restr', params.BooleanParam, label='Positional restraint on Calpha atoms', default=False,
+                      help="Apply a restraint on the positions of Ca atoms")
 
         # Experiments =================================================================================================
         form.addSection(label='EM data')
@@ -568,6 +570,7 @@ class FlexProtGenesis(EMProtocol):
             "nm_dt": self.nm_dt.get(),
             "nm_mass": self.nm_mass.get(),
             "rigid_bond": self.rigid_bond.get(),
+            "posi_restr": self.posi_restr.get(),
             "fast_water": self.fast_water.get(),
             "water_model": self.water_model.get(),
             "box_size_x": self.box_size_x.get(),
@@ -1030,7 +1033,7 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
                        electrostatics=ELECTROSTATICS_CUTOFF, switch_dist=10.0, cutoff_dist=12.0,
                        pairlist_dist=15.0, vdw_force_switch=True, implicitSolvent=IMPLICIT_SOLVENT_NONE,
                        integrator=INTEGRATOR_LEAPFROG, time_step=0.001, eneout_period=100, crdout_period=100,
-                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,
+                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,posi_restr=False,
                        fast_water = False, water_model="TIP3", box_size_x=None, box_size_y=None, box_size_z=None,
                        boundary=BOUNDARY_NOBC, ensemble=ENSEMBLE_NVE, tpcontrol=TPCONTROL_NONE, temperature=300.0,
                        pressure=1.0, EMfitChoice=EMFIT_NONE, constantK=1000.0, nreplica=4, emfit_sigma=2.0,
@@ -1047,6 +1050,9 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
         s += "grotopfile = %s.top\n" % inputPDBprefix
     if inputType == INPUT_RESTART:
         s += "rstfile = %s \n" % rstFile
+    if posi_restr:
+        s += "reffile = %s.pdb \n" % inputPDBprefix
+
 
     s += "\n[OUTPUT] \n"  # -----------------------------------------------------------
     if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
@@ -1100,7 +1106,7 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "nsteps = %i \n" % n_steps
     s += "eneout_period = %i \n" % eneout_period
     s += "crdout_period = %i \n" % crdout_period
-    s += "rstout_period = %i \n" % n_steps
+    s += "rstout_period = %i \n" % crdout_period
     s += "nbupdate_period = %i \n" % nbupdate_period
 
     if simulationType == SIMULATION_NMMD or simulationType == SIMULATION_RENMMD:
@@ -1154,22 +1160,39 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
         if ensemble == ENSEMBLE_NPT:
             s += "pressure = %.2f \n" % pressure
 
-    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
-            and simulationType != SIMULATION_MIN:
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
         s += "\n[SELECTION] \n"  # -----------------------------------------------------------
-        s += "group1 = all and not hydrogen\n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "group1 = all and not hydrogen\n"
+        if posi_restr:
+            s += "group1 = an:CA\n"
+
+
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
 
         s += "\n[RESTRAINTS] \n"  # -----------------------------------------------------------
-        s += "nfunctions = 1 \n"
-        s += "function1 = EM \n"
-        constStr = constantK
-        if "-" in constStr:
-            splt = constStr.split("-")
-            constStr = " ".join(
-                [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
-        s += "constant1 = %s \n" % constStr
-        s += "select_index1 = 1 \n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "nfunctions = 1 \n"
+            s += "function1 = EM \n"
+            constStr = constantK
+            if "-" in constStr:
+                splt = constStr.split("-")
+                constStr = " ".join(
+                    [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
+            s += "constant1 = %s \n" % constStr
+            s += "select_index1 = 1 \n"
+        else:
+            s += "nfunctions = 1 \n"
+            s += "function1 = POSI \n"
+            s += "constant1 = 1 \n"
+            s += "select_index1 = 1 \n"
 
+    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN:
         s += "\n[EXPERIMENTS] \n"  # -----------------------------------------------------------
         s += "emfit = YES  \n"
         s += "emfit_sigma = %.4f \n" % emfit_sigma

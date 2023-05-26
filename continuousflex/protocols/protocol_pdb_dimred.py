@@ -107,7 +107,7 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                            'and avoid creating an output set of pdb in the align pdb protocol.')
 
         form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
-                      choices=['PCA', 'UMAP', 'DensMAP'],help="")
+                      choices=['PCA', 'UMAP'],help="")
         form.addParam('n_neigbors', params.IntParam, label="n_neigbors", condition="method==%i"%REDUCE_METHOD_UMAP,
                       default=15,help="", expertLevel=params.LEVEL_ADVANCED)
         form.addParam('n_epocks', params.IntParam, label="n_epocks", condition="method==%i"%REDUCE_METHOD_UMAP,

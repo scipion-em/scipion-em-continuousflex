@@ -68,8 +68,6 @@ class ProtGenerateTopology(EMProtocol):
         form.addParam('reorderType', params.BooleanParam, label="Reorder based on segement name ?",
                        default=False, condition="reorderResidues",
                        help='If yes reorder the residues within a segement, otherwise, reorder residues within a chains')
-        form.addParam('nucleicChoice', params.EnumParam, label="Contains nucleic acids ?", default=NUCLEIC_NO,
-                       choices=['No', 'RNA', 'DNA'], help="Specify if the generator should consider nucleic residues as DNA or RNA")
 
     def _insertAllSteps(self):
         ff = self.forcefield.get()
@@ -109,16 +107,26 @@ class ProtGenerateTopology(EMProtocol):
         mol.alias_res("HIS", "HSE")
         mol.alias_res("MSE", "MET")
         mol.alias_atom("CD1", "CD", "ILE")
-        if self.nucleicChoice.get() == NUCLEIC_RNA:
-            mol.alias_res("A", "ADE")
-            mol.alias_res("G", "GUA")
-            mol.alias_res("C", "CYT")
-            mol.alias_res("U", "URA")
-        elif self.nucleicChoice.get() == NUCLEIC_DNA:
-            mol.alias_res("DA", "ADE")
-            mol.alias_res("DG", "GUA")
-            mol.alias_res("DC", "CYT")
-            mol.alias_res("DT", "THY")
+
+        rna = 0
+        rna += mol.alias_res("A", "ADE")
+        rna += mol.alias_res("G", "GUA")
+        rna += mol.alias_res("C", "CYT")
+        rna += mol.alias_res("U", "URA")
+
+        dna = 0
+        dna += mol.alias_res("DA", "ADE")
+        dna += mol.alias_res("DG", "GUA")
+        dna += mol.alias_res("DC", "CYT")
+        dna += mol.alias_res("DT", "THY")
+
+        if dna > 0 :
+            self.nucleicChoice = NUCLEIC_DNA
+        if rna >0 :
+            self.nucleicChoice = NUCLEIC_RNA
+        else:
+            self.nucleicChoice = NUCLEIC_NO
+
 
         if self.reorderResidues.get():
             if self.reorderType.get() :
@@ -126,7 +134,7 @@ class ProtGenerateTopology(EMProtocol):
             else:
                 mol.atom_res_reorder(chainType=0)
 
-        mol.write_pdb(inputPDB)
+        mol.write_pdb(self._getExtraPath("tmp.pdb"))
 
     def prepareGROTOP(self):
         inputPDB = self._getExtraPath("input.pdb")
@@ -143,17 +151,23 @@ class ProtGenerateTopology(EMProtocol):
         mol.alias_res("HSD", "HIS")
         mol.alias_res("HSP", "HIS")
 
-        if self.nucleicChoice.get() == NUCLEIC_RNA:
-            mol.alias_res("CYT", "C")
-            mol.alias_res("GUA", "G")
-            mol.alias_res("ADE", "A")
-            mol.alias_res("URA", "U")
+        rna = 0
+        rna += mol.alias_res("CYT", "C")
+        rna += mol.alias_res("GUA", "G")
+        rna += mol.alias_res("ADE", "A")
+        rna += mol.alias_res("URA", "U")
 
-        elif self.nucleicChoice.get() == NUCLEIC_DNA:
-            mol.alias_res("CYT", "DC")
-            mol.alias_res("GUA", "DG")
-            mol.alias_res("ADE", "DA")
-            mol.alias_res("THY", "DT")
+        dna = 0
+        dna += mol.alias_res("CYT", "DC")
+        dna += mol.alias_res("GUA", "DG")
+        dna += mol.alias_res("ADE", "DA")
+        dna += mol.alias_res("THY", "DT")
+        if dna > 0:
+            self.nucleicChoice = NUCLEIC_DNA
+        if rna > 0:
+            self.nucleicChoice = NUCLEIC_RNA
+        else:
+            self.nucleicChoice = NUCLEIC_NO
 
         mol.alias_atom("O1'", "O1*")
         mol.alias_atom("O2'", "O2*")
@@ -172,13 +186,12 @@ class ProtGenerateTopology(EMProtocol):
                 mol.atom_res_reorder(chainType=1)
             else:
                 mol.atom_res_reorder(chainType=0)
-        mol.write_pdb(inputPDB)
+        mol.write_pdb(self._getExtraPath("tmp.pdb"))
 
     def runPSF(self):
-        inputPDB = self._getExtraPath("input.pdb")
+        inputPDB = self._getExtraPath("tmp.pdb")
         inputTopo = self.getCHARMMInputs()[0]
         outputPrefix = self._getExtraPath("output")
-        nucleicChoice = self.nucleicChoice.get()
 
         fnPSFgen = self._getExtraPath("psfgen.tcl")
         with open(fnPSFgen, "w") as psfgen:
@@ -187,7 +200,7 @@ class ProtGenerateTopology(EMProtocol):
             psfgen.write("package require psfgen\n")
             psfgen.write("topology %s\n" % inputTopo)
             psfgen.write("\n")
-            if nucleicChoice == NUCLEIC_RNA or nucleicChoice == NUCLEIC_DNA:
+            if self.nucleicChoice == NUCLEIC_RNA or self.nucleicChoice == NUCLEIC_DNA:
                 psfgen.write("set nucleic [atomselect top nucleic]\n")
                 psfgen.write("set chains [lsort -unique [$nucleic get chain]] ;\n")
                 psfgen.write("foreach chain $chains {\n")
@@ -195,13 +208,13 @@ class ProtGenerateTopology(EMProtocol):
                 psfgen.write("    $sel writepdb %s_tmp.pdb\n" % outputPrefix)
                 psfgen.write("    segment N${chain} { pdb %s_tmp.pdb }\n" % outputPrefix)
                 psfgen.write("    coordpdb %s_tmp.pdb N${chain}\n" % outputPrefix)
-                if nucleicChoice == NUCLEIC_DNA:
+                if self.nucleicChoice == NUCLEIC_DNA:
                     psfgen.write("    set resids [lsort -unique [$sel get resid]]\n")
                     psfgen.write("    foreach r $resids {\n")
                     psfgen.write("        patch DEOX N${chain}:$r\n")
                     psfgen.write("    }\n")
                 psfgen.write("}\n")
-                if nucleicChoice == NUCLEIC_DNA:
+                if self.nucleicChoice == NUCLEIC_DNA:
                     psfgen.write("regenerate angles dihedrals\n")
                 psfgen.write("\n")
             psfgen.write("set protein [atomselect top protein]\n")
@@ -225,7 +238,7 @@ class ProtGenerateTopology(EMProtocol):
 
     def runGROTOP(self):
         outputPrefix = self._getExtraPath("output")
-        inputPDB = self._getExtraPath("input.pdb")
+        inputPDB = self._getExtraPath("tmp.pdb")
 
         # Run Smog2
         environ = pwutils.Environ(os.environ)
@@ -263,13 +276,11 @@ class ProtGenerateTopology(EMProtocol):
         runCommand("rm -f %s.tmp" % grotopFile)
 
         if self.forcefield.get() == FORCEFIELD_CAGO:
-            mol = ContinuousFlexPDBHandler(inputPDB)
+            mol = ContinuousFlexPDBHandler(self._getExtraPath("input.pdb"))
             mol.select_atoms(mol.allatoms2ca())
             mol.write_pdb(outputPrefix + ".pdb")
         else:
             runCommand("cp %s %s"%(inputPDB,outputPrefix + ".pdb"))
-
-
 
     def checkPDB(self):
         outPDB = self._getExtraPath("output.pdb")

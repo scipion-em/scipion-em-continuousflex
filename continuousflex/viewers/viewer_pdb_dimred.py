@@ -32,7 +32,7 @@ from continuousflex.protocols import FlexProtDimredPdb
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
 from joblib import load
-from continuousflex.viewers.tk_dimred import PCAWindowDimred
+from continuousflex.viewers.tk_dimred import PCAWindowDimred, ANIMATION_INV, ANIMATION_AVG
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
@@ -44,6 +44,7 @@ from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClu
 from .plotter import FlexPlotter
 import os
 from matplotlib.ticker import MaxNLocator
+import tkinter as tk
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -51,10 +52,6 @@ Y_LIMITS_NONE = 0
 Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
-
-ANIMATION_INV=0
-ANIMATION_AVG=1
-ANIMATION_PCA=2
 
 NUM_POINTS_TRAJECTORY=10
 
@@ -79,10 +76,10 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       help="Display the amount of variance explained by each PCA component. ",
                       condition=self.protocol.method.get()==REDUCE_METHOD_PCA)
 
-        group = form.addGroup("Display PCA")
+        group = form.addGroup("Display landscape")
         group.addParam('displayPCA', LabelParam,
-                      label='Display PCA axes',
-                      help='Open a GUI to visualize the PCA space')
+                      label='Display PCA/UMAP axes',
+                      help='Open a GUI to visualize the PCA/UMAP space')
 
         group.addParam('pcaAxes', StringParam, default="1 2",
                        label='Axes to display' )
@@ -104,12 +101,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         group.addParam('displayAnimationtool', LabelParam,
                       label='Open Animation tool ',
-                      help='Open a GUI to analyze the PCA space'
+                      help='Open a GUI to analyze the PCA/UMAP space'
                            ' to draw and adjust trajectories and create clusters.')
 
         group.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
-                      label='(Optional) Em data for cluster animation',  allowsNull=True,
-                      help="Provide a EM data set that match the PDB data set to visualize animation on 3D reconstructions")
+                      label='(Optional) Set of particles for clustering animation',  allowsNull=True,
+                      help="Provide a set of particles that match the PDB data set to visualize animation on 3D reconstructions")
 
         group = form.addGroup("Figure parameters")
 
@@ -177,13 +174,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                       alpha=self.alpha, s=self.s, cbar_label=None)
         if dim == 1:
             data.XIND = axes[0]-1
-            plotter.plotArray1D("PCA","%i component"%(axes[0]),"")
+            plotter.plotArray1D("","%i component"%(axes[0]),"")
         if dim == 2:
             data.YIND = axes[1]-1
-            plotter.plotArray2D_xy("PCA","%i component"%(axes[0]),"%i component"%(axes[1]))
+            plotter.plotArray2D_xy("","%i component"%(axes[0]),"%i component"%(axes[1]))
         if dim == 3:
             data.ZIND = axes[2]-1
-            plotter.plotArray3D_xyz("PCA","%i component"%(axes[0]),"%i component"%(axes[1]),"%i component"%(axes[2]))
+            plotter.plotArray3D_xyz("","%i component"%(axes[0]),"%i component"%(axes[1]),"%i component"%(axes[2]))
         plotter.show()
 
     def _displayFreeEnergy(self, paramName):
@@ -280,8 +277,15 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=weights[i]))
         return data
 
-    def _generateAnimation(self):
+    def _generateAnimation(self, animtype):
         prot = self.protocol
+
+        if prot.method.get() == REDUCE_METHOD_UMAP and animtype == ANIMATION_INV:
+            return  self.trajectoriesWindow.showError("Can not show the inverse tranform for UMAP. Try viewing cluster average instead.")
+
+        if all([int(p._weight) == 0 for p in self.trajectoriesWindow.data]) and animtype == ANIMATION_AVG:
+            return self.trajectoriesWindow.showError("No clustering detected.")
+
         initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
 
         # Get animation root
@@ -293,7 +297,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animationRoot = os.path.join(animationPath, '')
 
         # get trajectory coordinates
-        animtype = self.trajectoriesWindow.getAnimationType()
         coords_list = []
         if animtype ==ANIMATION_INV:
             trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
@@ -313,10 +316,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             count = 0 #CLUSTERINGTAG
             for p in self.trajectoriesWindow.data:
                 clsId = int(p._weight) #CLUSTERINGTAG
-                if clsId in classDict:
-                    classDict[clsId].append(count)
-                else:
-                    classDict[clsId] = [count]
+                if clsId!=0:
+                    if clsId in classDict:
+                        classDict[clsId].append(count)
+                    else:
+                        classDict[clsId] = [count]
                 count += 1
 
             keys = list(classDict.keys())
@@ -354,14 +358,21 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         VmdView(' -e ' + vmdFn).show()
 
     def saveClusterCallback(self, tkWindow):
+        if all([int(p._weight) == 0 for p in tkWindow.data]):
+            return tkWindow.showError("No clustering detected.")
+
         # get cluster name
         clusterName = "animation_" + tkWindow.getClusterName()
 
         # get input metadata
         inputSet = self.inputSet.get()
         if inputSet is None:
-            tkWindow.showError("Select an EM set before exporting clusters.")
+            tkWindow.showError("Select a set of particles to apply clustering to.")
             return
+
+        if inputSet.getSize() != tkWindow.data.getSize():
+            return tkWindow.showError("The number of particles differs from the number of data points. Select a set of particles that match the data.")
+
 
         classID=[]
         for p in tkWindow.data:
@@ -427,9 +438,14 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         if os.path.isfile(trajFile) and os.path.getsize(trajFile) != 0:
             trajectoryPoints = np.loadtxt(trajFile)
             data = PathData(dim=trajectoryPoints.shape[1])
+            n=0
             for i, row in enumerate(trajectoryPoints):
                 data.addPoint(Point(pointId=i + 1, data=list(row), weight=0))
-            loaded.append("trajectory.txt")
+                n+=1
+            loaded.append("trajectory")
+            self.trajectoriesWindow.numberOfPointsVar.set(n)
+            self.trajectoriesWindow.numberOfPoints = n
+
 
         clusterFile = os.path.join(trajPath,'clusters.txt')
         if os.path.isfile(clusterFile) and os.path.getsize(clusterFile) != 0:
@@ -438,7 +454,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             for p in self.trajectoriesWindow.data:
                 p._weight = clusterPoints[i]
                 i+=1
-            loaded.append("clusters.txt")
+            loaded.append("clusters")
         if len(loaded) ==0:
             return self.trajectoriesWindow.showError('Animation files not found. ')
         else:
@@ -447,6 +463,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         self.trajectoriesWindow.setPathData(data)
         self.trajectoriesWindow._onUpdateClick()
         self.trajectoriesWindow._checkNumberOfPoints()
+        self.trajectoriesWindow.saveClusterBtn.config(state=tk.NORMAL)
+
 
     def _saveAnimation(self, tkWindow):
         # get cluster name

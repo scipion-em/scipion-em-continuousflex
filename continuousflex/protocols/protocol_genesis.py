@@ -445,6 +445,12 @@ class FlexProtGenesis(EMProtocol):
             elif self.inputType.get() == INPUT_TOPOLOGY:
                 inputPSF = self.topoProt.get()._getExtraPath("output.psf")
             runCommand("cp %s %s.psf" % (inputPSF, inputPrefix))
+            inputRTF, inputPRM, inputSTR = self.getCHARMMInputs()
+            runCommand("cp %s %s_charmm.rtf" % (inputRTF, inputPrefix))
+            runCommand("cp %s %s_charmm.prm" % (inputPRM, inputPrefix))
+            runCommand("cp %s %s_charmm.str" % (inputSTR, inputPrefix))
+
+
         elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
             if self.inputType.get() == INPUT_NEW_SIM:
                 inputTOP = self.inputTOP.get()
@@ -548,9 +554,6 @@ class FlexProtGenesis(EMProtocol):
             "nm_number": self.getNumberOfNormalModes(),
             "rigid_body_params": self.getRigidBodyParams(indexFit),
             "forcefield": self.getForceField(),
-            "inputRTF": inputRTF,
-            "inputPRM": inputPRM,
-            "inputSTR": inputSTR,
 
             # Input Params
             "inputType": self.inputType.get(),
@@ -604,7 +607,7 @@ class FlexProtGenesis(EMProtocol):
         command = buildRunCommand(programname, params, numberOfMpi=self.numberOfMpi.get(),
                               hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
-        command = Plugin.getContinuousFlexCmd(command)
+        # command = Plugin.getContinuousFlexCmd(command)
         runCommand(command, env=env)
 
     def runSimulationParallel(self):
@@ -639,7 +642,7 @@ class FlexProtGenesis(EMProtocol):
         # Build parallel command
         parallel_cmd = "seq -f \"%%06g\" 1 %i | parallel -P %i \" %s\" " % (
         self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)
-        parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
+        # parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
 
         print("Command : %s" % cmd)
         print("Parallel Command : %s" % parallel_cmd)
@@ -713,17 +716,16 @@ class FlexProtGenesis(EMProtocol):
                             outputPDB=j + ".pdb",
                             inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
-        # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
-        # if self.getForceField() == FORCEFIELD_CAGO:
-        #     input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
-        #     for i in range(self.getNumberOfSimulation()):
-        #         outputPrefix = self.getOutputPrefixAll(i)
-        #         for j in outputPrefix:
-        #             fn_output = j + ".pdb"
-        #             if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
-        #                 output = ContinuousFlexPDBHandler(fn_output)
-        #                 input.coords = output.coords
-        #                 input.write_pdb(j + ".pdb")
+        # ensure GENESIS maintains input pdb format
+        if self.getForceField() == FORCEFIELD_CAGO:
+            input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
+            for i in range(self.getNumberOfSimulation()):
+                outputPrefix = self.getOutputPrefixAll(i)
+                for j in outputPrefix:
+                    fn_output = j + ".pdb"
+                    if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
+                        input.coords = ContinuousFlexPDBHandler.read_coords(fn_output)
+                        input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\
@@ -1028,8 +1030,7 @@ class FlexProtGenesis(EMProtocol):
             return None,None,None
 
 def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMprefix="", rstFile="", nm_number=0,
-                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputRTF=None, inputPRM=None,
-                       inputSTR=None, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
+                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
                        electrostatics=ELECTROSTATICS_CUTOFF, switch_dist=10.0, cutoff_dist=12.0,
                        pairlist_dist=15.0, vdw_force_switch=True, implicitSolvent=IMPLICIT_SOLVENT_NONE,
                        integrator=INTEGRATOR_LEAPFROG, time_step=0.001, eneout_period=100, crdout_period=100,
@@ -1042,10 +1043,9 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "pdbfile = %s.pdb\n" % inputPDBprefix
     if forcefield == FORCEFIELD_CHARMM:
         s += "psffile = %s.psf\n" % inputPDBprefix
-        s += "topfile = %s\n" % inputRTF
-        s += "parfile = %s\n" % inputPRM
-        if inputSTR != "" and inputSTR is not None:
-            s += "strfile = %s\n" % inputSTR
+        s += "topfile = %s_charmm.rtf\n" % inputPDBprefix
+        s += "parfile = %s_charmm.prm\n" % inputPDBprefix
+        s += "strfile = %s_charmm.str\n" % inputPDBprefix
     elif forcefield == FORCEFIELD_AAGO or forcefield == FORCEFIELD_CAGO:
         s += "grotopfile = %s.top\n" % inputPDBprefix
     if inputType == INPUT_RESTART:

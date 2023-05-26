@@ -23,7 +23,7 @@
 # **************************************************************************
 
 import multiprocessing
-from pyworkflow.protocol.params import PointerParam, FileParam
+from pyworkflow.protocol.params import PointerParam, FileParam, USE_GPU, GPU_LIST, BooleanParam, StringParam,LEVEL_ADVANCED
 from pwem.protocols import BatchProtocol
 from pwem.objects import SetOfClasses2D
 from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes, readSetOfVolumes
@@ -31,7 +31,7 @@ from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes, readSetOfVolu
 from pyworkflow.utils import runCommand
 from pwem.emlib.image import ImageHandler
 import pwem.emlib.metadata as md
-
+import os
 
 class FlexBatchProtClusterSet(BatchProtocol):
     """ Protocol executed when a set of cluster is created
@@ -41,8 +41,16 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
     def _defineParams(self, form):
         form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
-        form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
-        form.addParallelSection(threads=1, mpi=multiprocessing.cpu_count()//2-1)
+        form.addHidden(USE_GPU, BooleanParam, default=True,
+                       label="Use GPU for execution",
+                       help="This protocol has both CPU and GPU implementation.\
+                       Select the one you want to use.")
+
+        form.addHidden(GPU_LIST, StringParam, default='0',
+                       expertLevel=LEVEL_ADVANCED,
+                       label="Choose GPU IDs",
+                       help="Add a list of GPU devices that can be used")
+        form.addParallelSection(threads=4, mpi=1)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -73,12 +81,47 @@ class FlexBatchProtClusterSet(BatchProtocol):
                 classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     args = "-i %s -o %s " % (classFile, classVol)
-                    if self.numberOfMpi.get() > 1 :
-                        progname = "xmipp_mpi_reconstruct_fourier "
-                        self.runJob(progname, args)
+                    args += ' --sampling %f' % self.inputSet.get().getSamplingRate()
+
+                    if self.useGpu.get():
+                        # AJ to make it work with and without queue system
+                        args += ' --thr %d' % self.numberOfThreads.get()
+                        # if self.numberOfMpi.get() > 1:
+                        #     N_GPUs = len((self.gpuList.get()).split(','))
+                        #     args += ' -gpusPerNode %d' % N_GPUs
+                        #     args += ' -threadsPerGPU %d' % max(self.numberOfThreads.get(), 4)
+                        # count = 0
+                        # GpuListCuda = ''
+                        # if self.useQueueForSteps() or self.useQueue():
+                        #     GpuList = os.environ["CUDA_VISIBLE_DEVICES"]
+                        #     GpuList = GpuList.split(",")
+                        #     for elem in GpuList:
+                        #         GpuListCuda = GpuListCuda + str(count) + ' '
+                        #         count += 1
+                        # else:
+                        #     GpuListAux = ''
+                        #     for elem in self.getGpuList():
+                        #         GpuListCuda = GpuListCuda + str(count) + ' '
+                        #         GpuListAux = GpuListAux + str(elem) + ','
+                        #         count += 1
+                        #     os.environ["CUDA_VISIBLE_DEVICES"] = GpuListAux
+                        # if self.numberOfMpi.get() == 1:
+                        #     args += ' --device %s' % (GpuListCuda) if self.useGpu.get() else ''
+
+
+                    if self.useGpu.get():
+                        if self.numberOfMpi.get() > 1:
+                            self.runJob('xmipp_cuda_reconstruct_fourier', args,
+                                        numberOfMpi=len((self.gpuList.get()).split(',')) + 1)
+                        else:
+                            self.runJob('xmipp_cuda_reconstruct_fourier', args)
                     else:
-                        progname = "xmipp_reconstruct_fourier "
-                        runCommand(progname + args)
+                        if self.numberOfMpi.get() > 1 :
+                            progname = "xmipp_mpi_reconstruct_fourier "
+                            self.runJob(progname, args)
+                        else:
+                            progname = "xmipp_reconstruct_fourier "
+                            runCommand(progname + args)
                 else:
                     classAvg = ImageHandler().computeAverage(i)
                     classAvg.write(classVol)

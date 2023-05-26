@@ -176,22 +176,20 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             makePath(pathPC)
             matrix = pca.components_.reshape(self.reducedDim.get(),pdbs_matrix.shape[1]//3,3)
             self.writePrincipalComponents(prefix=pathPC, matrix = matrix)
+            np.savetxt(self.getOutputMatrixFile(),Y)
 
         elif self.method.get() == REDUCE_METHOD_UMAP:
             pdbs_dump = self._getTmpPath('pdbs_dump.pkl')
             joblib.dump(pdbs_matrix, pdbs_dump)
-            Y_dump = self._getTmpPath('Y_dump.pkl')
-            args = "%d %d %d %s %s %s %s %s" % (self.reducedDim.get(), self.n_neigbors.get(), self.n_epocks.get(),
-                                       pdbs_dump, self._getExtraPath('pca_pickled.joblib'), Y_dump, str(self.low_memory.get()),
-                                                str(self.metric_rmsd.get()))
+            args = "%d %d %d %s %s %s %i %i" % (self.reducedDim.get(), self.n_neigbors.get(), self.n_epocks.get(),
+                                       pdbs_dump, self._getExtraPath('pca_pickled.joblib'), self.getOutputMatrixFile(), int(self.low_memory.get()),
+                                                int(self.metric_rmsd.get()))
             script_path = continuousflex.__path__[0] + '/protocols/utilities/umap_run.py '
             command = "python " + script_path + args
             command = Plugin.getContinuousFlexCmd(command)
             check_call(command, shell=True, stdout=sys.stdout, stderr=sys.stderr,
                        env=None, cwd=None)
-            Y = joblib.load(Y_dump)
 
-        np.savetxt(self.getOutputMatrixFile(),Y)
 
     def createOutputStep(self):
             # Metadata

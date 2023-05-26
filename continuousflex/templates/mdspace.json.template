@@ -16,22 +16,6 @@ MDSPACE basic workflow example
     },
     {
         "object.className": "ProtGenerateTopology",
-        "object.id": "164",
-        "object.label": "All-atom model",
-        "object.comment": "",
-        "_useQueue": false,
-        "_prerequisites": "",
-        "_queueParams": null,
-        "runName": null,
-        "runMode": 1,
-        "forcefield": 0,
-        "reorderResidues": false,
-        "reorderType": false,
-        "nucleicChoice": 0,
-        "inputPDB": "3394.output"
-    },
-    {
-        "object.className": "ProtGenerateTopology",
         "object.id": "204",
         "object.label": "C-Alpha Go model",
         "object.comment": "",
@@ -43,8 +27,7 @@ MDSPACE basic workflow example
         "forcefield": 2,
         "reorderResidues": false,
         "reorderType": false,
-        "nucleicChoice": 0,
-        "inputPDB": "164.outputPDB"
+        "inputPDB": "3394.output"
     },
     {
         "object.className": "FlexProtGenesis",

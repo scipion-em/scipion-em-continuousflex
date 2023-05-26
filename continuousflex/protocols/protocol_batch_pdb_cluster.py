@@ -27,7 +27,6 @@ from pyworkflow.protocol.params import PointerParam, FileParam, USE_GPU, GPU_LIS
 from pwem.protocols import BatchProtocol
 from pwem.objects import SetOfClasses2D
 from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes, readSetOfVolumes
-
 from pyworkflow.utils import runCommand
 from pwem.emlib.image import ImageHandler
 import pwem.emlib.metadata as md
@@ -84,30 +83,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
                     args += ' --sampling %f' % self.inputSet.get().getSamplingRate()
 
                     if self.useGpu.get():
-                        # AJ to make it work with and without queue system
                         args += ' --thr %d' % self.numberOfThreads.get()
-                        # if self.numberOfMpi.get() > 1:
-                        #     N_GPUs = len((self.gpuList.get()).split(','))
-                        #     args += ' -gpusPerNode %d' % N_GPUs
-                        #     args += ' -threadsPerGPU %d' % max(self.numberOfThreads.get(), 4)
-                        # count = 0
-                        # GpuListCuda = ''
-                        # if self.useQueueForSteps() or self.useQueue():
-                        #     GpuList = os.environ["CUDA_VISIBLE_DEVICES"]
-                        #     GpuList = GpuList.split(",")
-                        #     for elem in GpuList:
-                        #         GpuListCuda = GpuListCuda + str(count) + ' '
-                        #         count += 1
-                        # else:
-                        #     GpuListAux = ''
-                        #     for elem in self.getGpuList():
-                        #         GpuListCuda = GpuListCuda + str(count) + ' '
-                        #         GpuListAux = GpuListAux + str(elem) + ','
-                        #         count += 1
-                        #     os.environ["CUDA_VISIBLE_DEVICES"] = GpuListAux
-                        # if self.numberOfMpi.get() == 1:
-                        #     args += ' --device %s' % (GpuListCuda) if self.useGpu.get() else ''
-
 
                     if self.useGpu.get():
                         if self.numberOfMpi.get() > 1:

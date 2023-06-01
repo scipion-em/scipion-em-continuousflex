@@ -336,15 +336,20 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # Generate DCD trajectory
         initdcdcp = initPDB.copy()
         initdcdcp.coords = coords_list[0]
-        initdcdcp.write_pdb(animationRoot+"trajectory.pdb")
-        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+"trajectory.dcd")
+        if  animtype == ANIMATION_INV:
+            outprefix = "trajectory"
+        else:
+            outprefix = "clusterAvg"
+
+        initdcdcp.write_pdb(animationRoot+"reference.pdb")
+        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+outprefix+".dcd")
 
         # Generate the vmd script
         vmdFn = animationRoot + 'trajectory.vmd'
         vmdFile = open(vmdFn, 'w')
         vmdFile.write("""
-        mol new %strajectory.pdb waitfor all
-        mol addfile %strajectory.dcd waitfor all
+        mol new %sreference.pdb waitfor all
+        mol addfile %s%s.dcd waitfor all
         animate style Rock
         display projection Orthographic
         mol modcolor 0 0 Index
@@ -352,7 +357,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animate speed 0.75
         animate forward
         animate delete  beg 0 end 0 skip 0 0
-        """ % (animationRoot,animationRoot))
+        """ % (animationRoot,animationRoot,outprefix))
         vmdFile.close()
 
         VmdView(' -e ' + vmdFn).show()
@@ -445,7 +450,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             loaded.append("trajectory")
             self.trajectoriesWindow.numberOfPointsVar.set(n)
             self.trajectoriesWindow.numberOfPoints = n
-
+            self.trajectoriesWindow.setPathData(data)
+            self.trajectoriesWindow._checkNumberOfPoints()
 
         clusterFile = os.path.join(trajPath,'clusters.txt')
         if os.path.isfile(clusterFile) and os.path.getsize(clusterFile) != 0:
@@ -458,12 +464,19 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         if len(loaded) ==0:
             return self.trajectoriesWindow.showError('Animation files not found. ')
         else:
+            self.trajectoriesWindow._onUpdateClick()
+            # self.trajectoriesWindow.saveClusterBtn.config(state=tk.NORMAL)
+            print("////////////////////////")
+            print(trajPath)
+            dirpath, dirname = os.path.split(trajPath)
+            if dirname == '':
+                dirname = os.path.basename(dirpath)
+            if dirname.startswith("animation_"):
+                dirname = dirname[10:]
+            self.trajectoriesWindow.clusterName.set(dirname)
+
             self.trajectoriesWindow.showInfo('Successfully loaded : %s.' %str(loaded))
 
-        self.trajectoriesWindow.setPathData(data)
-        self.trajectoriesWindow._onUpdateClick()
-        self.trajectoriesWindow._checkNumberOfPoints()
-        self.trajectoriesWindow.saveClusterBtn.config(state=tk.NORMAL)
 
 
     def _saveAnimation(self, tkWindow):

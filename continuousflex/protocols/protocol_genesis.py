@@ -233,30 +233,58 @@ class FlexProtGenesis(EMProtocol):
                       help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
         group.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
                       help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
+        group.addParam('posi_restr', params.BooleanParam, label='Positional restraint on Calpha atoms', default=False,
+                      help="Apply a restraint on the positions of Ca atoms")
 
         # Experiments =================================================================================================
         form.addSection(label='EM data')
         form.addParam('EMfitChoice', params.EnumParam, label="Cryo-EM Flexible Fitting", default=0,
                       choices=['None', 'Volume (s)', 'Image (s)'], important=True,
                       help="Type of cryo-EM data to be processed")
+
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
+                      help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
+                           " This parameters must be tuned with caution : "
+                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
+                           " force constant value must be equal to the number of replicas, for example for 4 replicas,"
+                           " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
+                           " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
+                           " to each replica."
+                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="Gaussian kernels variance",
+                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
+                        " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='Tolerance',
+                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
+                        " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        " than 0.1% of the maximum value. Smaller value requires large computational cost",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_period', params.IntParam, default=10, label='Update period',
+                       help="Number of MD iteration every which the EM poential is updated",
+                       condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
-                      label="Input volume", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+                      label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==%i"%EMFIT_VOLUMES, important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
-                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+                      help="Voxel size in Angstrom of the target volume (s)", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES,
+                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_x', params.FloatParam, default=0, label="Origin X",
                       help="Origin of the first voxel in X direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_y', params.FloatParam, default=0, label="Origin Y",
                       help="Origin of the first voxel in Y direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_z', params.FloatParam, default=0, label="Origin Z",
                       help="Origin of the first voxel in Z direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
 
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==%i"%EMFIT_IMAGES)
@@ -265,16 +293,13 @@ class FlexProtGenesis(EMProtocol):
                       condition="EMfitChoice==%i"%EMFIT_IMAGES, important=True)
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==%i"%EMFIT_IMAGES)
-        group.addParam('projectAngleChoice', params.EnumParam, default=0, label='Projection angles',
-                       choices=['same as image set', 'from xmipp file', 'from other set'],
+        group.addParam('projectAngleChoice', params.EnumParam, default=PROJECTION_ANGLE_SAME, label='Projection angles',
+                       choices=['same as image set', 'from xmipp file'],
                       help="Source of projection angles to align the input PDB with the set of images",
                        condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
                       help="Xmipp metadata file with projection alignement parameters ",
                        condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_XMIPP))
-        group.addParam('projectAngleImage', params.PointerParam, pointerClass="SetOfParticles",
-                      label="projection angle image set  ", help='Image set containing projection alignement parameters',
-                      condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
 
         group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
@@ -420,6 +445,12 @@ class FlexProtGenesis(EMProtocol):
             elif self.inputType.get() == INPUT_TOPOLOGY:
                 inputPSF = self.topoProt.get()._getExtraPath("output.psf")
             runCommand("cp %s %s.psf" % (inputPSF, inputPrefix))
+            inputRTF, inputPRM, inputSTR = self.getCHARMMInputs()
+            runCommand("cp %s %s_charmm.rtf" % (inputRTF, inputPrefix))
+            runCommand("cp %s %s_charmm.prm" % (inputPRM, inputPrefix))
+            runCommand("cp %s %s_charmm.str" % (inputSTR, inputPrefix))
+
+
         elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
             if self.inputType.get() == INPUT_NEW_SIM:
                 inputTOP = self.inputTOP.get()
@@ -523,9 +554,6 @@ class FlexProtGenesis(EMProtocol):
             "nm_number": self.getNumberOfNormalModes(),
             "rigid_body_params": self.getRigidBodyParams(indexFit),
             "forcefield": self.getForceField(),
-            "inputRTF": inputRTF,
-            "inputPRM": inputPRM,
-            "inputSTR": inputSTR,
 
             # Input Params
             "inputType": self.inputType.get(),
@@ -545,6 +573,7 @@ class FlexProtGenesis(EMProtocol):
             "nm_dt": self.nm_dt.get(),
             "nm_mass": self.nm_mass.get(),
             "rigid_bond": self.rigid_bond.get(),
+            "posi_restr": self.posi_restr.get(),
             "fast_water": self.fast_water.get(),
             "water_model": self.water_model.get(),
             "box_size_x": self.box_size_x.get(),
@@ -578,7 +607,7 @@ class FlexProtGenesis(EMProtocol):
         command = buildRunCommand(programname, params, numberOfMpi=self.numberOfMpi.get(),
                               hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
-        command = Plugin.getContinuousFlexCmd(command)
+        # command = Plugin.getContinuousFlexCmd(command)
         runCommand(command, env=env)
 
     def runSimulationParallel(self):
@@ -613,7 +642,7 @@ class FlexProtGenesis(EMProtocol):
         # Build parallel command
         parallel_cmd = "seq -f \"%%06g\" 1 %i | parallel -P %i \" %s\" " % (
         self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)
-        parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
+        # parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
 
         print("Command : %s" % cmd)
         print("Parallel Command : %s" % parallel_cmd)
@@ -687,17 +716,16 @@ class FlexProtGenesis(EMProtocol):
                             outputPDB=j + ".pdb",
                             inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
-        # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
-        # if self.getForceField() == FORCEFIELD_CAGO:
-        #     input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
-        #     for i in range(self.getNumberOfSimulation()):
-        #         outputPrefix = self.getOutputPrefixAll(i)
-        #         for j in outputPrefix:
-        #             fn_output = j + ".pdb"
-        #             if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
-        #                 output = ContinuousFlexPDBHandler(fn_output)
-        #                 input.coords = output.coords
-        #                 input.write_pdb(j + ".pdb")
+        # ensure GENESIS maintains input pdb format
+        if self.getForceField() == FORCEFIELD_CAGO:
+            input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
+            for i in range(self.getNumberOfSimulation()):
+                outputPrefix = self.getOutputPrefixAll(i)
+                for j in outputPrefix:
+                    fn_output = j + ".pdb"
+                    if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
+                        input.coords = ContinuousFlexPDBHandler.read_coords(fn_output)
+                        input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
         if (self.simulationType.get() != SIMULATION_REMD  and self.simulationType.get() != SIMULATION_RENMMD )\
@@ -978,8 +1006,6 @@ class FlexProtGenesis(EMProtocol):
                     inputEMMetadata.setValue(md.MDL_SHIFT_X, shx, i)
                     inputEMMetadata.setValue(md.MDL_SHIFT_Y, shy, i)
                 inputEMMetadata.write(nameMd)
-            elif self.projectAngleChoice.get() == PROJECTION_ANGLE_IMAGE:
-                raise RuntimeError("projection angles from other image set error : Not implemented")
 
         elif self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), Volume):
@@ -1004,12 +1030,11 @@ class FlexProtGenesis(EMProtocol):
             return None,None,None
 
 def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMprefix="", rstFile="", nm_number=0,
-                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputRTF=None, inputPRM=None,
-                       inputSTR=None, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
+                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
                        electrostatics=ELECTROSTATICS_CUTOFF, switch_dist=10.0, cutoff_dist=12.0,
                        pairlist_dist=15.0, vdw_force_switch=True, implicitSolvent=IMPLICIT_SOLVENT_NONE,
                        integrator=INTEGRATOR_LEAPFROG, time_step=0.001, eneout_period=100, crdout_period=100,
-                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,
+                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,posi_restr=False,
                        fast_water = False, water_model="TIP3", box_size_x=None, box_size_y=None, box_size_z=None,
                        boundary=BOUNDARY_NOBC, ensemble=ENSEMBLE_NVE, tpcontrol=TPCONTROL_NONE, temperature=300.0,
                        pressure=1.0, EMfitChoice=EMFIT_NONE, constantK=1000.0, nreplica=4, emfit_sigma=2.0,
@@ -1018,14 +1043,16 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "pdbfile = %s.pdb\n" % inputPDBprefix
     if forcefield == FORCEFIELD_CHARMM:
         s += "psffile = %s.psf\n" % inputPDBprefix
-        s += "topfile = %s\n" % inputRTF
-        s += "parfile = %s\n" % inputPRM
-        if inputSTR != "" and inputSTR is not None:
-            s += "strfile = %s\n" % inputSTR
+        s += "topfile = %s_charmm.rtf\n" % inputPDBprefix
+        s += "parfile = %s_charmm.prm\n" % inputPDBprefix
+        s += "strfile = %s_charmm.str\n" % inputPDBprefix
     elif forcefield == FORCEFIELD_AAGO or forcefield == FORCEFIELD_CAGO:
         s += "grotopfile = %s.top\n" % inputPDBprefix
     if inputType == INPUT_RESTART:
         s += "rstfile = %s \n" % rstFile
+    if posi_restr:
+        s += "reffile = %s.pdb \n" % inputPDBprefix
+
 
     s += "\n[OUTPUT] \n"  # -----------------------------------------------------------
     if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
@@ -1079,7 +1106,7 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "nsteps = %i \n" % n_steps
     s += "eneout_period = %i \n" % eneout_period
     s += "crdout_period = %i \n" % crdout_period
-    s += "rstout_period = %i \n" % n_steps
+    s += "rstout_period = %i \n" % crdout_period
     s += "nbupdate_period = %i \n" % nbupdate_period
 
     if simulationType == SIMULATION_NMMD or simulationType == SIMULATION_RENMMD:
@@ -1133,22 +1160,39 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
         if ensemble == ENSEMBLE_NPT:
             s += "pressure = %.2f \n" % pressure
 
-    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
-            and simulationType != SIMULATION_MIN:
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
         s += "\n[SELECTION] \n"  # -----------------------------------------------------------
-        s += "group1 = all and not hydrogen\n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "group1 = all and not hydrogen\n"
+        if posi_restr:
+            s += "group1 = an:CA\n"
+
+
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
 
         s += "\n[RESTRAINTS] \n"  # -----------------------------------------------------------
-        s += "nfunctions = 1 \n"
-        s += "function1 = EM \n"
-        constStr = constantK
-        if "-" in constStr:
-            splt = constStr.split("-")
-            constStr = " ".join(
-                [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
-        s += "constant1 = %s \n" % constStr
-        s += "select_index1 = 1 \n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "nfunctions = 1 \n"
+            s += "function1 = EM \n"
+            constStr = constantK
+            if "-" in constStr:
+                splt = constStr.split("-")
+                constStr = " ".join(
+                    [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
+            s += "constant1 = %s \n" % constStr
+            s += "select_index1 = 1 \n"
+        else:
+            s += "nfunctions = 1 \n"
+            s += "function1 = POSI \n"
+            s += "constant1 = 1 \n"
+            s += "select_index1 = 1 \n"
 
+    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN:
         s += "\n[EXPERIMENTS] \n"  # -----------------------------------------------------------
         s += "emfit = YES  \n"
         s += "emfit_sigma = %.4f \n" % emfit_sigma

@@ -30,10 +30,6 @@ from os.path import basename
 from pwem.utils import runProgram
 
 
-REFERENCE_EXT = 0
-REFERENCE_STA = 1
-
-
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     """ Protocol for subtomogram alignment after STA """
     _label = 'apply subtomogram alignment'
@@ -45,85 +41,24 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                       pointerClass='SetOfVolumes,Volume',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
-        form.addParam('AlignmentParameters', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
-                      default=REFERENCE_EXT,
-                      label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
-                      help='either an external metadata file containing alignment parameters or STA run')
-        form.addParam('MetaDataFile', params.FileParam,
-                      pointerClass='params.FileParam', allowsNull=True,
-                      condition='AlignmentParameters==%d' % REFERENCE_EXT,
-                      label="Alignment parameters MetaData",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('MetaDataSTA', params.PointerParam,
-                      pointerClass='FlexProtSubtomogramAveraging', allowsNull=True,
-                      condition='AlignmentParameters==%d' % REFERENCE_STA,
-                      label="Subtomogram averaging run",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('angleY', params.BooleanParam,
-                      default=True,
-                      label='Are those parameters come from Scipion/Xmipp?',
-                      help='If the original alignment was done on Dynamo or if the alignment was done '
-                           'without missing wedge compensation, switch this to no')
-
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         # Define some outputs filenames
-        self.imgsFn = self._getExtraPath('volumes.xmd')
-
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('prepareMetaData')
         self._insertFunctionStep('applyAlignment')
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
-
-    def prepareMetaData(self):
-        tempdir = self._getTmpPath()
-        imgFn = self.imgsFn
-        AlignmentParameters = self.AlignmentParameters.get()
-        MetaDataFile = self.MetaDataFile.get()
-        if AlignmentParameters == REFERENCE_STA:
-            MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
-            MetaDataFile = MetaDataSTA
-        copyFile(MetaDataFile,imgFn)
-
-        mdImgs = md.MetaData(imgFn)
-        # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
-        inputSet = self.inputVolumes.get()
-
-        for objId in mdImgs:
-            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-            index, fn = xmipp3.convert.xmippToLocation(imgPath)
-            if (index):  # case the input is a stack
-                # Conside the index is the id in the input set
-                particle = inputSet[index]
-            else:  # input is not a stack
-                # convert the inputSet to metadata:
-                mdtemp = md.MetaData(self._getExtraPath('input.xmd'))
-                # Loop and find the index based on the basename:
-                bn_retrieved = basename(imgPath)
-                for searched_index in mdtemp:
-                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE, searched_index)
-                    bn_searched = basename(imgPath_temp)
-                    if bn_searched == bn_retrieved:
-                        index = searched_index
-                        particle = inputSet[index]
-                        break
-            mdImgs.setValue(md.MDL_IMAGE, xmipp3.convert.getImageLocation(particle), objId)
-            mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        mdImgs.write(self.imgsFn)
-
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('volumes.xmd'))
 
     def applyAlignment(self):
-        makePath(self._getExtraPath()+'/aligned')
+        makePath(self._getExtraPath() + '/aligned')
         tempdir = self._getTmpPath()
-        mdImgs = md.MetaData(self.imgsFn)
+        mdImgs = md.MetaData(self._getExtraPath('volumes.xmd'))
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             new_imgPath = self._getExtraPath()+'/aligned/' + basename(imgPath)
@@ -136,18 +71,11 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
             # rotate 90 around y, align, then rotate -90 to get to neutral
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
-            if(self.angleY):
-                params += '--rotate_volume euler 0 90 0 '
-            else: # only to convert
-                params += '--rotate_volume euler 0 0 0 '
             runProgram('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            if (not(self.angleY)):
-                params += ' --inverse '
-
-            # print('xmipp_transform_geometry',params)
+            params += ' --inverse '
             runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)

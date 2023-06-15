@@ -33,6 +33,7 @@ from pwem import Domain
 from .convert import eulerAngles2matrix, matrix2eulerAngles
 import numpy as np
 import multiprocessing
+from pwem.emlib.image import ImageHandler
 
 WEDGE_MASK_NONE = 0
 WEDGE_MASK_THRE = 1
@@ -43,6 +44,7 @@ REFERENCE_IMPORTED = 2
 
 PERFORM_STA = 0
 COPY_STA = 1
+ALIGNED_STA=2
 
 IMPORT_XMIPP_MD = 0
 IMPORT_DYNAMO_TBL = 1
@@ -68,7 +70,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                       help='Select volumes')
         group.addParam('StA_choice', params.EnumParam,
                       choices=['Perform StA using Fast Rotational Matching (FRM)',
-                               'Import parameters of a previously performed StA'],
+                               'Import parameters of a previously performed StA',
+                               'Average a set of aligned subtomograms'],
                       default=PERFORM_STA,
                       label='Choose what processes you want to perform:', display=params.EnumParam.DISPLAY_COMBO,
                        help='If you choose to "Perform StA" using FRM you have to set the parameters in the last tab.'
@@ -173,8 +176,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
         elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_TOMBOX_MTV:
             self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
-        else:
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_XMIPP_MD:
             self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
+
+        if self.StA_choice.get() == ALIGNED_STA:
+            self._insertFunctionStep('averagingStep')
+
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
@@ -489,6 +496,10 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
 
+
+    def averagingStep(self):
+        classAvg = ImageHandler().computeAverage(self.inputVolumes.get())
+        classAvg.write(self.outputVolume)
 
     def createOutputStep(self):
         inputSet = self.inputVolumes.get()

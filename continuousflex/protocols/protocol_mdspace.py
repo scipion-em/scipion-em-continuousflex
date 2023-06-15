@@ -52,7 +52,7 @@ class FlexProtMDSPACE(FlexProtGenesis):
                       help="Number of round of fitting for MDSPACE", important=True)
 
         form.addParam('numberOfPCA', params.IntParam, label="Number of PCA component", default=5,
-                      help="Number of principal component to keep at each round", important=True)
+                      help="Number of principal component to keep at each round",  expertLevel=params.LEVEL_ADVANCED)
 
         FlexProtGenesis._defineParams(self, form)
 

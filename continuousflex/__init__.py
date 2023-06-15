@@ -130,7 +130,7 @@ class Plugin(pwem.Plugin):
                                   % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "main"
+        target_branch = "master"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
         if gfotran_version >= 10:
@@ -141,7 +141,7 @@ class Plugin(pwem.Plugin):
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/mms29/Genesis2.git . &&'
+                           'git clone -b %s https://github.com/mms29/MDTools-old.git . &&'
                            'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
                            ' autoreconf -fi && ./configure LDFLAGS=-L\"lib\" FFLAGS=\"%s\" && make install;'
                            % (target_branch, cls.getCondaLibPath(),

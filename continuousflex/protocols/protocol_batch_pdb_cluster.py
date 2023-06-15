@@ -23,15 +23,14 @@
 # **************************************************************************
 
 import multiprocessing
-from pyworkflow.protocol.params import PointerParam, FileParam
+from pyworkflow.protocol.params import PointerParam, FileParam, USE_GPU, GPU_LIST, BooleanParam, StringParam,LEVEL_ADVANCED
 from pwem.protocols import BatchProtocol
 from pwem.objects import SetOfClasses2D
 from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes, readSetOfVolumes
-
 from pyworkflow.utils import runCommand
 from pwem.emlib.image import ImageHandler
 import pwem.emlib.metadata as md
-
+import os
 
 class FlexBatchProtClusterSet(BatchProtocol):
     """ Protocol executed when a set of cluster is created
@@ -41,8 +40,16 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
     def _defineParams(self, form):
         form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
-        form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
-        form.addParallelSection(threads=1, mpi=multiprocessing.cpu_count()//2-1)
+        form.addHidden(USE_GPU, BooleanParam, default=True,
+                       label="Use GPU for execution",
+                       help="This protocol has both CPU and GPU implementation.\
+                       Select the one you want to use.")
+
+        form.addHidden(GPU_LIST, StringParam, default='0',
+                       expertLevel=LEVEL_ADVANCED,
+                       label="Choose GPU IDs",
+                       help="Add a list of GPU devices that can be used")
+        form.addParallelSection(threads=4, mpi=1)
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
@@ -61,7 +68,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
         for i in inputClasses:
             if i.getObjId() != 0:
-                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
+                classFile = self._getExtraPath("class%s.xmd" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     writeSetOfParticles(i, classFile)
                 else:
@@ -69,16 +76,28 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
         for i in inputClasses:
             if i.getObjId() != 0:
-                classFile = self._getExtraPath("class%i.xmd" % i.getObjId())
-                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                classFile = self._getExtraPath("class%s.xmd" % str(i.getObjId()).zfill(6))
+                classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     args = "-i %s -o %s " % (classFile, classVol)
-                    if self.numberOfMpi.get() > 1 :
-                        progname = "xmipp_mpi_reconstruct_fourier "
-                        self.runJob(progname, args)
+                    args += ' --sampling %f' % self.inputSet.get().getSamplingRate()
+
+                    if self.useGpu.get():
+                        args += ' --thr %d' % self.numberOfThreads.get()
+
+                    if self.useGpu.get():
+                        if self.numberOfMpi.get() > 1:
+                            self.runJob('xmipp_cuda_reconstruct_fourier', args,
+                                        numberOfMpi=len((self.gpuList.get()).split(',')) + 1)
+                        else:
+                            self.runJob('xmipp_cuda_reconstruct_fourier', args)
                     else:
-                        progname = "xmipp_reconstruct_fourier "
-                        runCommand(progname + args)
+                        if self.numberOfMpi.get() > 1 :
+                            progname = "xmipp_mpi_reconstruct_fourier "
+                            self.runJob(progname, args)
+                        else:
+                            progname = "xmipp_reconstruct_fourier "
+                            runCommand(progname + args)
                 else:
                     classAvg = ImageHandler().computeAverage(i)
                     classAvg.write(classVol)
@@ -88,7 +107,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
         inputClasses = self.inputSet.get()
         for i in inputClasses:
             if i.getObjId() != 0:
-                classVol = self._getExtraPath("class%i.vol" % i.getObjId())
+                classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 index = outputMd.addObject()
                 outputMd.setValue(md.MDL_IMAGE, classVol, index)
                 outputMd.setValue(md.MDL_ITEM_ID, i.getObjId(), index)

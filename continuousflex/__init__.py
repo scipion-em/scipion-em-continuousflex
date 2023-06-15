@@ -130,7 +130,7 @@ class Plugin(pwem.Plugin):
                                   % cls.getCondaLibPath() , 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
-        target_branch = "main"
+        target_branch = "master"
         output = subprocess.getoutput("gfortran --version")
         gfotran_version = int(re.search(r'\d+', output).group())
         if gfotran_version >= 10:

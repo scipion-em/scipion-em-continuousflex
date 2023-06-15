@@ -576,7 +576,8 @@ class FlexProtSynthesizeImages(ProtAnalysis3D):
         for i in range(numberOfVolumes):
             params = " -i " + self._getExtraPath(str(i + 1).zfill(5) + '_projected.spi')
             params += " --ctf " + self._getExtraPath('ctf.param')
-            paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
+            paramsNoiseCTF = params+ " --noNoise "
+            # paramsNoiseCTF = params+ " --after_ctf_noise --targetSNR " + str(self.targetSNR.get())
             runProgram('xmipp_phantom_simulate_microscope', paramsNoiseCTF)
 
             # Phase flip:

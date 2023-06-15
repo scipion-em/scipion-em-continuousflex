@@ -41,7 +41,7 @@ class ContinuousFlexPDBHandler:
             for line in f:
                 spl = line.split()
                 if len(spl) > 0:
-                    if (spl[0] == 'ATOM'):  # or (hetatm and spl[0] == 'HETATM'):
+                    if (spl[0] == 'ATOM') or (spl[0] == 'HETATM'):
                         l = [line[:6], line[6:11], line[12:16], line[16], line[17:21], line[21], line[22:26],
                              line[26], line[30:38],
                              line[38:46], line[46:54], line[54:60], line[60:66], line[72:76], line[76:78]]

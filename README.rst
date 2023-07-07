@@ -61,7 +61,9 @@ Protocols
 * **TomoFlow**: Method for analyzing continuous conformational variability of macromolecules in cryo-ET subtomograms (in vitro and in situ) based on 3D dense optical flow [6]
 * **NMMD**: Software to perform cryo-EM flexible fitting using a combination of Normal Mode (NM) analysis and Molecular Dynamics (MD) simulations  implemented in GENESIS [7]
 * **DeepHEMNMA**: A deep learning extension of HEMNMA  [8]
-* **MDSPACE**: Approach for extracting atomic-resolution landscapes of continuous conformational variability of biomolecular complexes from cryo electron microscopy (cryo-EM) single particle images based on a new 3D-to-2D flexible fitting method, which uses molecular dynamics (MD) simulation and is embedded in an iterative conformational-landscape refinement scheme. [11]
+* **MDSPACE** `[Tutorial] <https://scipion-em.github.io/docs/release-3.0.0/docs/user/tutorials/flexibilityHub/Tutorials/MDSPACE_Tutorial_v0.html>`__
+: Approach for extracting atomic-resolution landscapes of continuous conformational variability of biomolecular complexes from cryo electron microscopy (cryo-EM) single particle images based on a new 3D-to-2D flexible fitting method, which uses molecular dynamics (MD) simulation and is embedded in an iterative conformational-landscape refinement scheme. [11]
+* **MDTOMO**: Approach for extracting continuous conformational atomic-resolution landscapes of biomolecular complexes from cryo electron subtomograms using Molecular Dynamics simulations. [12]
 
 Notes:
 
@@ -97,6 +99,8 @@ References
 [10] Jonic S, Sorzano CO, Thevenaz P, El-Bez C, De Carlo S, Unser M: Spline-based image-to-volume registration for three-dimensional electron microscopy. Ultramicroscopy 2005, 103:303-317. `[Journal] <https://www.sciencedirect.com/science/article/pii/S0304399105000173>`__
 
 [11] Vuillemot R, Mirzaei A, Harastani M, Hamitouche I, Fréchin L, Klaholz BP, Miyashita O, Tama F, Rouiller I, Jonic S. MDSPACE: Extracting continuous conformational landscapes from cryo-EM single particle datasets using 3D-to-2D flexible fitting based on Molecular Dynamics simulation. Journal of Molecular Biology. 2023 Jan 10:167951. `[Journal] <https://www.sciencedirect.com/science/article/abs/pii/S0022283623000074>`__
+
+[12] Vuillemot, R., Rouiller, I., & Jonić, S. MDTOMO method for continuous conformational variability analysis in cryo electron subtomograms based on molecular dynamics simulations. Scientific Reports, 2023, 13(1), 10596. `[Journal] <https://doi.org/10.1038/s41598-023-37037-9>`__
 
 Citation
 ----------

@@ -463,9 +463,10 @@ class FlexProtGenesis(EMProtocol):
         # Center PDBs -----------------------------------------------------
         if self.centerPDB.get():
             for i in range(self.getNumberOfInputPDB()):
-                cmd = "xmipp_pdb_center -i %s.pdb -o %s.pdb" %\
+                cmd = "xmipp_pdb_center"
+                args = "-i %s.pdb -o %s.pdb" %\
                         (self.getInputPDBprefix(i),self.getInputPDBprefix(i))
-                runCommand(cmd)
+                runProgram(cmd, args)
                 print(cmd)
 
     def convertNormalModeFileStep(self):

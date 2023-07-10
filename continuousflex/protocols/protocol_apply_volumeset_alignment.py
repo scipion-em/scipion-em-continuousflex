@@ -29,7 +29,15 @@ from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename
 from pwem.utils import runProgram
 from os.path import exists, basename, abspath, relpath, join, splitext
-from continuousflex.protocols.convert import eulerAngles2matrix
+import pwem.objects as emobj
+from xmipp3.convert import writeSetOfVolumes, readSetOfVolumes
+from .convert import eulerAngles2matrix, matrix2eulerAngles
+import numpy as np
+from pyworkflow.utils.path import makePath, copyFile
+import json
+from ast import literal_eval as make_tuple
+import os
+from pwem.constants import ALIGN_3D
 
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     """ Protocol for subtomogram alignment after STA """
@@ -84,25 +92,33 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         if  self.importFrom == self.IMPORT_FROM_XMIPP:
-            self.inputFromXmipp()
+            volSet = self.inputFromXmipp()
         elif  self.importFrom == self.IMPORT_FROM_EMAN:
-            self.inputFromEman()
+            volSet = self.inputFromEman()
         elif  self.importFrom == self.IMPORT_FROM_DYNAMO:
-            self.inputFromDynamo()
+            volSet = self.inputFromDynamo()
         elif  self.importFrom == self.IMPORT_FROM_TOMBOX:
-            self.inputFromTombox()
+            volSet = self.inputFromTombox()
         else:
             raise NotImplementedError("")
 
-        if self.inputVolumes.get().getSize() == self.volSet.getSize():
+        inputVols = self.inputVolumes.get()
+
+        if inputVols.getSize() == volSet.getSize():
             # Write a metadata with the volumes
-            iter1 = self.volSet.iterItems()
-            iter2 = self.inputVolumes.get().iterItems()
-            for i in range(self.volSet.getSize()):
+            iter1 = volSet.iterItems()
+            iter2 = inputVols.iterItems()
+            inputset = self._createSetOfVolumes("inputSet")
+            inputset.setSamplingRate(inputVols.getSamplingRate())
+            inputset.setAlignment(ALIGN_3D)
+
+            for i in range(volSet.getSize()):
                 p1 = iter1.__next__()
                 p2 = iter2.__next__()
-                p1.setLocation(p2.getLocation())
-            xmipp3.convert.writeSetOfVolumes(self.volSet, self._getExtraPath('volumes.xmd'))
+                p2.setTransform(p1.getTransform())
+                inputset.append(p2)
+                print(p2.getTransform())
+            xmipp3.convert.writeSetOfVolumes(inputset, self._getExtraPath('volumes.xmd'))
         else:
             raise RuntimeError("The number of volumes and STA parameters mismatch")
 
@@ -139,9 +155,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                 mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
                 mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
                 mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
-
-        mdImgs.write(self._getExtraPath('output.xmd'))
-        self.createVolSetSubtomo(mdImgs)
+        return self.createVolSetSubtomo(mdImgs)
 
     def inputFromEman(self):
         Table = self.emanJSON.get()
@@ -191,18 +205,17 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             vol.setLocation(imgPath)
             volSet.append(vol)
         volSet.setAlignment3D()
-        self.volSet = volSet
+        return volSet
 
     def inputFromDynamo(self):
         from continuousflex.protocols.utilities.dynamo import tbl2metadata
 
         volumes_in = self._getExtraPath('input.xmd')
-        xmipp3.convert.writeSetOfVolumes(self.inputVolsDynamo.get(), volumes_in)
-        md_out =self._getExtraPath('output.xmd')
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), volumes_in)
         tbl2metadata(self.dynamoTable.get(), volumes_in, md_out)
 
         mdImgs = md.MetaData(md_out)
-        self.createVolSetSubtomo(mdImgs)
+        return self.createVolSetSubtomo(mdImgs)
 
     def inputFromTombox(self):
         raise NotImplementedError()
@@ -233,7 +246,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             # vol.setLocation(imgPath)
             volSet.append(vol)
         volSet.setAlignment3D()
-        self.volSet=volset
+        return volSet
 
 
     def applyAlignment(self):

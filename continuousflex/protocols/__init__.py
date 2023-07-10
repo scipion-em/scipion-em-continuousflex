@@ -57,4 +57,3 @@ from .protocol_mdtomo import FlexProtMDTOMO
 from .protocol_generate_topology import ProtGenerateTopology
 from .protocol_generate_topology import ProtGenerateTopology
 from .protocol_pdb_synthesize import FlexProtSynthesizePDBs
-from .protocol_import_subtomograms import FlexProtImportSubtomogram

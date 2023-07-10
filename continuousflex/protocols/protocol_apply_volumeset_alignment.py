@@ -33,20 +33,20 @@ from pwem.utils import runProgram
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     """ Protocol for subtomogram alignment after STA """
     _label = 'apply subtomogram alignment'
-    IMPORT_FROM_XMIPP=1
-    IMPORT_FROM_EMAN=2
-    IMPORT_FROM_DYNAMO=3
-    IMPORT_FROM_TOMBOX=4
+    IMPORT_FROM_XMIPP=0
+    IMPORT_FROM_EMAN=1
+    IMPORT_FROM_DYNAMO=2
+    IMPORT_FROM_TOMBOX=3
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume,SetOfSubtomograms',
+                      pointerClass='SetOfVolumes',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
 
-        group2.addParam('importFrom', params.EnumParam, default=self.IMPORT_FROM_XMIPP,
+        form.addParam('importFrom', params.EnumParam, default=self.IMPORT_FROM_XMIPP,
                       allowsNull=True,
                       choices=['XMIPP', 'EMAN', 'DYNAMO', 'TOMBOX'],
                       label='import STA alignment from',
@@ -83,13 +83,13 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
         if  self.importFrom == self.IMPORT_FROM_XMIPP:
-            self._insertFunctionStep(self.inputFromXmipp)
+            self.inputFromXmipp()
         elif  self.importFrom == self.IMPORT_FROM_EMAN:
-            self._insertFunctionStep(self.inputFromEman)
+            self.inputFromEman()
         elif  self.importFrom == self.IMPORT_FROM_DYNAMO:
-            self._insertFunctionStep(self.inputFromDynamo)
+            self.inputFromDynamo()
         elif  self.importFrom == self.IMPORT_FROM_TOMBOX:
-            self._insertFunctionStep(self.inputFromTombox)
+            self.inputFromTombox()
         else:
             raise NotImplementedError("")
 
@@ -170,7 +170,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                 raise RuntimeError("Unkown file type for subtomograms")
 
         volSet = self._createSetOfVolumes()
-        volSet.setSamplingRate(self.self.inputVolumes.get().getSamplingRate())
+        volSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
 
         for i in range(n_data):
 
@@ -178,7 +178,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             transform = emobj.Transform()
             transform.setMatrix(matrices[i])
             vol = emobj.Volume()
-            vol.setSamplingRate(self.self.inputVolumes.get().getSamplingRate())
+            vol.setSamplingRate(self.inputVolumes.get().getSamplingRate())
             vol.cleanObjId()
             vol.setTransform(transform)
             vol.setLocation(imgPath)
@@ -202,7 +202,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
 
     def createVolSetSubtomo(self, mdImgs):
         volSet = self._createSetOfVolumes()
-        volSet.setSamplingRate(self.self.inputVolumes.get().getSamplingRate())
+        volSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
 
         for objId in mdImgs:
 
@@ -220,7 +220,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             transform.setMatrix(matrix)
 
             vol = emobj.Volume()
-            vol.setSamplingRate(self.self.inputVolumes.get().getSamplingRate())
+            vol.setSamplingRate(self.inputVolumes.get().getSamplingRate())
             vol.cleanObjId()
             vol.setTransform(transform)
             vol.setLocation(imgPath)

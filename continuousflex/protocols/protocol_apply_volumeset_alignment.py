@@ -28,7 +28,8 @@ import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename
 from pwem.utils import runProgram
-
+from os.path import exists, basename, abspath, relpath, join, splitext
+from continuousflex.protocols.convert import eulerAngles2matrix
 
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     """ Protocol for subtomogram alignment after STA """
@@ -95,6 +96,12 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
 
         if self.inputVolumes.get().getSize() == self.volSet.getSize():
             # Write a metadata with the volumes
+            iter1 = self.volSet.iterItems()
+            iter2 = self.inputVolumes.get().iterItems()
+            for i in range(self.volSet.getSize()):
+                p1 = iter1.__next__()
+                p2 = iter2.__next__()
+                p1.setLocation(p2.getLocation())
             xmipp3.convert.writeSetOfVolumes(self.volSet, self._getExtraPath('volumes.xmd'))
         else:
             raise RuntimeError("The number of volumes and STA parameters mismatch")
@@ -206,7 +213,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
 
         for objId in mdImgs:
 
-            imgPath = abspath(mdImgs.getValue(md.MDL_IMAGE, objId))
+            # imgPath = abspath(mdImgs.getValue(md.MDL_IMAGE, objId))
             rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
             tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
             psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
@@ -223,7 +230,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             vol.setSamplingRate(self.inputVolumes.get().getSamplingRate())
             vol.cleanObjId()
             vol.setTransform(transform)
-            vol.setLocation(imgPath)
+            # vol.setLocation(imgPath)
             volSet.append(vol)
         volSet.setAlignment3D()
         self.volSet=volset

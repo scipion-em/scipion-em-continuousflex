@@ -38,3 +38,4 @@ from .viewer_mdspace import FlexMDSPACEViewer
 from .viewer_genesis import FlexGenesisViewer
 from .viewer_deephemnma_train import FlexDeepHEMNMAViewer
 from .viewer_deephemnma_infer import FlexDeepHEMNMAinferViewer
+from .viewer_test import FlexTestViewer

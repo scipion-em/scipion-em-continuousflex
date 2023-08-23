@@ -109,12 +109,12 @@ class Plugin(pwem.Plugin):
 
         def getCondaInstallation(version, txtfile):
             installationCmd = cls.getCondaActivationCmd()
-            # If nvcc is not in the path, don't install Optical Flow or DeepLearning Libraries
-            if os.popen('which nvcc').read() == "":
-                config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
-            else:
+            config_path = continuousflex.__path__[0] + '/conda_noCuda.yaml'
+            installationCmd += 'conda env create -f {} --prefix .'.format(config_path)
+            # If nvcc is in the path, install Optical Flow and DeepLearning Libraries
+            if os.popen('which nvcc').read() is not None:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-            installationCmd += 'conda env create -f {} --prefix . --force'.format(config_path)
+                installationCmd += "&& conda env update --name . --file={}".format(config_path)
             installationCmd += ' && touch {}'.format(txtfile)
             return installationCmd
 

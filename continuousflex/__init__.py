@@ -114,7 +114,7 @@ class Plugin(pwem.Plugin):
             # If nvcc is in the path, install Optical Flow and DeepLearning Libraries
             if os.popen('which nvcc').read() is not None:
                 config_path = continuousflex.__path__[0] + '/conda.yaml'
-                installationCmd += "&& conda env update --name . --file={}".format(config_path)
+                installationCmd += "&& conda env update --prefix . --file={}".format(config_path)
             installationCmd += ' && touch {}'.format(txtfile)
             return installationCmd
 

@@ -28,102 +28,231 @@ import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile
 from os.path import basename
 from pwem.utils import runProgram
-
-
-REFERENCE_EXT = 0
-REFERENCE_STA = 1
-
+from os.path import exists, basename, abspath, relpath, join, splitext
+import pwem.objects as emobj
+from xmipp3.convert import writeSetOfVolumes, readSetOfVolumes
+from .convert import eulerAngles2matrix, matrix2eulerAngles
+import numpy as np
+from pyworkflow.utils.path import makePath, copyFile
+import json
+from ast import literal_eval as make_tuple
+import os
+from pwem.constants import ALIGN_3D
 
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
     """ Protocol for subtomogram alignment after STA """
     _label = 'apply subtomogram alignment'
+    IMPORT_FROM_XMIPP=0
+    IMPORT_FROM_EMAN=1
+    IMPORT_FROM_DYNAMO=2
+    IMPORT_FROM_TOMBOX=3
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
         form.addSection(label='Input')
         form.addParam('inputVolumes', params.PointerParam,
-                      pointerClass='SetOfVolumes,Volume',
+                      pointerClass='SetOfVolumes',
                       label="Input volume(s)", important=True,
                       help='Select volumes')
-        form.addParam('AlignmentParameters', params.EnumParam,
-                      choices=['from input file', 'from STA run'],
-                      default=REFERENCE_EXT,
-                      label='Alignment parameters', display=params.EnumParam.DISPLAY_COMBO,
-                      help='either an external metadata file containing alignment parameters or STA run')
-        form.addParam('MetaDataFile', params.FileParam,
-                      pointerClass='params.FileParam', allowsNull=True,
-                      condition='AlignmentParameters==%d' % REFERENCE_EXT,
-                      label="Alignment parameters MetaData",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('MetaDataSTA', params.PointerParam,
-                      pointerClass='FlexProtSubtomogramAveraging', allowsNull=True,
-                      condition='AlignmentParameters==%d' % REFERENCE_STA,
-                      label="Subtomogram averaging run",
-                      help='Alignment parameters, typically from a STA previous run')
-        form.addParam('angleY', params.BooleanParam,
-                      default=True,
-                      label='Are those parameters come from Scipion/Xmipp?',
-                      help='If the original alignment was done on Dynamo or if the alignment was done '
-                           'without missing wedge compensation, switch this to no')
+
+        form.addParam('importFrom', params.EnumParam, default=self.IMPORT_FROM_XMIPP,
+                      allowsNull=True,
+                      choices=['XMIPP', 'EMAN', 'DYNAMO', 'TOMBOX'],
+                      label='import STA alignment from',
+                      help='Select the alignment files to apply to the volumes')
+
+        form.addParam('xmdFile', params.FileParam,
+                      condition='(importFrom == %d)' % self.IMPORT_FROM_XMIPP,
+                      label='Input Xmipp Metatada file',
+                      help="Select the XMD file containing subtomograms and alignment ")
+
+        form.addParam('inputVolsDynamo', params.PointerParam,
+                      condition='(importFrom == %d)' % self.IMPORT_FROM_DYNAMO, pointerClass='SetOfVolumes',
+                      label='Input volumes',
+                      help="Select a set of volumes")
+        form.addParam('dynamoTable', params.PathParam,
+                      condition='(importFrom == %d)' % self.IMPORT_FROM_DYNAMO,
+                      label='Dynamo Table [Beta]',
+                      help="import a Dynamo table that contains the StA parameters. ")
+
+        form.addParam('emanJSON', params.PathParam, allowsNull=True,
+                       condition='importFrom==%d' % self.IMPORT_FROM_EMAN,
+                       label='Import a JSON file from EMAN [Beta]',
+                       help='import a JSON file that contains the STA parameters. ')
 
 
     # --------------------------- INSERT steps functions --------------------------------------------
 
     def _insertAllSteps(self):
         # Define some outputs filenames
-        self.imgsFn = self._getExtraPath('volumes.xmd')
-
         self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('prepareMetaData')
         self._insertFunctionStep('applyAlignment')
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions --------------------------------------------
     def convertInputStep(self):
-        # Write a metadata with the volumes
-        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), self._getExtraPath('input.xmd'))
+        if  self.importFrom == self.IMPORT_FROM_XMIPP:
+            volSet = self.inputFromXmipp()
+        elif  self.importFrom == self.IMPORT_FROM_EMAN:
+            volSet = self.inputFromEman()
+        elif  self.importFrom == self.IMPORT_FROM_DYNAMO:
+            volSet = self.inputFromDynamo()
+        elif  self.importFrom == self.IMPORT_FROM_TOMBOX:
+            volSet = self.inputFromTombox()
+        else:
+            raise NotImplementedError("")
 
-    def prepareMetaData(self):
-        tempdir = self._getTmpPath()
-        imgFn = self.imgsFn
-        AlignmentParameters = self.AlignmentParameters.get()
-        MetaDataFile = self.MetaDataFile.get()
-        if AlignmentParameters == REFERENCE_STA:
-            MetaDataSTA = self.MetaDataSTA.get()._getExtraPath('final_md.xmd')
-            MetaDataFile = MetaDataSTA
-        copyFile(MetaDataFile,imgFn)
+        inputVols = self.inputVolumes.get()
 
-        mdImgs = md.MetaData(imgFn)
-        # in case of metadata from an external file, it has to be updated with the proper filenames from 'input.xmd'
-        inputSet = self.inputVolumes.get()
+        if inputVols.getSize() == volSet.getSize():
+            # Write a metadata with the volumes
+            iter1 = volSet.iterItems()
+            iter2 = inputVols.iterItems()
+            inputset = self._createSetOfVolumes("inputSet")
+            inputset.setSamplingRate(inputVols.getSamplingRate())
+            inputset.setAlignment(ALIGN_3D)
+
+            for i in range(volSet.getSize()):
+                p1 = iter1.__next__()
+                p2 = iter2.__next__()
+                p2.setTransform(p1.getTransform())
+                inputset.append(p2)
+                print(p2.getTransform())
+            xmipp3.convert.writeSetOfVolumes(inputset, self._getExtraPath('volumes.xmd'))
+        else:
+            raise RuntimeError("The number of volumes and STA parameters mismatch")
+
+
+
+
+    def inputFromXmipp(self):
+
+        mdImgs = md.MetaData(self.xmdFile)
+        flag = None
+        try:
+            flag = mdImgs.getValue(md.MDL_ANGLE_Y, 1)
+        except:
+            pass
+
+        if flag == 90:
+            mdImgs = md.MetaData(self.xmdFile)
+            for objId in mdImgs:
+                rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+                tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+                psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+                x = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+                y = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+                z = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+                T = eulerAngles2matrix(rot, tilt, psi, x, y, z)
+                # Rotate 90 degrees (compensation for missing wedge)
+                T0 = eulerAngles2matrix(0, 90, 0, 0, 0, 0)
+                T = np.linalg.inv(np.matmul(T, T0))
+                rot, tilt, psi, x, y, z = matrix2eulerAngles(T)
+                mdImgs.setValue(md.MDL_ANGLE_ROT, rot, objId)
+                mdImgs.setValue(md.MDL_ANGLE_TILT, tilt, objId)
+                mdImgs.setValue(md.MDL_ANGLE_PSI, psi, objId)
+                mdImgs.setValue(md.MDL_SHIFT_X, x, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Y, y, objId)
+                mdImgs.setValue(md.MDL_SHIFT_Z, z, objId)
+                mdImgs.setValue(md.MDL_ANGLE_Y, 0.0, objId)
+        return self.createVolSetSubtomo(mdImgs)
+
+    def inputFromEman(self):
+        Table = self.emanJSON.get()
+
+        with open(Table, "r") as f:
+            jf = json.load(f)
+        n_data = len(jf)
+
+        index = []
+        fname = []
+        matrices = []
+        for i in jf:
+            fname_i, index_i = make_tuple(i)
+            index.append(index_i)
+            fname.append(fname_i)
+            mat = np.array(json.loads(jf[i]["xform.align3d"]["matrix"]), dtype=np.float64).reshape(3, 4)
+            matrices.append(matrix2eulerAngles(mat))
+        matrices = np.array(matrices)
+
+        for i in range(n_data):
+            fileext = os.path.splitext(fname[i])[1]
+            if fileext == ".lst":
+                with open(fname[i], "r") as f:
+                    for line in f:
+                        if not line.startswith('#'):
+                            spl = line.split()
+                            if int(spl[0]) == index[i]:
+                                fname[i] = spl[1]
+                                break
+            elif fileext == ".hdf" or fileext == ".mrc" or fileext == ".mrcs" or fileext == ".vol" or fileext == ".spi":
+                pass
+            else:
+                raise RuntimeError("Unkown file type for subtomograms")
+
+        volSet = self._createSetOfVolumes()
+        volSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+
+        for i in range(n_data):
+
+            imgPath = "%s@%s" % (str(index[i] + 1).zfill(6), abspath(fname[i]))
+            transform = emobj.Transform()
+            transform.setMatrix(matrices[i])
+            vol = emobj.Volume()
+            vol.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+            vol.cleanObjId()
+            vol.setTransform(transform)
+            vol.setLocation(imgPath)
+            volSet.append(vol)
+        volSet.setAlignment3D()
+        return volSet
+
+    def inputFromDynamo(self):
+        from continuousflex.protocols.utilities.dynamo import tbl2metadata
+
+        volumes_in = self._getExtraPath('input.xmd')
+        xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), volumes_in)
+        tbl2metadata(self.dynamoTable.get(), volumes_in, md_out)
+
+        mdImgs = md.MetaData(md_out)
+        return self.createVolSetSubtomo(mdImgs)
+
+    def inputFromTombox(self):
+        raise NotImplementedError()
+
+    def createVolSetSubtomo(self, mdImgs):
+        volSet = self._createSetOfVolumes()
+        volSet.setSamplingRate(self.inputVolumes.get().getSamplingRate())
 
         for objId in mdImgs:
-            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
-            index, fn = xmipp3.convert.xmippToLocation(imgPath)
-            if (index):  # case the input is a stack
-                # Conside the index is the id in the input set
-                particle = inputSet[index]
-            else:  # input is not a stack
-                # convert the inputSet to metadata:
-                mdtemp = md.MetaData(self._getExtraPath('input.xmd'))
-                # Loop and find the index based on the basename:
-                bn_retrieved = basename(imgPath)
-                for searched_index in mdtemp:
-                    imgPath_temp = mdtemp.getValue(md.MDL_IMAGE, searched_index)
-                    bn_searched = basename(imgPath_temp)
-                    if bn_searched == bn_retrieved:
-                        index = searched_index
-                        particle = inputSet[index]
-                        break
-            mdImgs.setValue(md.MDL_IMAGE, xmipp3.convert.getImageLocation(particle), objId)
-            mdImgs.setValue(md.MDL_ITEM_ID, int(particle.getObjId()), objId)
-        mdImgs.write(self.imgsFn)
+
+            # imgPath = abspath(mdImgs.getValue(md.MDL_IMAGE, objId))
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+            matrix = eulerAngles2matrix(rot, tilt, psi, x_shift, y_shift, z_shift)
+
+            transform = emobj.Transform()
+            transform.setMatrix(matrix)
+
+            vol = emobj.Volume()
+            vol.setSamplingRate(self.inputVolumes.get().getSamplingRate())
+            vol.cleanObjId()
+            vol.setTransform(transform)
+            # vol.setLocation(imgPath)
+            volSet.append(vol)
+        volSet.setAlignment3D()
+        return volSet
 
 
     def applyAlignment(self):
-        makePath(self._getExtraPath()+'/aligned')
+        makePath(self._getExtraPath() + '/aligned')
         tempdir = self._getTmpPath()
-        mdImgs = md.MetaData(self.imgsFn)
+        mdImgs = md.MetaData(self._getExtraPath('volumes.xmd'))
         for objId in mdImgs:
             imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
             new_imgPath = self._getExtraPath()+'/aligned/' + basename(imgPath)
@@ -136,18 +265,11 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
             shiftz = str(mdImgs.getValue(md.MDL_SHIFT_Z, objId))
             # rotate 90 around y, align, then rotate -90 to get to neutral
             params = '-i ' + imgPath + ' -o ' + tempdir + '/temp.vol '
-            if(self.angleY):
-                params += '--rotate_volume euler 0 90 0 '
-            else: # only to convert
-                params += '--rotate_volume euler 0 0 0 '
             runProgram('xmipp_transform_geometry', params)
             params = '-i ' + tempdir + '/temp.vol -o ' + new_imgPath + ' '
             params += '--rotate_volume euler ' + rot + ' ' + tilt + ' ' + psi + ' '
             params += '--shift ' + shiftx + ' ' + shifty + ' ' + shiftz + ' '
-            if (not(self.angleY)):
-                params += ' --inverse '
-
-            # print('xmipp_transform_geometry',params)
+            params += ' --inverse '
             runProgram('xmipp_transform_geometry', params)
         self.fnaligned = self._getExtraPath('volumes_aligned.xmd')
         mdImgs.write(self.fnaligned)

@@ -315,6 +315,7 @@ class ContinuousFlexPDBHandler:
                 self.resName[i] = resNew
                 n_alias+=1
         print("%s -> %s : %i lines changed"%(resName ,resNew,  n_alias))
+        return n_alias
 
 
     def add_terminal_res(self):

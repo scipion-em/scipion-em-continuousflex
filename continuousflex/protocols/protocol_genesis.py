@@ -38,7 +38,7 @@ from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes
 from pwem.convert.atom_struct import cifToPdb
 from continuousflex import Plugin
 from pyworkflow.utils.path import makePath
-
+import continuousflex
 import pwem.emlib.metadata as md
 import re
 
@@ -56,8 +56,8 @@ class FlexProtGenesis(EMProtocol):
         # Inputs ============================================================================================
         form.addSection(label='Inputs')
 
-        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_NEW_SIM,
-                      choices=['New simulation from topology protocol', 'Restart previous GENESIS simulation', "New simulation from files"],
+        form.addParam('inputType', params.EnumParam, label="Simulation inputs", default=INPUT_TOPOLOGY,
+                      choices=['New simulation from topology model', 'Restart previous simulation', "New simulation from files"],
                       help="Chose the type of input for your simulation",
                       important=True)
 
@@ -106,7 +106,8 @@ class FlexProtGenesis(EMProtocol):
                            'Latest forcefields can be founded at http://mackerell.umaryland.edu/charmm_ff.shtml ')
 
         form.addParam('centerPDB', params.BooleanParam, label="Center PDB ?",
-                      default=False, help="Center the input PDBs with the center of mass")
+                      default=False, help="Center the input PDBs with the center of mass",
+                      expertLevel=params.LEVEL_ADVANCED)
 
 
         # Simulation =================================================================================================
@@ -118,15 +119,18 @@ class FlexProtGenesis(EMProtocol):
         group = form.addGroup('Simulation parameters')
         group.addParam('integrator', params.EnumParam, label="Integrator", default=0,
                       choices=['Velocity Verlet', 'Leapfrog', ''],
-                      help="Type of integrator for the simulation", condition="simulationType!=0")
-        group.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
-                      help="Time step in the MD run", condition="simulationType!=0")
+                      help="Type of integrator for the simulation", condition="simulationType!=0",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('n_steps', params.IntParam, default=10000, label='Number of steps',
                       help="Total number of steps in one MD run")
+        group.addParam('time_step', params.FloatParam, default=0.002, label='Time step (ps)',
+                      help="Time step in the MD run", condition="simulationType!=0")
         group.addParam('eneout_period', params.IntParam, default=100, label='Energy output period',
-                      help="Output period for the energy data")
+                      help="Output period for the energy data",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('crdout_period', params.IntParam, default=100, label='Coordinate output period',
-                      help="Output period for the coordinates data")
+                      help="Output period for the coordinates data",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nbupdate_period', params.IntParam, default=10, label='Non-bonded update period',
                       help="Update period of the non-bonded pairlist",
                       expertLevel=params.LEVEL_ADVANCED)
@@ -148,10 +152,12 @@ class FlexProtGenesis(EMProtocol):
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
                       help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
-                           "to accelerate NM integration, however can make the simulation unstable.")
+                           "to accelerate NM integration, however can make the simulation unstable.",
+                      expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
                       help="Mass value of Normal modes for NMMD. Lower values accelerate the fitting but can make the "
-                           "simulation unstable")
+                           "simulation unstable",
+                      expertLevel=params.LEVEL_ADVANCED)
         group = form.addGroup('REMD parameters', condition="simulationType==%i or simulationType==%i"%(SIMULATION_REMD,
                                SIMULATION_RENMMD))
         group.addParam('exchange_period', params.IntParam, default=1000, label='Exchange Period',
@@ -161,13 +167,30 @@ class FlexProtGenesis(EMProtocol):
 
         # MD params =================================================================================================
         form.addSection(label='MD parameters')
+
+        group = form.addGroup('Ensemble', condition="simulationType!=0")
+
+        group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
+                      help="Initial and target temperature", important=True)
+        group.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
+                      choices=['NVT', 'NVE', 'NPT'],
+                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
+                           " NPT: Isothermal-isobaric ensemble")
+        group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
+                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
+                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
+                           " Leapfrog : BERENDSEN, LANGEVIN;  Velocity Verlet : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
+                           " NMMD : LANGEVIN (NVT only)")
+        group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
+                      help="Target pressure in the NPT ensemble", condition="ensemble==%i"%ENSEMBLE_NPT)
+
         group = form.addGroup('Energy')
         group.addParam('implicitSolvent', params.EnumParam, label="Implicit Solvent", default=1,
                       choices=['GBSA', 'NONE'],
                       help="Turn on Generalized Born/Solvent accessible surface area model (Implicit Solvent). Boundary condition must be NO."
                            " ATDYN only.")
 
-        group.addParam('boundary', params.EnumParam, label="Boundary", default=0,
+        group.addParam('boundary', params.EnumParam, label="Boundary", default=BOUNDARY_NOBC,
                       choices=['No boundary', 'Periodic Boundary Condition'],
                       help="Type of boundary condition. In case of implicit solvent, "
                            " GO models or vaccum simulation, choose No boundary")
@@ -184,7 +207,8 @@ class FlexProtGenesis(EMProtocol):
                            " CUTOFF: Non-bonded interactions including the van der Waals interaction are just"
                            " truncated at cutoffdist; "
                            " PME : Particle mesh Ewald (PME) method is employed for long-range interactions."
-                            " This option is only availabe in the periodic boundary condition")
+                            " This option is only availabe in the periodic boundary condition",
+                       condition="boundary==%i"%BOUNDARY_PBC)
         group.addParam('vdw_force_switch', params.BooleanParam, label="Switch function Van der Waals", default=True,
                       help="This paramter determines whether the force switch function for van der Waals interactions is"
                         " employed or not. The users must take care about this parameter, when the CHARMM"
@@ -199,21 +223,6 @@ class FlexProtGenesis(EMProtocol):
                       help="Distance used to make a Verlet pair list for non-bonded interactions . This distance"
                             " must be larger than cutoffdist")
 
-        group = form.addGroup('Ensemble', condition="simulationType!=0")
-        group.addParam('ensemble', params.EnumParam, label="Ensemble", default=0,
-                      choices=['NVT', 'NVE', 'NPT'],
-                      help="Type of ensemble, NVE: Microcanonical ensemble, NVT: Canonical ensemble,"
-                           " NPT: Isothermal-isobaric ensemble")
-        group.addParam('tpcontrol', params.EnumParam, label="Thermostat/Barostat", default=1,
-                      choices=['NO', 'LANGEVIN', 'BERENDSEN', 'BUSSI'],
-                      help="Type of thermostat and barostat. The availabe algorithm depends on the integrator :"
-                           " Leapfrog : BERENDSEN, LANGEVIN;  Velocity Verlet : BERENDSEN (NVT only), LANGEVIN, BUSSI; "
-                           " NMMD : LANGEVIN (NVT only)")
-        group.addParam('temperature', params.FloatParam, default=300.0, label='Temperature (K)',
-                      help="Initial and target temperature")
-        group.addParam('pressure', params.FloatParam, default=1.0, label='Pressure (atm)',
-                      help="Target pressure in the NPT ensemble", condition="ensemble==%i"%ENSEMBLE_NPT)
-
         group = form.addGroup('Contraints', condition="simulationType==%i or simulationType==%i"%(SIMULATION_MD,SIMULATION_REMD))
         group.addParam('rigid_bond', params.BooleanParam, label="Rigid bonds (SHAKE/RATTLE)",
                       default=False,
@@ -224,6 +233,8 @@ class FlexProtGenesis(EMProtocol):
                       help="Turn on or off the SETTLE algorithm for the constraints of the water molecules")
         group.addParam('water_model', params.StringParam, label='Water model', default="TIP3",
                       help="Residue name of the water molecule to be rigidified in the SETTLE algorithm", condition="fast_water")
+        group.addParam('posi_restr', params.BooleanParam, label='Positional restraint on Calpha atoms', default=False,
+                      help="Apply a restraint on the positions of Ca atoms")
 
         # Experiments =================================================================================================
         form.addSection(label='EM data')
@@ -242,37 +253,38 @@ class FlexProtGenesis(EMProtocol):
                            " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
                            " to each replica."
                       , condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="Gaussian kernels variance",
                       help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
                         " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='Tolerance',
                       help="This variable determines the tail length of the Gaussian function. For example, if em-"
                         " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
                         " than 0.1% of the maximum value. Smaller value requires large computational cost",
-                      condition="EMfitChoice!=%i"%EMFIT_NONE)
-        group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
+                      condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_period', params.IntParam, default=10, label='Update period',
                        help="Number of MD iteration every which the EM poential is updated",
-                       condition="EMfitChoice!=%i"%EMFIT_NONE)
+                       condition="EMfitChoice!=%i"%EMFIT_NONE, expertLevel=params.LEVEL_ADVANCED)
 
         # Volumes
         group = form.addGroup('Volume Parameters', condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume",
-                      label="Input volume", help='Select the target EM density volume',
+        group.addParam('inputVolume', params.PointerParam, pointerClass="Volume, SetOfVolumes",
+                      label="Input volume (s)", help='Select the target EM density volume',
                       condition="EMfitChoice==%i"%EMFIT_VOLUMES, important=True)
         group.addParam('voxel_size', params.FloatParam, default=1.0, label='Voxel size (A)',
-                      help="Voxel size in ANgstrom of the target volume", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
-        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=True,
-                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+                      help="Voxel size in Angstrom of the target volume (s)", condition="EMfitChoice==%i"%EMFIT_VOLUMES)
+        group.addParam('centerOrigin', params.BooleanParam, label="Center Origin", default=False,
+                      help="Center the volume to the origin", condition="EMfitChoice==%i"%EMFIT_VOLUMES,
+                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_x', params.FloatParam, default=0, label="Origin X",
                       help="Origin of the first voxel in X direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_y', params.FloatParam, default=0, label="Origin Y",
                       help="Origin of the first voxel in Y direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
         group.addParam('origin_z', params.FloatParam, default=0, label="Origin Z",
                       help="Origin of the first voxel in Z direction (in Angstrom) ",
-                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES)
+                      condition="EMfitChoice==%i and not centerOrigin"%EMFIT_VOLUMES, expertLevel=params.LEVEL_ADVANCED)
 
         # Images
         group = form.addGroup('Image Parameters', condition="EMfitChoice==%i"%EMFIT_IMAGES)
@@ -281,16 +293,40 @@ class FlexProtGenesis(EMProtocol):
                       condition="EMfitChoice==%i"%EMFIT_IMAGES, important=True)
         group.addParam('pixel_size', params.FloatParam, default=1.0, label='Pixel size (A)',
                       help="Pixel size of the EM data in Angstrom", condition="EMfitChoice==%i"%EMFIT_IMAGES)
-        group.addParam('projectAngleChoice', params.EnumParam, default=0, label='Projection angles',
-                       choices=['same as image set', 'from xmipp file', 'from other set'],
+        group.addParam('projectAngleChoice', params.EnumParam, default=PROJECTION_ANGLE_SAME, label='Projection angles',
+                       choices=['same as image set', 'from xmipp file'],
                       help="Source of projection angles to align the input PDB with the set of images",
                        condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
                       help="Xmipp metadata file with projection alignement parameters ",
                        condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_XMIPP))
-        group.addParam('projectAngleImage', params.PointerParam, pointerClass="SetOfParticles",
-                      label="projection angle image set  ", help='Image set containing projection alignement parameters',
-                      condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_IMAGE))
+
+        group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
+                      help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
+                           " This parameters must be tuned with caution : "
+                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
+                           " force constant value must be equal to the number of replicas, for example for 4 replicas,"
+                           " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
+                           " values (for example \"1000-4000\") and the force constant values will be linearly distributed "
+                           " to each replica."
+                      , condition="EMfitChoice!=%i"%EMFIT_NONE)
+        group.addParam('emfit_sigma', params.FloatParam, default=2.0, label="EM fit gaussian variance",
+                      help="Resolution parameter of the simulated map. This is usually set to the half of the resolution"
+                        " of the target map. For example, if the target map resolution is 5 Å, emfit_sigma=2.5",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_tolerance', params.FloatParam, default=0.01, label='EM Fit Tolerance',
+                      help="This variable determines the tail length of the Gaussian function. For example, if em-"
+                        " fit_tolerance=0.001 is specified, the Gaussian function is truncated to zero when it is less"
+                        " than 0.1% of the maximum value. Smaller value requires large computational cost",
+                      condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
+        group.addParam('emfit_period', params.IntParam, default=10, label='EM Fit period',
+                       help="Number of MD iteration every which the EM poential is updated",
+                       condition="EMfitChoice!=%i"%EMFIT_NONE,
+                      expertLevel=params.LEVEL_ADVANCED)
 
         form.addSection(label='MPI parallelization')
 
@@ -308,14 +344,16 @@ class FlexProtGenesis(EMProtocol):
                            "the MD simulation are exectuted one after the other (serial) and are using the maximum number of cores"
                            " available (the performance are not comparable to MPI or GNU parallel and can be suitable only "
                            "for very small datasets) ")
-        form.addParam('use_parallelCmd', params.BooleanParam, default=False, label="Use parallel command ? ",
-                      help="If yes, will use the parallel command set in host.conf to run the simulations. "
-                           "This option may be required to run on clusters with mulitple nodes.",
-                      condition="parallelType==%i"%PARALLEL_MPI)
-        form.addParam('use_rankfiles', params.BooleanParam, default=False, label="Use rankfiles ? ",
+
+        form.addParam('use_rankfiles', params.BooleanParam, default=False, label="Running on cluster ? ",
                       help="If yes, will use rankfiles to attribute a core to each simulation. This option should be use on "
                            "cluster systems with multiple nodes. Note that the parallel command in host.conf must be mpirun",
                       condition="parallelType==%i"%PARALLEL_MPI)
+        form.addParam('use_parallelCmd', params.BooleanParam, default=False, label="Use parallel command ? ",
+                      help="If yes, will use the parallel command set in host.conf to run the simulations. "
+                           "This option may be required to run on clusters with mulitple nodes.",
+                      condition="parallelType==%i" % PARALLEL_MPI,
+                      expertLevel=params.LEVEL_ADVANCED)
         form.addParam('num_core_per_node', params.IntParam, default=0, label="Number of cores per node",
                       help="The number of MPI cores per node. If set to 0, will use number_of_mpi / number_of_nodes ",
                       condition="parallelType==%i and use_rankfiles"%PARALLEL_MPI)
@@ -407,6 +445,12 @@ class FlexProtGenesis(EMProtocol):
             elif self.inputType.get() == INPUT_TOPOLOGY:
                 inputPSF = self.topoProt.get()._getExtraPath("output.psf")
             runCommand("cp %s %s.psf" % (inputPSF, inputPrefix))
+            inputRTF, inputPRM, inputSTR = self.getCHARMMInputs()
+            runCommand("cp %s %s_charmm.rtf" % (inputRTF, inputPrefix))
+            runCommand("cp %s %s_charmm.prm" % (inputPRM, inputPrefix))
+            runCommand("cp %s %s_charmm.str" % (inputSTR, inputPrefix))
+
+
         elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
             if self.inputType.get() == INPUT_NEW_SIM:
                 inputTOP = self.inputTOP.get()
@@ -419,9 +463,10 @@ class FlexProtGenesis(EMProtocol):
         # Center PDBs -----------------------------------------------------
         if self.centerPDB.get():
             for i in range(self.getNumberOfInputPDB()):
-                cmd = "xmipp_pdb_center -i %s.pdb -o %s.pdb" %\
+                cmd = "xmipp_pdb_center"
+                args = "-i %s.pdb -o %s.pdb" %\
                         (self.getInputPDBprefix(i),self.getInputPDBprefix(i))
-                runCommand(cmd)
+                runProgram(cmd, args)
                 print(cmd)
 
     def convertNormalModeFileStep(self):
@@ -510,9 +555,6 @@ class FlexProtGenesis(EMProtocol):
             "nm_number": self.getNumberOfNormalModes(),
             "rigid_body_params": self.getRigidBodyParams(indexFit),
             "forcefield": self.getForceField(),
-            "inputRTF": inputRTF,
-            "inputPRM": inputPRM,
-            "inputSTR": inputSTR,
 
             # Input Params
             "inputType": self.inputType.get(),
@@ -532,6 +574,7 @@ class FlexProtGenesis(EMProtocol):
             "nm_dt": self.nm_dt.get(),
             "nm_mass": self.nm_mass.get(),
             "rigid_bond": self.rigid_bond.get(),
+            "posi_restr": self.posi_restr.get(),
             "fast_water": self.fast_water.get(),
             "water_model": self.water_model.get(),
             "box_size_x": self.box_size_x.get(),
@@ -565,7 +608,7 @@ class FlexProtGenesis(EMProtocol):
         command = buildRunCommand(programname, params, numberOfMpi=self.numberOfMpi.get(),
                               hostConfig=self._stepsExecutor.hostConfig,
                               env=env)
-        command = Plugin.getContinuousFlexCmd(command)
+        # command = Plugin.getContinuousFlexCmd(command)
         runCommand(command, env=env)
 
     def runSimulationParallel(self):
@@ -600,7 +643,7 @@ class FlexProtGenesis(EMProtocol):
         # Build parallel command
         parallel_cmd = "seq -f \"%%06g\" 1 %i | parallel -P %i \" %s\" " % (
         self.getNumberOfSimulation(),self.numberOfMpi.get()//numberOfMpiPerFit, cmd)
-        parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
+        # parallel_cmd = Plugin.getContinuousFlexCmd(parallel_cmd)
 
         print("Command : %s" % cmd)
         print("Parallel Command : %s" % parallel_cmd)
@@ -628,7 +671,7 @@ class FlexProtGenesis(EMProtocol):
                     fi.write(self.getGenesisInputFile(i)+"\n")
                     fo.write(self.getOutputPrefix(i)+".log\n")
 
-        script = os.path.join(Plugin.getVar("GENESIS_HOME"), "mpigenesis.py")
+        script = os.path.join(continuousflex.__path__[0], "protocols/utilities/mpi_genesis.py")
         programname = os.path.join( Plugin.getVar("GENESIS_HOME"), "bin/atdyn")
         if self.use_parallelCmd.get() or self.use_rankfiles.get():
             mpi_command = self._stepsExecutor.hostConfig.mpiCommand.get() % \
@@ -674,7 +717,7 @@ class FlexProtGenesis(EMProtocol):
                             outputPDB=j + ".pdb",
                             inputPDB=self.getInputPDBprefix(i) + ".pdb")
 
-        # In Case of CAGO, replace PDB info by input PDB because Genesis is not saving it properly
+        # ensure GENESIS maintains input pdb format
         if self.getForceField() == FORCEFIELD_CAGO:
             input = ContinuousFlexPDBHandler(self.getInputPDBprefix() + ".pdb")
             for i in range(self.getNumberOfSimulation()):
@@ -682,8 +725,7 @@ class FlexProtGenesis(EMProtocol):
                 for j in outputPrefix:
                     fn_output = j + ".pdb"
                     if os.path.exists(fn_output) and os.path.getsize(fn_output) !=0:
-                        output = ContinuousFlexPDBHandler(fn_output)
-                        input.coords = output.coords
+                        input.coords = ContinuousFlexPDBHandler.read_coords(fn_output)
                         input.write_pdb(j + ".pdb")
 
         # CREATE a output PDB
@@ -965,8 +1007,6 @@ class FlexProtGenesis(EMProtocol):
                     inputEMMetadata.setValue(md.MDL_SHIFT_X, shx, i)
                     inputEMMetadata.setValue(md.MDL_SHIFT_Y, shy, i)
                 inputEMMetadata.write(nameMd)
-            elif self.projectAngleChoice.get() == PROJECTION_ANGLE_IMAGE:
-                raise RuntimeError("projection angles from other image set error : Not implemented")
 
         elif self.EMfitChoice.get() == EMFIT_VOLUMES:
             if isinstance(self.inputVolume.get(), Volume):
@@ -984,19 +1024,18 @@ class FlexProtGenesis(EMProtocol):
             if self.inputType.get() == INPUT_RESTART:
                 return self.restartProt.get().getCHARMMInputs()
             elif  self.inputType.get() == INPUT_TOPOLOGY:
-                return self.topoProt.get().inputRTF.get(),self.topoProt.get().inputPRM.get(), self.topoProt.get().inputSTR.get()
+                return self.topoProt.get().getCHARMMInputs()
             elif  self.inputType.get() == INPUT_NEW_SIM:
                 return self.inputRTF.get(),self.inputPRM.get(), self.inputSTR.get()
         else:
             return None,None,None
 
 def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMprefix="", rstFile="", nm_number=0,
-                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputRTF=None, inputPRM=None,
-                       inputSTR=None, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
+                       rigid_body_params=None, forcefield= FORCEFIELD_CAGO, inputType=INPUT_NEW_SIM, simulationType=SIMULATION_MIN,
                        electrostatics=ELECTROSTATICS_CUTOFF, switch_dist=10.0, cutoff_dist=12.0,
                        pairlist_dist=15.0, vdw_force_switch=True, implicitSolvent=IMPLICIT_SOLVENT_NONE,
                        integrator=INTEGRATOR_LEAPFROG, time_step=0.001, eneout_period=100, crdout_period=100,
-                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,
+                       n_steps=10000, nbupdate_period=10, nm_dt=0.001, nm_mass=10.0, rigid_bond=False,posi_restr=False,
                        fast_water = False, water_model="TIP3", box_size_x=None, box_size_y=None, box_size_z=None,
                        boundary=BOUNDARY_NOBC, ensemble=ENSEMBLE_NVE, tpcontrol=TPCONTROL_NONE, temperature=300.0,
                        pressure=1.0, EMfitChoice=EMFIT_NONE, constantK=1000.0, nreplica=4, emfit_sigma=2.0,
@@ -1005,14 +1044,16 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "pdbfile = %s.pdb\n" % inputPDBprefix
     if forcefield == FORCEFIELD_CHARMM:
         s += "psffile = %s.psf\n" % inputPDBprefix
-        s += "topfile = %s\n" % inputRTF
-        s += "parfile = %s\n" % inputPRM
-        if inputSTR != "" and inputSTR is not None:
-            s += "strfile = %s\n" % inputSTR
+        s += "topfile = %s_charmm.rtf\n" % inputPDBprefix
+        s += "parfile = %s_charmm.prm\n" % inputPDBprefix
+        s += "strfile = %s_charmm.str\n" % inputPDBprefix
     elif forcefield == FORCEFIELD_AAGO or forcefield == FORCEFIELD_CAGO:
         s += "grotopfile = %s.top\n" % inputPDBprefix
     if inputType == INPUT_RESTART:
         s += "rstfile = %s \n" % rstFile
+    if posi_restr:
+        s += "reffile = %s.pdb \n" % inputPDBprefix
+
 
     s += "\n[OUTPUT] \n"  # -----------------------------------------------------------
     if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
@@ -1066,7 +1107,7 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
     s += "nsteps = %i \n" % n_steps
     s += "eneout_period = %i \n" % eneout_period
     s += "crdout_period = %i \n" % crdout_period
-    s += "rstout_period = %i \n" % n_steps
+    s += "rstout_period = %i \n" % crdout_period
     s += "nbupdate_period = %i \n" % nbupdate_period
 
     if simulationType == SIMULATION_NMMD or simulationType == SIMULATION_RENMMD:
@@ -1120,22 +1161,39 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
         if ensemble == ENSEMBLE_NPT:
             s += "pressure = %.2f \n" % pressure
 
-    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
-            and simulationType != SIMULATION_MIN:
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
         s += "\n[SELECTION] \n"  # -----------------------------------------------------------
-        s += "group1 = all and not hydrogen\n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "group1 = all and not hydrogen\n"
+        if posi_restr:
+            s += "group1 = an:CA\n"
+
+
+    if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN ) or posi_restr:
 
         s += "\n[RESTRAINTS] \n"  # -----------------------------------------------------------
-        s += "nfunctions = 1 \n"
-        s += "function1 = EM \n"
-        constStr = constantK
-        if "-" in constStr:
-            splt = constStr.split("-")
-            constStr = " ".join(
-                [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
-        s += "constant1 = %s \n" % constStr
-        s += "select_index1 = 1 \n"
+        if ((EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+                and simulationType != SIMULATION_MIN):
+            s += "nfunctions = 1 \n"
+            s += "function1 = EM \n"
+            constStr = constantK
+            if "-" in constStr:
+                splt = constStr.split("-")
+                constStr = " ".join(
+                    [str(int(i)) for i in np.linspace(int(splt[0]), int(splt[1]), nreplica)])
+            s += "constant1 = %s \n" % constStr
+            s += "select_index1 = 1 \n"
+        else:
+            s += "nfunctions = 1 \n"
+            s += "function1 = POSI \n"
+            s += "constant1 = 1 \n"
+            s += "select_index1 = 1 \n"
 
+    if (EMfitChoice == EMFIT_VOLUMES or EMfitChoice == EMFIT_IMAGES) \
+            and simulationType != SIMULATION_MIN:
         s += "\n[EXPERIMENTS] \n"  # -----------------------------------------------------------
         s += "emfit = YES  \n"
         s += "emfit_sigma = %.4f \n" % emfit_sigma
@@ -1153,13 +1211,13 @@ def createGenesisInput(inp_file, outputPrefix="", inputPDBprefix="", inputEMpref
             s += "emfit_shift_x = %f\n" % rigid_body_params[3]
             s += "emfit_shift_y =  %f\n" % rigid_body_params[4]
 
-        if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
-            s += "\n[REMD] \n"  # -----------------------------------------------------------
-            s += "dimension = 1 \n"
-            s += "exchange_period = %i \n" % exchange_period
-            s += "type1 = RESTRAINT \n"
-            s += "nreplica1 = %i \n" % nreplica
-            s += "rest_function1 = 1 \n"
+    if simulationType == SIMULATION_REMD or simulationType == SIMULATION_RENMMD:
+        s += "\n[REMD] \n"  # -----------------------------------------------------------
+        s += "dimension = 1 \n"
+        s += "exchange_period = %i \n" % exchange_period
+        s += "type1 = RESTRAINT \n"
+        s += "nreplica1 = %i \n" % nreplica
+        s += "rest_function1 = 1 \n"
 
     with open(inp_file, "w") as f:
         f.write(s)

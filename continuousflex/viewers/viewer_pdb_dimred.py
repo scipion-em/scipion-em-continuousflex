@@ -23,7 +23,7 @@
 # **************************************************************************
 
 import numpy as np
-from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam
+from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam, BooleanParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pwem.viewers import ChimeraView
 from pwem.objects.data import SetOfParticles,SetOfVolumes
@@ -32,7 +32,7 @@ from continuousflex.protocols import FlexProtDimredPdb
 import matplotlib.pyplot as plt
 from pwem.emlib.image import ImageHandler
 from joblib import load
-from continuousflex.viewers.tk_dimred import PCAWindowDimred
+from continuousflex.viewers.tk_dimred import PCAWindowDimred, ANIMATION_INV, ANIMATION_AVG
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
 from pyworkflow.utils.path import cleanPath, makePath
@@ -44,6 +44,7 @@ from continuousflex.protocols.protocol_batch_pdb_cluster import FlexBatchProtClu
 from .plotter import FlexPlotter
 import os
 from matplotlib.ticker import MaxNLocator
+import tkinter as tk
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -51,10 +52,6 @@ Y_LIMITS_NONE = 0
 Y_LIMITS = 1
 Z_LIMITS_NONE = 0
 Z_LIMITS = 1
-
-ANIMATION_INV=0
-ANIMATION_AVG=1
-ANIMATION_PCA=2
 
 NUM_POINTS_TRAJECTORY=10
 
@@ -79,10 +76,10 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       help="Display the amount of variance explained by each PCA component. ",
                       condition=self.protocol.method.get()==REDUCE_METHOD_PCA)
 
-        group = form.addGroup("Display PCA")
+        group = form.addGroup("Display landscape")
         group.addParam('displayPCA', LabelParam,
-                      label='Display PCA axes',
-                      help='Open a GUI to visualize the PCA space')
+                      label='Display PCA/UMAP axes',
+                      help='Open a GUI to visualize the PCA/UMAP space')
 
         group.addParam('pcaAxes', StringParam, default="1 2",
                        label='Axes to display' )
@@ -95,17 +92,21 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                        label='Axes to display' )
         group.addParam('freeEnergySize', IntParam, default=100,
                        label='Sampling size' )
+        group.addParam('freeEnergyCmap', StringParam, default="jet",
+                       label='Colormap' , help="See matplotlib colormaps for available colormaps")
+        group.addParam('freeEnergyInterpolate', BooleanParam, default=False,
+                       label='Interpolate contours ?' )
 
         group = form.addGroup("Animation tool")
 
         group.addParam('displayAnimationtool', LabelParam,
                       label='Open Animation tool ',
-                      help='Open a GUI to analyze the PCA space'
+                      help='Open a GUI to analyze the PCA/UMAP space'
                            ' to draw and adjust trajectories and create clusters.')
 
         group.addParam('inputSet', PointerParam, pointerClass ='SetOfParticles,SetOfVolumes',
-                      label='(Optional) Em data for cluster animation',  allowsNull=True,
-                      help="Provide a EM data set that match the PDB data set to visualize animation on 3D reconstructions")
+                      label='(Optional) Set of particles for clustering animation',  allowsNull=True,
+                      help="Provide a set of particles that match the PDB data set to visualize animation on 3D reconstructions")
 
         group = form.addGroup("Figure parameters")
 
@@ -173,13 +174,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                       alpha=self.alpha, s=self.s, cbar_label=None)
         if dim == 1:
             data.XIND = axes[0]-1
-            plotter.plotArray1D("PCA","%i component"%(axes[0]),"")
+            plotter.plotArray1D("","%i component"%(axes[0]),"")
         if dim == 2:
             data.YIND = axes[1]-1
-            plotter.plotArray2D_xy("PCA","%i component"%(axes[0]),"%i component"%(axes[1]))
+            plotter.plotArray2D_xy("","%i component"%(axes[0]),"%i component"%(axes[1]))
         if dim == 3:
             data.ZIND = axes[2]-1
-            plotter.plotArray3D_xyz("PCA","%i component"%(axes[0]),"%i component"%(axes[1]),"%i component"%(axes[2]))
+            plotter.plotArray3D_xyz("","%i component"%(axes[0]),"%i component"%(axes[1]),"%i component"%(axes[2]))
         plotter.show()
 
     def _displayFreeEnergy(self, paramName):
@@ -197,6 +198,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         xmax = np.max(data[:,0])
         ymin = np.min(data[:,1])
         ymax = np.max(data[:,1])
+        xm = (xmax-xmin)*0.1
+        ym = (ymax-ymin)*0.1
+        xmin -= xm
+        xmax += xm
+        ymin -= ym
+        ymax += ym
         x = np.linspace(xmin, xmax, size)
         y = np.linspace(ymin, ymax, size)
         count = np.zeros((size, size))
@@ -209,12 +216,13 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         plotter = FlexPlotter()
         ax = plotter.createSubPlot("Free energy", "component "+axes_str[0],
                                         "component " + axes_str[1])
-        # im = ax.imshow(img.T[::-1,:],
-        #            cmap = "jet", interpolation=interp,
-        #            extent=[xmin,xmax,ymin,ymax])
-
-        xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
-        im = ax.contourf(xx, yy, img, cmap='jet')
+        if self.freeEnergyInterpolate.get():
+            im = ax.imshow(img.T[::-1,:],
+                       cmap = self.freeEnergyCmap.get(), interpolation="bicubic",
+                       extent=[xmin,xmax,ymin,ymax])
+        else:
+            xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
+            im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get(),levels=12)
         cbar = plotter.figure.colorbar(im)
         cbar.set_label("$\Delta G / k_{B}T$")
         plotter.show()
@@ -269,8 +277,15 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             data.addPoint(Point(pointId=i+1, data=pdb_matrix[i, :],weight=weights[i]))
         return data
 
-    def _generateAnimation(self):
+    def _generateAnimation(self, animtype):
         prot = self.protocol
+
+        if prot.method.get() == REDUCE_METHOD_UMAP and animtype == ANIMATION_INV:
+            return  self.trajectoriesWindow.showError("Can not show the inverse tranform for UMAP. Try viewing cluster average instead.")
+
+        if all([int(p._weight) == 0 for p in self.trajectoriesWindow.data]) and animtype == ANIMATION_AVG:
+            return self.trajectoriesWindow.showError("No clustering detected.")
+
         initPDB = ContinuousFlexPDBHandler(prot.getPDBRef())
 
         # Get animation root
@@ -282,7 +297,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animationRoot = os.path.join(animationPath, '')
 
         # get trajectory coordinates
-        animtype = self.trajectoriesWindow.getAnimationType()
         coords_list = []
         if animtype ==ANIMATION_INV:
             trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
@@ -302,10 +316,11 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             count = 0 #CLUSTERINGTAG
             for p in self.trajectoriesWindow.data:
                 clsId = int(p._weight) #CLUSTERINGTAG
-                if clsId in classDict:
-                    classDict[clsId].append(count)
-                else:
-                    classDict[clsId] = [count]
+                if clsId!=0:
+                    if clsId in classDict:
+                        classDict[clsId].append(count)
+                    else:
+                        classDict[clsId] = [count]
                 count += 1
 
             keys = list(classDict.keys())
@@ -321,15 +336,20 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # Generate DCD trajectory
         initdcdcp = initPDB.copy()
         initdcdcp.coords = coords_list[0]
-        initdcdcp.write_pdb(animationRoot+"trajectory.pdb")
-        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+"trajectory.dcd")
+        if  animtype == ANIMATION_INV:
+            outprefix = "trajectory"
+        else:
+            outprefix = "clusterAvg"
+
+        initdcdcp.write_pdb(animationRoot+"reference.pdb")
+        numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+outprefix+".dcd")
 
         # Generate the vmd script
         vmdFn = animationRoot + 'trajectory.vmd'
         vmdFile = open(vmdFn, 'w')
         vmdFile.write("""
-        mol new %strajectory.pdb waitfor all
-        mol addfile %strajectory.dcd waitfor all
+        mol new %sreference.pdb waitfor all
+        mol addfile %s%s.dcd waitfor all
         animate style Rock
         display projection Orthographic
         mol modcolor 0 0 Index
@@ -337,20 +357,27 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         animate speed 0.75
         animate forward
         animate delete  beg 0 end 0 skip 0 0
-        """ % (animationRoot,animationRoot))
+        """ % (animationRoot,animationRoot,outprefix))
         vmdFile.close()
 
         VmdView(' -e ' + vmdFn).show()
 
     def saveClusterCallback(self, tkWindow):
+        if all([int(p._weight) == 0 for p in tkWindow.data]):
+            return tkWindow.showError("No clustering detected.")
+
         # get cluster name
         clusterName = "animation_" + tkWindow.getClusterName()
 
         # get input metadata
         inputSet = self.inputSet.get()
         if inputSet is None:
-            tkWindow.showError("Select an EM set before exporting clusters.")
+            tkWindow.showError("Select a set of particles to apply clustering to.")
             return
+
+        if inputSet.getSize() != tkWindow.data.getSize():
+            return tkWindow.showError("The number of particles differs from the number of data points. Select a set of particles that match the data.")
+
 
         classID=[]
         for p in tkWindow.data:
@@ -416,9 +443,15 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         if os.path.isfile(trajFile) and os.path.getsize(trajFile) != 0:
             trajectoryPoints = np.loadtxt(trajFile)
             data = PathData(dim=trajectoryPoints.shape[1])
+            n=0
             for i, row in enumerate(trajectoryPoints):
                 data.addPoint(Point(pointId=i + 1, data=list(row), weight=0))
-            loaded.append("trajectory.txt")
+                n+=1
+            loaded.append("trajectory")
+            self.trajectoriesWindow.numberOfPointsVar.set(n)
+            self.trajectoriesWindow.numberOfPoints = n
+            self.trajectoriesWindow.setPathData(data)
+            self.trajectoriesWindow._checkNumberOfPoints()
 
         clusterFile = os.path.join(trajPath,'clusters.txt')
         if os.path.isfile(clusterFile) and os.path.getsize(clusterFile) != 0:
@@ -427,15 +460,24 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             for p in self.trajectoriesWindow.data:
                 p._weight = clusterPoints[i]
                 i+=1
-            loaded.append("clusters.txt")
+            loaded.append("clusters")
         if len(loaded) ==0:
             return self.trajectoriesWindow.showError('Animation files not found. ')
         else:
+            self.trajectoriesWindow._onUpdateClick()
+            # self.trajectoriesWindow.saveClusterBtn.config(state=tk.NORMAL)
+            print("////////////////////////")
+            print(trajPath)
+            dirpath, dirname = os.path.split(trajPath)
+            if dirname == '':
+                dirname = os.path.basename(dirpath)
+            if dirname.startswith("animation_"):
+                dirname = dirname[10:]
+            self.trajectoriesWindow.clusterName.set(dirname)
+
             self.trajectoriesWindow.showInfo('Successfully loaded : %s.' %str(loaded))
 
-        self.trajectoriesWindow.setPathData(data)
-        self.trajectoriesWindow._onUpdateClick()
-        self.trajectoriesWindow._checkNumberOfPoints()
+
 
     def _saveAnimation(self, tkWindow):
         # get cluster name
@@ -479,6 +521,12 @@ class VolumeTrajectoryViewer(ProtocolViewer):
         form.addParam('displayTrajectories', LabelParam,
                       label='ChimeraX',
                       help='Open the trajectory in ChimeraX.')
+        form.addParam('morph', BooleanParam, default=True,
+                      label='morph volumes ?',
+                      help='If set, will use morphing of volumes in ChimeraX')
+        form.addParam('rock', BooleanParam, default=True,
+                      label='rock trajectory ?', condition="morph",
+                      help='If set, will loop the trajectory back and forth')
     def _getVisualizeDict(self):
         return {
                 'displayTrajectories': self._visualize,
@@ -486,19 +534,29 @@ class VolumeTrajectoryViewer(ProtocolViewer):
 
     def _visualize(self, obj, **kwargs):
         """visualisation for volumes set"""
-        volNames = ""
+        volNames = []
         for i in self.protocol:
             i.setSamplingRate(self.protocol.getSamplingRate())
             vol = ImageHandler().read(i)
             volName = os.path.abspath(self._getPath("tmp%i.vol"%i.getObjId()))
             vol.write(volName)
-            volNames += volName+" "
+            volNames.append(volName)
         # Show Chimera
         tmpChimeraFile = self._getPath("chimera.cxc")
         with open(tmpChimeraFile, "w") as f:
-            f.write("open %s vseries true \n" % volNames)
-            # f.write("volume #1 style surface level 0.5")
-            f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
+            if self.morph.get():
+                if self.rock.get():
+                    nvol = len(volNames)
+                    for i in range(nvol):
+                        volNames.append(volNames[nvol-i-1])
+                for n in volNames:
+                    f.write("open %s\n"%n)
+                f.write("color #1-%i lightgrey\n"%len(volNames))
+                f.write("volume morph #1-%i\n"%len(volNames))
+            else:
+                f.write("open %s vseries true \n" % " ".join(volNames))
+                # f.write("volume #1 style surface level 0.5")
+                f.write("vseries play #1 loop true maxFrameRate 7 direction oscillate \n")
 
         cv = ChimeraView(tmpChimeraFile)
         return [cv]

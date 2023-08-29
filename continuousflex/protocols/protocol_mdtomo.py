@@ -1,9 +1,7 @@
-
 # **************************************************************************
+# * Authors: Rémi Vuillemot             (remi.vuillemot@upmc.fr)
 # *
-# * Authors:
-# * Mohamad Harastani (mohamad.harastani@igbmc.fr)
-# * Slavica Jonic (slavica.jonic@upmc.fr)
+# * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -22,14 +20,20 @@
 # *
 # *  All comments concerning this program package may be sent to the
 # *  e-mail address 'scipion@cnb.csic.es'
-# *
 # **************************************************************************
 
+from continuousflex.protocols.protocol_genesis import FlexProtGenesis, EMFIT_VOLUMES, SIMULATION_NMMD
 
-CONTINUOUSFLEX_HOME = 'CONTINUOUSFLEX_HOME'
-NMA_HOME = 'NMA_HOME'
-VMD_HOME = 'VMD_HOME'
-GENESIS_HOME = 'GENESIS_HOME'
-SMOG_HOME = 'SMOG_HOME'
-MATLAB_HOME = 'MATLAB_HOME'
-CONTINUOUSFLEX_URL = 'https://github.com/scipion-em/scipion-em-continuousflex'
+class FlexProtMDTOMO(FlexProtGenesis):
+    """ Protocol to perform MDTOMO using GENESIS """
+    _label = 'MDTOMO'
+
+    # --------------------------- DEFINE param functions --------------------------------------------
+    def _defineParams(self, form):
+        FlexProtGenesis._defineParams(self, form)
+        param = form.getParam("simulationType")
+        param.setDefault(SIMULATION_NMMD)
+        param = form.getParam("n_steps")
+        param.setDefault(50000)
+        param = form.getParam("EMfitChoice")
+        param.setDefault(EMFIT_VOLUMES)

@@ -33,6 +33,8 @@ from pwem import Domain
 from .convert import eulerAngles2matrix, matrix2eulerAngles
 import numpy as np
 import multiprocessing
+from ast import literal_eval as make_tuple
+import json
 from pwem.emlib.image import ImageHandler
 
 WEDGE_MASK_NONE = 0
@@ -49,6 +51,8 @@ ALIGNED_STA=2
 IMPORT_XMIPP_MD = 0
 IMPORT_DYNAMO_TBL = 1
 IMPORT_TOMBOX_MTV = 2
+IMPORT_EMAN_JSON = 3
+
 
 class FlexProtSubtomogramAveraging(ProtAnalysis3D):
     """ Protocol for subtomogram averaging. This protocol has two modes of operation.
@@ -82,7 +86,8 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                        label='From which software?',
                        choices=['Import Scipion/Xmipp metadata',
                                 'Import Dynamo table',
-                                'Import TOM-ToolBox motive list'],
+                                'Import TOM-ToolBox motive list',
+                                'Import EMAN2 JSON file'],
                        default=IMPORT_XMIPP_MD,
                        help='You have to provide a pervious table of rigid-body alignment parameters in one of the list'
                             'of supported formats. The software will evaluate the average based on the provided file. '
@@ -105,6 +110,12 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                        label='Import a TOM-toolbox table (motive list) [Beta]',
                       help='import a TOM-toolbox table that contains the STA parameters. This option will evaluate '
                            'the average and transform the motive list to Scipion metadata format. and allows you to '
+                           'perform post-StA processes (refinement and heterogeneity analysis).')
+        group.addParam('emanJSON', params.PathParam, allowsNull=True,
+                       condition='import_choice==%d' % IMPORT_EMAN_JSON,
+                       label='Import a JSON file from EMAN [Beta]',
+                      help='import a JSON file that contains the STA parameters. This option will evaluate '
+                           'the average and transform the JSON file to Scipion metadata format. and allows you to '
                            'perform post-StA processes (refinement and heterogeneity analysis).')
         group = form.addGroup('Subtomogram Averaging using Fast Rotational Matching (FRM)',
                               condition='StA_choice==%d'% PERFORM_STA)
@@ -176,7 +187,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             self._insertFunctionStep('adaptDynamoStep', self.dynamoTable.get())
         elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_TOMBOX_MTV:
             self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
-        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_XMIPP_MD:
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_EMAN_JSON:
+            self._insertFunctionStep('adaptEmanStep', self.emanJSON.get())
+        else:
             self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
 
         if self.StA_choice.get() == ALIGNED_STA:
@@ -495,6 +508,88 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
         os.system("rm -f %(tempVol)s" % locals())
+
+    def adaptEmanStep(self, Table):
+        volumes_in = self.imgsFn
+        volume_out = self.outputVolume
+        mdImgs = md.MetaData()
+
+        with open(Table, "r") as f:
+            jf = json.load(f)
+        n_data = len(jf)
+
+        index = []
+        fname = []
+        matrices = []
+        for i in jf:
+            fname_i, index_i = make_tuple(i)
+            index.append(index_i)
+            fname.append(fname_i)
+            mat = np.array(json.loads(jf[i]["xform.align3d"]["matrix"]), dtype=np.float64).reshape(3, 4)
+            matrices.append(matrix2eulerAngles(mat))
+        matrices = np.array(matrices)
+
+        for i in range(n_data):
+            fileext = os.path.splitext(fname[i])[1]
+            if fileext == ".lst":
+                with open(fname[i], "r") as f:
+                    for line in f:
+                        if not line.startswith('#'):
+                            spl = line.split()
+                            if int(spl[0]) == index[i]:
+                                fname[i] = spl[1]
+                                break
+            elif fileext == ".hdf" or fileext == ".mrc"or fileext == ".mrcs"or fileext == ".vol"or fileext == ".spi":
+                pass
+            else:
+                raise RuntimeError("Unkown file type for subtomograms")
+
+        for i in range(n_data):
+            objId = mdImgs.addObject()
+            mdImgs.setValue(md.MDL_IMAGE, "%s@%s" % (str(index[i] + 1).zfill(6), fname[i]), objId)
+            mdImgs.setValue(md.MDL_ANGLE_ROT, matrices[i,0],objId)
+            mdImgs.setValue(md.MDL_ANGLE_TILT,matrices[i,1], objId)
+            mdImgs.setValue(md.MDL_ANGLE_PSI, matrices[i,2],objId)
+            mdImgs.setValue(md.MDL_SHIFT_X, matrices[i,3],objId)
+            mdImgs.setValue(md.MDL_SHIFT_Y, matrices[i,4],objId)
+            mdImgs.setValue(md.MDL_SHIFT_Z, matrices[i,5],objId)
+            mdImgs.setValue(md.MDL_ITEM_ID, int(index[i] + 1),objId)
+
+        # Averaging based on the metadata:
+        mdImgs.write(self._getExtraPath('final_md.xmd'))
+        counter = 0
+
+        for objId in mdImgs:
+            counter = counter + 1
+
+            imgPath = mdImgs.getValue(md.MDL_IMAGE, objId)
+            rot = mdImgs.getValue(md.MDL_ANGLE_ROT, objId)
+            tilt = mdImgs.getValue(md.MDL_ANGLE_TILT, objId)
+            psi = mdImgs.getValue(md.MDL_ANGLE_PSI, objId)
+
+            x_shift = mdImgs.getValue(md.MDL_SHIFT_X, objId)
+            y_shift = mdImgs.getValue(md.MDL_SHIFT_Y, objId)
+            z_shift = mdImgs.getValue(md.MDL_SHIFT_Z, objId)
+
+            tempVol = self._getExtraPath('temp.mrc')
+            extra = self._getExtraPath()
+
+            params = '-i %(imgPath)s -o %(tempVol)s --rotate_volume euler %(rot)s %(tilt)s %(psi)s' \
+                 ' --shift %(x_shift)s %(y_shift)s %(z_shift)s' % locals()
+
+            runProgram('xmipp_transform_geometry', params)
+
+            if counter == 1:
+                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+
+            else:
+                params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
+                runProgram('xmipp_image_operate', params)
+
+        params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
+        runProgram('xmipp_image_operate', params)
+        os.system("rm -f %(tempVol)s" % locals())
+
 
 
     def averagingStep(self):

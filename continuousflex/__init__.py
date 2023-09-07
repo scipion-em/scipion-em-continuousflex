@@ -153,7 +153,7 @@ class Plugin(pwem.Plugin):
                        buildDir='smog-2.4.5', url="https://smog-server.org/smog2/code/smog-2.4.5.tgz",
                        target="smog-2.4.5",
                        commands=[( "mkdir -p smogenv && cd smogenv && %s conda env create -f %s/smog2.yaml --force --prefix . " 
-                                  "&& cd .. && yes | %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
+                                  "&& cd .. && %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
                                   "export perl4smog=\"%s/smog-2.4.5/smogenv/bin/perl\" && "
                                   "echo -n '#!/bin/bash' > configure && "
                                   "echo "" >> configure &&"

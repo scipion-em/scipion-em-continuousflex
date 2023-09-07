@@ -143,9 +143,9 @@ class Plugin(pwem.Plugin):
                        commands=[(
                            'git clone -b %s https://github.com/mms29/MDTools-old.git . &&'
                            'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
-                           ' autoreconf -fi && ./configure LDFLAGS=-L\"lib\" FFLAGS=\"%s\" && make install;'
+                           ' autoreconf -fi && ./configure LDFLAGS=-L%s/lib FFLAGS=\"%s\" && make install;'
                            % (target_branch, cls.getCondaLibPath(),
-                              cls.getCondaLibPath(),cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
+                              cls.getCondaLibPath(),cls.getCondaLibPath(), cls.getVar("GENESIS_HOME"), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)
 
 
@@ -153,7 +153,7 @@ class Plugin(pwem.Plugin):
                        buildDir='smog-2.4.5', url="https://smog-server.org/smog2/code/smog-2.4.5.tgz",
                        target="smog-2.4.5",
                        commands=[( "mkdir -p smogenv && cd smogenv && %s conda env create -f %s/smog2.yaml --force --prefix . " 
-                                  "&& cd .. && %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
+                                  "&& cd .. && yes | %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
                                   "export perl4smog=\"%s/smog-2.4.5/smogenv/bin/perl\" && "
                                   "echo -n '#!/bin/bash' > configure && "
                                   "echo "" >> configure &&"

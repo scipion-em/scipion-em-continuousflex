@@ -35,7 +35,7 @@ from joblib import load
 from continuousflex.viewers.tk_dimred import PCAWindowDimred, ANIMATION_INV, ANIMATION_AVG
 from continuousflex.protocols.data import Point, Data, PathData
 from pwem.viewers import VmdView
-from pyworkflow.utils.path import cleanPath, makePath
+from pyworkflow.utils.path import cleanPath, makePath, makeTmpPath
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
 from pyworkflow.gui.browser import FileBrowserWindow
@@ -45,6 +45,8 @@ from .plotter import FlexPlotter
 import os
 from matplotlib.ticker import MaxNLocator
 import tkinter as tk
+import matplotlib
+import mrcfile
 
 X_LIMITS_NONE = 0
 X_LIMITS = 1
@@ -90,8 +92,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                       help='Open a GUI to visualize the PCA space as free energy landscape')
         group.addParam('freeEnergyAxes', StringParam, default="1 2",
                        label='Axes to display' )
-        group.addParam('freeEnergySize', IntParam, default=100,
-                       label='Sampling size' )
+        group.addParam('freeEnergySize', IntParam, default=50,
+                       label='Resolution (pix)' )
         group.addParam('freeEnergyCmap', StringParam, default="jet",
                        label='Colormap' , help="See matplotlib colormaps for available colormaps")
         group.addParam('freeEnergyInterpolate', BooleanParam, default=False,
@@ -189,45 +191,111 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         for i in axes_str : axes.append(int(i.strip())-1)
 
         dim = len(axes)
-        if dim != 2:
-            return self.errorMessage("Please select only 2 axes", "Invalid Input")
+        if dim == 2:
 
-        data = np.array([p.getData()[axes] for p in self.getData()])
-        size =self.freeEnergySize.get()
-        xmin = np.min(data[:,0])
-        xmax = np.max(data[:,0])
-        ymin = np.min(data[:,1])
-        ymax = np.max(data[:,1])
-        xm = (xmax-xmin)*0.1
-        ym = (ymax-ymin)*0.1
-        xmin -= xm
-        xmax += xm
-        ymin -= ym
-        ymax += ym
-        x = np.linspace(xmin, xmax, size)
-        y = np.linspace(ymin, ymax, size)
-        count = np.zeros((size, size))
-        for i in range(data.shape[0]):
-            count[np.argmin(np.abs(x.T - data[i, 0])),
-                  np.argmin(np.abs(y.T - data[i, 1]))] += 1
-        img = -np.log(count / count.max())
-        img[img == np.inf] = img[img != np.inf].max()
+            data = np.array([p.getData()[axes] for p in self.getData()])
+            size =self.freeEnergySize.get()
+            xmin = np.min(data[:,0])
+            xmax = np.max(data[:,0])
+            ymin = np.min(data[:,1])
+            ymax = np.max(data[:,1])
+            xm = (xmax-xmin)*0.1
+            ym = (ymax-ymin)*0.1
+            xmin -= xm
+            xmax += xm
+            ymin -= ym
+            ymax += ym
+            x = np.linspace(xmin, xmax, size)
+            y = np.linspace(ymin, ymax, size)
+            count = np.zeros((size, size))
+            for i in range(data.shape[0]):
+                count[np.argmin(np.abs(x.T - data[i, 0])),
+                      np.argmin(np.abs(y.T - data[i, 1]))] += 1
+            img = -np.log(count / count.max())
+            img[img == np.inf] = img[img != np.inf].max()
 
-        plotter = FlexPlotter()
-        ax = plotter.createSubPlot("Free energy", "component "+axes_str[0],
-                                        "component " + axes_str[1])
-        if self.freeEnergyInterpolate.get():
-            im = ax.imshow(img.T[::-1,:],
-                       cmap = self.freeEnergyCmap.get(), interpolation="bicubic",
-                       extent=[xmin,xmax,ymin,ymax])
+            plotter = FlexPlotter()
+            ax = plotter.createSubPlot("Free energy", "component "+axes_str[0],
+                                            "component " + axes_str[1])
+            if self.freeEnergyInterpolate.get():
+                im = ax.imshow(img.T[::-1,:],
+                           cmap = self.freeEnergyCmap.get(), interpolation="bicubic",
+                           extent=[xmin,xmax,ymin,ymax])
+            else:
+                xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
+                im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get(),levels=12)
+            cbar = plotter.figure.colorbar(im)
+            cbar.set_label("$\Delta G / k_{B}T$")
+            plotter.show()
+
+        elif dim ==3 :
+
+            data = np.array([p.getData()[axes] for p in self.getData()])
+            size =self.freeEnergySize.get()
+            xmin = np.min(data[:, 0])
+            xmax = np.max(data[:, 0])
+            ymin = np.min(data[:, 1])
+            ymax = np.max(data[:, 1])
+            zmin = np.min(data[:, 2])
+            zmax = np.max(data[:, 2])
+            xm = (xmax - xmin) * 0.1
+            ym = (ymax - ymin) * 0.1
+            zm = (zmax - zmin) * 0.1
+            xmin -= xm
+            xmax += xm
+            ymin -= ym
+            ymax += ym
+            zmin -= zm
+            zmax += zm
+            x = np.linspace(xmin, xmax, size)
+            y = np.linspace(ymin, ymax, size)
+            z = np.linspace(zmin, zmax, size)
+            count = np.zeros((size, size, size))
+            for i in range(data.shape[0]):
+                count[np.argmin(np.abs(x.T - data[i, 0])),
+                np.argmin(np.abs(y.T - data[i, 1])),
+                np.argmin(np.abs(z.T - data[i, 2]))] += 1
+            img = -np.log(count / count.max())
+            img[img == np.inf] = img[img != np.inf].max()
+
+
+            tmpChimeraFile = self._getTmpPath("3d_plot_chimera.cxc")
+            tmpDensityFile = self._getTmpPath("3d_plot_chimera.mrc")
+            makePath(tmpChimeraFile)
+            makePath(tmpDensityFile)
+            cleanPath(tmpChimeraFile)
+            cleanPath(tmpDensityFile)
+            with mrcfile.new(self._getTmpPath("3d_plot_chimera.mrc"), overwrite=True) as mrc:
+                mrc.set_data(np.float32(-img))
+
+            N = 20
+            colors = ["white"]
+            for i in range(N - 1):
+                cmap = matplotlib.cm.get_cmap('jet_r')
+                col = matplotlib.colors.to_hex(cmap((1 / (N)) * (i + 1)))
+                colors.append(col)
+
+            points = np.linspace(-img.max(), 0, N)
+            thresh = 1 - np.exp(-0.7 * np.linspace(0, 10, N))
+
+            with open(tmpChimeraFile, "w") as f:
+                f.write("open %s\n"%os.path.abspath(tmpDensityFile))
+                f.write("set bgColor white\n")
+                f.write("volume showOutlineBox true\n")
+                f.write("graphics silhouettes true\n")
+                f.write("volume style image\n")
+                f.write("volume #1 ")
+                for i in range(N):
+                    f.write("level %.2f,%.2f " % (points[i], thresh[i]))
+                for i in colors:
+                    f.write("color %s " % i)
+                f.write("\n")
+
+            cv = ChimeraView(tmpChimeraFile)
+            cv.show()
+
         else:
-            xx, yy = np.mgrid[xmin:xmax:size * 1j, ymin:ymax:size * 1j]
-            im = ax.contourf(xx, yy, img, cmap=self.freeEnergyCmap.get(),levels=12)
-        cbar = plotter.figure.colorbar(im)
-        cbar.set_label("$\Delta G / k_{B}T$")
-        plotter.show()
-
-
+            return self.errorMessage("Please select only 2 or 3 axes", "Invalid Input")
 
     def _displayAnimationtool(self, paramName):
         self.trajectoriesWindow = self.tkWindow(PCAWindowDimred,

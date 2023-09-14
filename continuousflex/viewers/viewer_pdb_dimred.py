@@ -26,7 +26,7 @@ import numpy as np
 from pyworkflow.protocol.params import StringParam, LabelParam, EnumParam, FloatParam, PointerParam, IntParam, BooleanParam
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pwem.viewers import ChimeraView
-from pwem.objects.data import SetOfParticles,SetOfVolumes
+from pwem.objects.data import SetOfParticles,SetOfVolumes, AtomStruct
 from continuousflex.viewers.nma_plotter import FlexNmaPlotter
 from continuousflex.protocols import FlexProtDimredPdb
 import matplotlib.pyplot as plt
@@ -271,8 +271,8 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             N = 20
             colors = ["white"]
             for i in range(N - 1):
-                cmap = matplotlib.cm.get_cmap('jet_r')
-                col = matplotlib.colors.to_hex(cmap((1 / (N)) * (i + 1)))
+                cmap = matplotlib.cm.get_cmap(self.freeEnergyCmap.get())
+                col = matplotlib.colors.to_hex(cmap(1-  ((1 /N)*(i+1))))
                 colors.append(col)
 
             points = np.linspace(-img.max(), 0, N)
@@ -367,38 +367,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # get trajectory coordinates
         coords_list = []
         if animtype ==ANIMATION_INV:
-            trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
-            if trajectoryPoints.shape[0] == 0 :
-                return self.trajectoriesWindow.showError("No animation to show.")
-            np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
-            pca = load(prot._getExtraPath('pca_pickled.joblib'))
-            deformations = pca.inverse_transform(trajectoryPoints)
-            for i in range(self.trajectoriesWindow.numberOfPoints):
-                coords_list.append(deformations[i].reshape((initPDB.n_atoms, 3)))
+            coords_list = self.computeInv()
         else :
-            # read save coordinates
-            coords = dcd2numpyArr(self.protocol._getExtraPath("coords.dcd"))
-
-            # get class dict
-            classDict = {}
-            count = 0 #CLUSTERINGTAG
-            for p in self.trajectoriesWindow.data:
-                clsId = int(p._weight) #CLUSTERINGTAG
-                if clsId!=0:
-                    if clsId in classDict:
-                        classDict[clsId].append(count)
-                    else:
-                        classDict[clsId] = [count]
-                count += 1
-
-            keys = list(classDict.keys())
-            keys.sort()
-
-            if animtype == ANIMATION_AVG:
-                # compute avg
-                for i in keys:
-                    coord_avg = np.mean(coords[np.array(classDict[i])], axis=0)
-                    coords_list.append(coord_avg.reshape((initPDB.n_atoms, 3)))
+            coords_list = self.computeAvg()
 
 
         # Generate DCD trajectory
@@ -411,6 +382,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         initdcdcp.write_pdb(animationRoot+"reference.pdb")
         numpyArr2dcd(arr = np.array(coords_list), filename=animationRoot+outprefix+".dcd")
+        for i in range(len(coords_list)):
+            initPDB.coords = coords_list[i]
+            initPDB.write_pdb(animationRoot+outprefix+"%s.pdb"%(str(i+1).zfill(3)))
 
         # Generate the vmd script
         vmdFn = animationRoot + 'trajectory.vmd'
@@ -429,6 +403,54 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         vmdFile.close()
 
         VmdView(' -e ' + vmdFn).show()
+
+    def computeAvg(self):
+        # read save coordinates
+        coords = dcd2numpyArr(self.protocol._getExtraPath("coords.dcd"))
+
+        # get class dict
+        classDict = {}
+        count = 0  # CLUSTERINGTAG
+        for p in self.trajectoriesWindow.data:
+            clsId = int(p._weight)  # CLUSTERINGTAG
+            if clsId != 0:
+                if clsId in classDict:
+                    classDict[clsId].append(count)
+                else:
+                    classDict[clsId] = [count]
+            count += 1
+
+        keys = list(classDict.keys())
+        keys.sort()
+
+        # compute avg
+        initPDB = ContinuousFlexPDBHandler(self.protocol.getPDBRef())
+        coords_list= []
+        for i in keys:
+            coord_avg = np.mean(coords[np.array(classDict[i])], axis=0)
+            coords_list.append(coord_avg.reshape((initPDB.n_atoms, 3)))
+
+        return coords_list
+
+    def computeInv(self):
+        trajectoryPoints = np.array([p.getData() for p in self.trajectoriesWindow.pathData])
+        if trajectoryPoints.shape[0] == 0:
+            return self.trajectoriesWindow.showError("No animation to show.")
+
+        pca_file =self.protocol._getExtraPath('pca_pickled.joblib')
+        if not os.path.exists(pca_file):
+            return self.trajectoriesWindow.showError("Missing PCA file")
+        # np.savetxt(animationRoot + 'trajectory.txt', trajectoryPoints)
+        pca = load(pca_file)
+        deformations = pca.inverse_transform(trajectoryPoints)
+
+        coords_list = []
+        initPDB = ContinuousFlexPDBHandler(self.protocol.getPDBRef())
+
+        for i in range(self.trajectoriesWindow.numberOfPoints):
+            coords_list.append(deformations[i].reshape((initPDB.n_atoms, 3)))
+
+        return coords_list
 
     def saveClusterCallback(self, tkWindow):
         if all([int(p._weight) == 0 for p in tkWindow.data]):
@@ -483,12 +505,32 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             iterParams=None,
             doClone=True)
 
+        # self._saveAnimation(tkWindow)
+
+        coordlist = self.computeAvg()
+        animationPath = os.path.join(self.protocol._getExtraPath(clusterName), '')
+        outprefix = "clusterAvg"
+        initPDB = ContinuousFlexPDBHandler(self.protocol.getPDBRef())
+
+        clusterAvgName = clusterName+" "+ outprefix
+        PDBSet = self.protocol._createSetOfPDBs(clusterAvgName)
+
+        for i in range(len(coordlist)):
+            initPDB.coords = coordlist[i]
+            pdb_file = animationPath+outprefix+"%s.pdb"%(str(i+1).zfill(3))
+            initPDB.write_pdb(pdb_file)
+            PDBSet.append(AtomStruct(pdb_file))
+
+
         # Run reconstruction
-        self.protocol._defineOutputs(**{clusterName : classSet})
+        self.protocol._defineOutputs(**{clusterName : classSet,
+                                        clusterAvgName : PDBSet})
         project = self.protocol.getProject()
         newProt = project.newProtocol(FlexBatchProtClusterSet)
         newProt.setObjLabel(clusterName)
-        newProt.inputSet.set(getattr(self.protocol, clusterName))
+        newProt.inputSet.set(self.inputSet)
+        newProt.inputClasses.set(getattr(self.protocol, clusterName))
+        newProt.inputPDBs.set(getattr(self.protocol, clusterAvgName))
         project.launchProtocol(newProt)
         project.getRunsGraph()
 

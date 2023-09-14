@@ -125,9 +125,9 @@ class Plugin(pwem.Plugin):
                        createBuildDir=False,
                        buildDir='nma',
                        target="nma",
-                       commands=[('gfortran --version; cd ElNemo; make; mv nma_* ..', 'nma_elnemo_pdbmat'),
+                       commands=[('%s;  gfortran --version; cd ElNemo; make; mv nma_* ..'%cls.getContinuousFlexCmd("gfortran --version"), 'nma_elnemo_pdbmat'),
                                  ('cd NMA_cart; LDFLAGS=-L%s make; mv nma_* ..'
-                                  % cls.getCondaLibPath() , 'nma_diag_arpack')],
+                                  % cls.getCondaLibPath(), 'nma_diag_arpack')],
                        neededProgs=['gfortran'], default=True)
 
         target_branch = "master"

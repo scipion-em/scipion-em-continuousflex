@@ -1,7 +1,6 @@
 dependencies:
   - conda-forge::arpack
   - conda-forge::lapack
-  - conda-forge::gfortran
   - pip
   - python=3.8
   - pip:

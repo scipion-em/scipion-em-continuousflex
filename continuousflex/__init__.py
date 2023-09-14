@@ -143,9 +143,9 @@ class Plugin(pwem.Plugin):
                        commands=[(
                            'git clone -b %s https://github.com/mms29/MDTools-old.git . &&'
                            'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
-                           ' autoreconf -fi && ./configure LDFLAGS=-L\"lib\" FFLAGS=\"%s\" && make install;'
+                           ' autoreconf -fi && ./configure LDFLAGS=-L%s/lib FFLAGS=\"%s\" && make install;'
                            % (target_branch, cls.getCondaLibPath(),
-                              cls.getCondaLibPath(),cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
+                              cls.getCondaLibPath(),cls.getCondaLibPath(), cls.getVar("GENESIS_HOME"), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)
 
 

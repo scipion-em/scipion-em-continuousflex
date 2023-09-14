@@ -60,15 +60,23 @@ class FlexProtBatchPdbCluster(ProtocolViewer):
         with open(script_file, "w") as f :
             f.write("light full\n")
             f.write("set bgColor white\n")
+            models_pdb = 0
+
             for pdb in pdb_set :
                 f.write("open " + os.path.abspath(pdb.getFileName()) + "\n")
                 f.write("color bychain\n")
+                models_pdb+=1
+            # f.write("hide atoms\n")
+            # f.write("show cartoons\n")
+            f.write("morph #1-%s frames 4"%models_pdb)
+
+            models_vol =models_pdb
             for vol in vol_set :
                 f.write("open " + os.path.abspath(vol.getFileName()) + "\n")
-
             f.write("volume voxelSize %f origin %i \n"%(vol_set.getSamplingRate(), -vol_set.getXDim()//2))
-                # f.write("hide atoms\n")
-                # f.write("show cartoons\n")
+            n_vols = models_vol-models_pdb
+            # f.write("hide atoms\n")
+            # f.write("show cartoons\n")
 
         cv = ChimeraView(script_file)
         cv.show()

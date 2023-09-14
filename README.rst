@@ -8,8 +8,8 @@ This plugin provides the latest Scipion protocols for cryo-EM continuous conform
 Requirements
 ------------
 
-You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols.
-If you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
+- You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols. If you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
+- GCC/GFORTRAN >= 8 
 
 
 Installation

@@ -1,4 +1,5 @@
 # By Remi Vuillemot
+import os.path
 
 import numpy as np
 import copy
@@ -23,6 +24,11 @@ class ContinuousFlexPDBHandler:
         Contructor
         :param pdb_file: PDB file
         """
+        if not os.path.exists(pdb_file):
+            raise RuntimeError("Could not read PDB file : No such file")
+        if os.path.getsize(pdb_file) == 0:
+            raise RuntimeError("Could not read PDB file : file empty")
+
         atom = []
         atomNum = []
         atomName = []

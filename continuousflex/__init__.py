@@ -141,7 +141,7 @@ class Plugin(pwem.Plugin):
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/mms29/MDTools-old.git . &&'
+                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . &&'
                            'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
                            ' autoreconf -fi && ./configure LDFLAGS=-L%s/lib FFLAGS=\"%s\" && make install;'
                            % (target_branch, cls.getCondaLibPath(),

@@ -24,7 +24,7 @@
 
 from continuousflex.viewers.nma_gui import TrajectoriesWindow, ClusteringWindow
 import tkinter as tk
-from pyworkflow.gui.widgets import Button, ComboBox
+from pyworkflow.gui.widgets import Button, ComboBox, HotButton
 from tkinter import Radiobutton
 import numpy as np
 import scipy as sp
@@ -33,6 +33,9 @@ from sklearn.cluster import KMeans
 
 TOOL_TRAJECTORY = 1
 TOOL_CLUSTERING = 2
+
+ANIMATION_INV=0
+ANIMATION_AVG=1
 
 
 class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
@@ -46,6 +49,8 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         self._alpha=self.alpha
         self._s=self.s
         self._clusterNumber = 0
+
+        self._onUpdateClick()
 
     def _createContent(self, content):
         self._createModeBox(content)
@@ -77,37 +82,23 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
         # Create a listbox with x1, x2 ...
         listbox = tk.Listbox(frame, height=5,
-                             selectmode=tk.MULTIPLE, bg='white')
+                             selectmode=tk.MULTIPLE, bg='white', exportselection=False)
         for x in range(1, self.dim + 1):
             listbox.insert(tk.END, 'x%d' % x)
         listbox.grid(row=0, column=1, padx=5, pady=5, sticky='w')
+        listbox.selection_set(0,1)
         self.listbox = listbox
 
-        # Selection controls
-        self._addLabel(frame, 'Rejection', 1, 0)
-        # Selection label
         self.selectionVar = tk.StringVar()
-        self.clusterLabel = tk.Label(frame, textvariable=self.selectionVar)
-        self.clusterLabel.grid(row=1, column=1, sticky='w', padx=5, pady=(10, 5))
-        self._updateSelectionLabel()
-        # --- Expression
-        expressionFrame = tk.Frame(frame)
-        expressionFrame.grid(row=2, column=1, sticky='w')
-        tk.Label(expressionFrame, text='Expression').grid(row=0, column=0, sticky='ne')
         self.expressionVar = tk.StringVar()
-        expressionEntry = tk.Entry(expressionFrame, textvariable=self.expressionVar,
-                                   width=30, bg='white')
-        expressionEntry.grid(row=0, column=1, sticky='nw')
-        helpText = 'e.g. x1>0 and x1<100 or x3>20'
-        tk.Label(expressionFrame, text=helpText).grid(row=1, column=1, sticky='nw')
 
         # Buttons
         buttonFrame = tk.Frame(frame)
-        buttonFrame.grid(row=5, column=1, sticky='sew', pady=(10, 5))
+        buttonFrame.grid(row=1, column=1, sticky='sew', pady=(10, 5))
         buttonFrame.columnconfigure(0, weight=1)
         resetBtn = Button(buttonFrame, text='Reset', command=self._onResetClick)
         resetBtn.grid(row=0, column=0, sticky='ne', padx=(5, 0))
-        updateBtn = Button(buttonFrame, text='Update Plot', imagePath='fa-refresh.png',
+        updateBtn = HotButton(buttonFrame, text='Update Plot', imagePath='fa-refresh.png',
                            command=self._onUpdateClick)
         updateBtn.grid(row=0, column=1, sticky='ne', padx=5)
 
@@ -147,7 +138,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         buttonFrame = tk.Frame(frame)
         buttonFrame.grid(row=1, column=0, sticky='w', pady=(10, 5))
 
-        self.saveClusterBtn = Button(buttonFrame, text='Export to EM dataset', state=tk.DISABLED,
+        self.saveClusterBtn = Button(buttonFrame, text='Export to clusters to Scipion', state=tk.NORMAL,
                               tooltip='export clusters to scipion', command=self._onSaveClusterClick)
         self.saveClusterBtn.grid(row=0, column=2, padx=5)
 
@@ -215,6 +206,14 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
                                 width=3, bg='white')
         clusterEntry.grid(row=0, column=3, pady=5)
 
+        buttonsFrame2 = tk.Frame(frame)
+        buttonsFrame2.grid(row=3, column=0, sticky='w', pady=(10, 5))
+        buttonsFrame2.columnconfigure(0, weight=1)
+        self.generateBtn = HotButton(buttonsFrame2, text='Show cluster average in VMD', state=tk.NORMAL,
+                                     tooltip='Average clusters and show it in VMD',
+                                     imagePath='fa-plus-circle.png', command=self._onClusterAverageClick)
+        self.generateBtn.grid(row=0, column=0, padx=5)
+
 
         frame.grid(row=3, column=0, sticky='new', padx=5, pady=(10, 5))
 
@@ -250,17 +249,23 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         self.trajTypeBtn.grid(row=0, column=2, padx=(5, 5))
 
         buttonsFrame3 = tk.Frame(frame)
-        buttonsFrame3.grid(row=2, column=0,
-                          sticky='w', padx=5, pady=5)
-        buttonsFrame3.columnconfigure(0, weight=1)
-        self.generateBtn = Button(buttonsFrame3, text='Show in VMD', state=tk.NORMAL,
+        buttonsFrame3.grid(row=2, column=0, sticky='w', pady=(10, 5))
+        # buttonsFrame3.columnconfigure(0, weight=1)
+        self.generateBtn = HotButton(buttonsFrame3, text='Show trajectory in VMD', state=tk.NORMAL,
                                      tooltip='Select trajectory points to generate the animations',
                                      imagePath='fa-plus-circle.png', command=self._onCreateClick)
         self.generateBtn.grid(row=0, column=0, padx=5)
-        self.comboBtn = ComboBox(buttonsFrame3, choices=["Inverse transformation", "cluster average"])
-        self.comboBtn.grid(row=0, column=1, padx=(5, 10))
 
-        frame.grid(row=2, column=0, sticky='new', padx=5, pady=(5, 10))
+        frame.grid(row=2, column=0, sticky='new', padx=5, pady=5)
+
+    def _onClusterAverageClick(self, e=None):
+        if self.callback:
+            self.callback(animtype=ANIMATION_AVG)
+
+
+    def _onCreateClick(self, e=None):
+        if self.callback:
+            self.callback(animtype=ANIMATION_INV)
 
     def _onSaveClusterClick(self, e=None):
         if self.saveClusterCallback:
@@ -293,7 +298,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             point._weight = classes[i]
             i+=1
-        self.saveClusterBtn.config(state=tk.NORMAL)
         self._onUpdateClick()
         self.setClusterNumber(3)
 
@@ -344,7 +348,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
             closet_point = np.argmin(np.linalg.norm(traj_sel - point_sel, axis=1))
             point._weight = closet_point + 1
 
-        self.saveClusterBtn.config(state=tk.NORMAL)
         self._onUpdateClick()
         self.setClusterNumber(self.numberOfPoints)
 
@@ -354,7 +357,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             if point.getState() == Point.SELECTED:
                 point._weight =self.getClusterNumber()
-        self.saveClusterBtn.config(state=tk.NORMAL)
         ClusteringWindow._onResetClick(self)
 
     def setClusterNumber(self, n):
@@ -364,7 +366,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         for point in self.data:
             if point.getState() == Point.SELECTED:
                 point._weight =0.0
-        self.saveClusterBtn.config(state=tk.NORMAL)
         ClusteringWindow._onResetClick(self)
 
     def _checkNumberOfPoints(self):
@@ -373,7 +374,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
     def _onResetClick(self, e=None):
         self.updateClusterBtn.config(state=tk.DISABLED)
-        self.saveClusterBtn.config(state=tk.DISABLED)
         self.setClusterNumber(0)
 
         for point in self.data:
@@ -384,9 +384,6 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
 
     def getClusterName(self):
         return self.clusterName.get().strip()
-
-    def getAnimationType(self):
-        return self.comboBtn.getValue()
 
     def getClusterNumber(self):
         return self._clusterNumber

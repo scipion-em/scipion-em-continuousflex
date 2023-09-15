@@ -18,4 +18,4 @@ dependencies:
       - git+https://github.com/scipion-em/scipion-pyworkflow.git@master
       - scipion-em
       - numpy==1.23.0
-      - git+https://github.com/MohamadHarastani/farneback3d.git
+      - farneback3d==0.1.4

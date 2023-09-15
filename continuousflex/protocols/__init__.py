@@ -53,6 +53,7 @@ from .protocol_deep_hemnma_train import FlexProtDeepHEMNMATrain
 from .protocol_deep_hemnma_infer import FlexProtDeepHEMNMAInfer
 from .protocol_genesis import FlexProtGenesis
 from .protocol_mdspace import FlexProtMDSPACE
+from .protocol_mdtomo import FlexProtMDTOMO
 from .protocol_generate_topology import ProtGenerateTopology
 from .protocol_generate_topology import ProtGenerateTopology
 from .protocol_pdb_synthesize import FlexProtSynthesizePDBs

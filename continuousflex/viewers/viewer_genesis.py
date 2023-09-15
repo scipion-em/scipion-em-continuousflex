@@ -251,7 +251,7 @@ class FlexGenesisViewer(ProtocolViewer):
                             nrep=len(nmlist[0]), labels=labels)
     def _plotEnergyDetail(self):
         ene_default = ["BOND", "ANGLE", "UREY-BRADLEY", "DIHEDRAL", "IMPROPER", "CMAP", "VDWAALS", "ELECT", "NATIVE_CONTACT",
-               "NON-NATIVE_CONT", "RESTRAINT_TOTAL"]
+               "NON-NATIVE_CONT", "RESTRAINT_TOTAL", "SOLVATION"]
 
         ene = {}
         for i in self.getSimulationList():

@@ -1,4 +1,5 @@
 # By Remi Vuillemot
+import os.path
 
 import numpy as np
 import copy
@@ -23,6 +24,11 @@ class ContinuousFlexPDBHandler:
         Contructor
         :param pdb_file: PDB file
         """
+        if not os.path.exists(pdb_file):
+            raise RuntimeError("Could not read PDB file : No such file")
+        if os.path.getsize(pdb_file) == 0:
+            raise RuntimeError("Could not read PDB file : file empty")
+
         atom = []
         atomNum = []
         atomName = []
@@ -315,6 +321,7 @@ class ContinuousFlexPDBHandler:
                 self.resName[i] = resNew
                 n_alias+=1
         print("%s -> %s : %i lines changed"%(resName ,resNew,  n_alias))
+        return n_alias
 
 
     def add_terminal_res(self):

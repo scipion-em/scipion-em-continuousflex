@@ -65,9 +65,9 @@ class ProtGenerateTopology(EMProtocol):
         form.addParam('reorderResidues', params.BooleanParam, label="Reorder residues and remove insertions", default=False,
                        help='Remove insertion code in the PDB and reorder residues accordingly')
 
-        form.addParam('reorderType', params.BooleanParam, label="Reorder based on segement name ?",
+        form.addParam('reorderType', params.BooleanParam, label="Reorder based on segment name?",
                        default=False, condition="reorderResidues",
-                       help='If yes reorder the residues within a segement, otherwise, reorder residues within a chains')
+                       help='If yes reorder the residues within a segment, otherwise, reorder residues within a chain')
 
     def _insertAllSteps(self):
         ff = self.forcefield.get()

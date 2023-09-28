@@ -151,7 +151,7 @@ class FlexProtGenesis(EMProtocol):
                            ' "8 9, 10-12" -> [8,9,10,11,12])\n')
 
         group.addParam('nm_dt', params.FloatParam, label='NM time step', default=0.001,
-                      help="Time step of normal modes integration. Should be equal to MD time step. Could be increase "
+                      help="Time step of normal modes integration. Should be equal to MD time step. Could be increased "
                            "to accelerate NM integration, however can make the simulation unstable.",
                       expertLevel=params.LEVEL_ADVANCED)
         group.addParam('nm_mass', params.FloatParam, default=10.0, label='NM mass',
@@ -246,7 +246,7 @@ class FlexProtGenesis(EMProtocol):
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
                            " This parameters must be tuned with caution : "
-                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "too high values will deform the structure and overfit the data, too low values will not "
                            "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
                            " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "
@@ -298,14 +298,14 @@ class FlexProtGenesis(EMProtocol):
                       help="Source of projection angles to align the input PDB with the set of images",
                        condition="EMfitChoice==%i"%EMFIT_IMAGES)
         group.addParam('projectAngleXmipp', params.FileParam, default=None, label='projection angle Xmipp file',
-                      help="Xmipp metadata file with projection alignement parameters ",
+                      help="Xmipp metadata file with projection alignment parameters ",
                        condition="EMfitChoice==%i and projectAngleChoice==%i"%(EMFIT_IMAGES,PROJECTION_ANGLE_XMIPP))
 
         group = form.addGroup('Fitting parameters', condition="EMfitChoice!=%i"%EMFIT_NONE)
         group.addParam('constantK', params.StringParam, default="10000", label='Force constant (kcal/mol)',
                       help="Force constant in Eem = k*(1 - c.c.). Determines the strengh of the fitting. "
                            " This parameters must be tuned with caution : "
-                           "to high values will deform the structure and overfit the data, to low values will not "
+                           "too high values will deform the structure and overfit the data, too low values will not "
                            "move the atom senough to fit properly the data. Note that in the case of REUS, the number of "
                            " force constant value must be equal to the number of replicas, for example for 4 replicas,"
                            " a valid force constant is \"1000 2000 3000 4000\", otherwise you can specify a range of "

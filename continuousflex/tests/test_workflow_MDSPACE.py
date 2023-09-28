@@ -50,8 +50,8 @@ class TestMDSPACE(TestWorkflow):
                                       pdbFile=self.ds.getFile('4ake_ca_pdb'))
         protPdb4ake.setObjLabel('Input PDB (4AKE C-Alpha only)')
         self.launchProtocol(protPdb4ake)
-        # ------------------------- Genesis Min prot --------------------------------
 
+        # ------------------------- Genesis Min prot --------------------------------
         protGenesisMin = self.newProtocol(FlexProtGenesis,
                                           inputPDB=protPdb4ake.outputPdb,
                                           forcefield=FORCEFIELD_CAGO,

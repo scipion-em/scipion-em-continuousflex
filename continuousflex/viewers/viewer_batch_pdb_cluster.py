@@ -1,6 +1,5 @@
 # **************************************************************************
-# * Authors:  Mohamad Harastani          (mohamad.harastani@igbmc.fr)
-# *           Remi Vuillemot             (remi.vuillemot@upmc.fr)
+# * Authors:  Remi Vuillemot             (remi.vuillemot@upmc.fr)
 # * IMPMC, UPMC Sorbonne University
 # *
 # * This program is free software; you can redistribute it and/or modify
@@ -44,6 +43,31 @@ class FlexProtBatchPdbCluster(ProtocolViewer):
                       label="Display clusters in ChimeraX",
                       help="")
 
+        form.addParam('nsteps', IntParam, default="5",
+                      label="Number of steps between models",
+                      help="")
+        form.addParam('loop', IntParam, default=4,
+                      label="Number of loop of the movie",
+                      help="")
+
+        form.addParam('volumes', BooleanParam, default=True,
+                      label="Show maps ?",
+                      help="")
+
+        form.addParam('gaussian', BooleanParam, default=True,
+                      label="Apply gaussian filter ?",
+                      help="", condition="volumes")
+        form.addParam('sdev', FloatParam, default=1.0,
+                      label="gaussian sigma",
+                      help="", condition="gaussian")
+
+        form.addParam('models', BooleanParam, default=True,
+                      label="Show models ?",
+                      help="")
+        form.addParam('fitmap', BooleanParam, default=True,
+                      label="Fit models into maps ?",
+                      help="", condition="volumes and models")
+
     def _getVisualizeDict(self):
         return {
                 'displayChimera': self._displayChimera,
@@ -54,27 +78,65 @@ class FlexProtBatchPdbCluster(ProtocolViewer):
         script_file = self._getTmpPath("cluster_chimerax.cxc")
         makePath(script_file)
         cleanPath(script_file)
+        nstep = self.nsteps.get()
+        loop = self.loop.get()
+        sdev= self.sdev.get()
 
         pdb_set = self.protocol.inputPDBs.get()
         vol_set = self.protocol.outputVols
         with open(script_file, "w") as f :
             f.write("light full\n")
             f.write("set bgColor white\n")
-            models_pdb = 0
+            f.write("graphics silhouettes true\n")
+            start_pdb = 1
+            stop_pdb = 0
 
-            for pdb in pdb_set :
-                f.write("open " + os.path.abspath(pdb.getFileName()) + "\n")
-                f.write("color bychain\n")
-                models_pdb+=1
-            # f.write("hide atoms\n")
-            # f.write("show cartoons\n")
-            f.write("morph #1-%s frames 4"%models_pdb)
+            if self.models.get():
+                for pdb in pdb_set :
+                    f.write("open " + os.path.abspath(pdb.getFileName()) + "\n")
+                    f.write("color bychain\n")
+                    stop_pdb+=1
+                # f.write("hide atoms\n")
+                # f.write("show cartoons\n")
+                f.write("style sphere\n")
+                n_pdbs = stop_pdb-start_pdb +1
 
-            models_vol =models_pdb
-            for vol in vol_set :
-                f.write("open " + os.path.abspath(vol.getFileName()) + "\n")
-            f.write("volume voxelSize %f origin %i \n"%(vol_set.getSamplingRate(), -vol_set.getXDim()//2))
-            n_vols = models_vol-models_pdb
+            start_vol = stop_pdb+1
+            stop_vol = stop_pdb
+            if self.volumes.get():
+                for vol in vol_set :
+                    f.write("open " + os.path.abspath(vol.getFileName()) + "\n")
+                    stop_vol+=1
+                n_vols = stop_vol-start_vol +1
+
+            if self.gaussian.get() and self.volumes.get():
+                for i in range(n_vols):
+                    f.write("vop gaussian #%i sdev %f \n"%(start_vol+i, sdev))
+                start_vol+=n_vols
+                stop_vol+=n_vols
+
+            if self.volumes.get():
+                f.write("volume voxelSize %f origin %i transparency 0.5 color lightgrey \n"%(vol_set.getSamplingRate(), -vol_set.getXDim()//2))
+
+            if (self.models.get() and self.volumes.get()) and self.fitmap.get():
+                for i in range(n_pdbs):
+                    f.write("fitmap #%i inMap #%i \n"%(start_pdb+i, start_vol+i))
+
+
+
+            if self.models.get():
+                    f.write("morph #%i-%i frames %i same true\n"%(start_pdb, stop_pdb, nstep))
+
+            if self.volumes.get():
+                nframes = 1+((n_vols-1)*nstep)
+                f.write("volume morph #%i-%i playStep %f frames %i ; "%(start_vol, stop_vol, 1/(nframes-0.5), (2*nframes)*loop))
+            if self.models.get():
+                f.write("coordset #%i loop %i bounce true\n"%(stop_vol+1, loop))
+            else:
+                f.write("\n")
+
+            f.write("hide #%i-%i \n"%(start_pdb, stop_vol))
+
             # f.write("hide atoms\n")
             # f.write("show cartoons\n")
 

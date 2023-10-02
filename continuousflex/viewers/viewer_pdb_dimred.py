@@ -474,9 +474,9 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
             classID.append(int(p._weight))
 
         if isinstance(inputSet, SetOfParticles):
-            classSet = self.protocol._createSetOfClasses2D(inputSet, clusterName)
+            classSet = self.protocol._createSetOfClasses2D(self.inputSet, clusterName)
         else:
-            classSet = self.protocol._createSetOfClasses3D(inputSet,clusterName)
+            classSet = self.protocol._createSetOfClasses3D(self.inputSet,clusterName)
 
         def updateItemCallback(item, row):
             item.setClassId(row)
@@ -491,7 +491,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
             def __next__(self):
                 if self.n > len(self.clsID)-1:
-                    return 0
+                    raise StopIteration
                 else:
                     index = self.clsID[self.n]
                     self.n += 1
@@ -508,7 +508,12 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         # self._saveAnimation(tkWindow)
 
         coordlist = self.computeAvg()
-        animationPath = os.path.join(self.protocol._getExtraPath(clusterName), '')
+        animationPath = self.protocol._getExtraPath(clusterName)
+        if not os.path.isdir(animationPath):
+            cleanPath(animationPath)
+            makePath(animationPath)
+        animationRoot = os.path.join(animationPath, '')
+
         outprefix = "clusterAvg"
         initPDB = ContinuousFlexPDBHandler(self.protocol.getPDBRef())
 
@@ -517,7 +522,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
 
         for i in range(len(coordlist)):
             initPDB.coords = coordlist[i]
-            pdb_file = animationPath+outprefix+"%s.pdb"%(str(i+1).zfill(3))
+            pdb_file = animationRoot+outprefix+"%s.pdb"%(str(i+1).zfill(3))
             initPDB.write_pdb(pdb_file)
             PDBSet.append(AtomStruct(pdb_file))
 
@@ -528,7 +533,7 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         project = self.protocol.getProject()
         newProt = project.newProtocol(FlexBatchProtClusterSet)
         newProt.setObjLabel(clusterName)
-        newProt.inputSet.set(self.inputSet)
+        # newProt.inputSet.set(getattr(self, "inputSet"))
         newProt.inputClasses.set(getattr(self.protocol, clusterName))
         newProt.inputPDBs.set(getattr(self.protocol, clusterAvgName))
         project.launchProtocol(newProt)
@@ -576,8 +581,6 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
         else:
             self.trajectoriesWindow._onUpdateClick()
             # self.trajectoriesWindow.saveClusterBtn.config(state=tk.NORMAL)
-            print("////////////////////////")
-            print(trajPath)
             dirpath, dirname = os.path.split(trajPath)
             if dirname == '':
                 dirname = os.path.basename(dirpath)

@@ -18,7 +18,7 @@ MDTOMO basic workflow example
         "setHalfMaps": false,
         "half1map": null,
         "half2map": null,
-        "samplingRate": 1.0,
+        "samplingRate": null,
         "setOrigCoord": false,
         "x": null,
         "y": null,

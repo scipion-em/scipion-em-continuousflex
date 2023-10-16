@@ -336,7 +336,7 @@ MDSPACE basic workflow example
         "sphericalAberration": 2.7,
         "amplitudeContrast": 0.1,
         "magnification": 50000,
-        "samplingRate": "",
+        "samplingRate": null,
         "dataStreaming": false,
         "timeout": 43200,
         "fileTimeout": 30

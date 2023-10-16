@@ -39,7 +39,9 @@ class FlexBatchProtClusterSet(BatchProtocol):
     _label = 'cluster set'
 
     def _defineParams(self, form):
-        form.addHidden('inputSet', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
+        form.addHidden('inputSet', PointerParam, pointerClass='SetOfParticles,SetOfVolumes')
+        form.addHidden('inputClasses', PointerParam, pointerClass='SetOfClasses2D,SetOfClasses3D')
+        form.addHidden('inputPDBs', PointerParam, pointerClass='SetOfAtomStructs')
         form.addHidden(USE_GPU, BooleanParam, default=True,
                        label="Use GPU for execution",
                        help="This protocol has both CPU and GPU implementation.\
@@ -64,7 +66,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
         pass
 
     def reconstructStep(self):
-        inputClasses = self.inputSet.get()
+        inputClasses = self.inputClasses.get()
 
         for i in inputClasses:
             if i.getObjId() != 0:
@@ -80,7 +82,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
                 classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))
                 if isinstance(inputClasses, SetOfClasses2D):
                     args = "-i %s -o %s " % (classFile, classVol)
-                    args += ' --sampling %f' % self.inputSet.get().getSamplingRate()
+                    args += ' --sampling %f' % self.inputClasses.get().getSamplingRate()
 
                     if self.useGpu.get():
                         args += ' --thr %d' % self.numberOfThreads.get()
@@ -104,7 +106,7 @@ class FlexBatchProtClusterSet(BatchProtocol):
 
     def createOutputStep(self):
         outputMd = md.MetaData()
-        inputClasses = self.inputSet.get()
+        inputClasses = self.inputClasses.get()
         for i in inputClasses:
             if i.getObjId() != 0:
                 classVol = self._getExtraPath("class%s.vol" % str(i.getObjId()).zfill(6))

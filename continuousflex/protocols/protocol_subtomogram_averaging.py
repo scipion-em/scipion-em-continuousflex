@@ -189,10 +189,9 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             self._insertFunctionStep('adaptTomboxStep', self.tomBoxTable.get())
         elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_EMAN_JSON:
             self._insertFunctionStep('adaptEmanStep', self.emanJSON.get())
-        else:
+        elif self.StA_choice.get() == COPY_STA and self.import_choice.get() == IMPORT_XMIPP_MD:
             self._insertFunctionStep('adaptXmippStep', self.xmippMD.get())
-
-        if self.StA_choice.get() == ALIGNED_STA:
+        elif self.StA_choice.get() == ALIGNED_STA:
             self._insertFunctionStep('averagingStep')
 
         self._insertFunctionStep('createOutputStep')

@@ -117,7 +117,6 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
                 p2 = iter2.__next__()
                 p2.setTransform(p1.getTransform())
                 inputset.append(p2)
-                print(p2.getTransform())
             xmipp3.convert.writeSetOfVolumes(inputset, self._getExtraPath('volumes.xmd'))
         else:
             raise RuntimeError("The number of volumes and STA parameters mismatch")

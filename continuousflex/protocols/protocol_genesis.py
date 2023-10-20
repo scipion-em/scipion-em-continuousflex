@@ -775,7 +775,6 @@ class FlexProtGenesis(EMProtocol):
 
     def _validate(self):
         errors = []
-        print(self.getGenesisEnv()["PATH"])
         if not os.path.exists(os.path.join(
                 Plugin.getVar("GENESIS_HOME"), 'bin/atdyn')):
             errors.append("Missing GENESIS program : atdyn ")

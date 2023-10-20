@@ -138,7 +138,7 @@ class PCAWindowDimred(TrajectoriesWindow, ClusteringWindow):
         buttonFrame = tk.Frame(frame)
         buttonFrame.grid(row=1, column=0, sticky='w', pady=(10, 5))
 
-        self.saveClusterBtn = Button(buttonFrame, text='Export to clusters to Scipion', state=tk.NORMAL,
+        self.saveClusterBtn = Button(buttonFrame, text='Export clusters to Scipion', state=tk.NORMAL,
                               tooltip='export clusters to scipion', command=self._onSaveClusterClick)
         self.saveClusterBtn.grid(row=0, column=2, padx=5)
 

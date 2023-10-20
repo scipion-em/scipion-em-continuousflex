@@ -234,7 +234,9 @@ class ProtGenerateTopology(EMProtocol):
         fnPSFgen = self._getExtraPath("psfgen.tcl")
 
         # Run VMD PSFGEN
-        runCommand("vmd -dispdev text -e %s" % (fnPSFgen))
+        from pwem.viewers import Vmd
+        runCommand("vmd -dispdev text -e %s" % (fnPSFgen), 
+                   env=Vmd.getEnviron())
 
     def runGROTOP(self):
         outputPrefix = self._getExtraPath("output")

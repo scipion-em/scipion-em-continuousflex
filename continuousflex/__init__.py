@@ -44,7 +44,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.4.0"
+__version__ = "3.4.1"
 
 
 class Plugin(pwem.Plugin):
@@ -141,11 +141,11 @@ class Plugin(pwem.Plugin):
         env.addPackage('MDTools', version=MD_NMMD_GENESIS_VERSION,
                        buildDir='MDTools', tar="void.tgz",
                        commands=[(
-                           'git clone -b %s https://github.com/mms29/MDTools-old.git . &&'
+                           'git clone -b %s https://github.com/continuousflex-org/MDTools.git . &&'
                            'mkdir lib && cp %s/libopenblas* lib && cp %s/libblas* lib && cp %s/liblapack* lib &&'
-                           ' autoreconf -fi && ./configure LDFLAGS=-L\"lib\" FFLAGS=\"%s\" && make install;'
+                           ' autoreconf -fi && ./configure LDFLAGS=-L%s/lib FFLAGS=\"%s\" && make install;'
                            % (target_branch, cls.getCondaLibPath(),
-                              cls.getCondaLibPath(),cls.getCondaLibPath(), FFLAGS), ["bin/atdyn"])],
+                              cls.getCondaLibPath(),cls.getCondaLibPath(), cls.getVar("GENESIS_HOME"), FFLAGS), ["bin/atdyn"])],
                        neededProgs=['mpif90'], default=True)
 
 

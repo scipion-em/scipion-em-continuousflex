@@ -24,7 +24,7 @@
 import joblib
 from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
-from pyworkflow.utils.path import makePath
+from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
 from pwem.emlib import (MetaData, MDL_ENABLED, MDL_NMA_MODEFILE, MDL_ORDER,
                         MDL_NMA_EIGENVAL)
@@ -107,6 +107,13 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                       help='Point to a protocol of pdb aligned. For large data set, you can use here the align pdb protocol as input '
                            'and avoid creating an output set of pdb in the align pdb protocol.')
 
+        form.addParam('loadReducedSpace', params.BooleanParam, label="Load an existing reduced space ?",
+                      default=False,help="Skip the analysis and load the pre existing reduced space", expertLevel=params.LEVEL_ADVANCED)
+
+        form.addParam('reducedSpace', params.PathParam, label="Provide a txt file of the existing reduced space", condition="loadReducedSpace",
+                    help="Cloud of point of N dimension constituing a reduced space "
+                                         " obtained by any reduction method. The file is a txt file.", expertLevel=params.LEVEL_ADVANCED)
+
         form.addParam('method', params.EnumParam, label="Reduction method", default=REDUCE_METHOD_PCA,
                       choices=['PCA', 'UMAP'],help="")
         form.addParam('n_neigbors', params.IntParam, label="n_neigbors", condition="method==%i"%REDUCE_METHOD_UMAP,
@@ -160,6 +167,10 @@ class FlexProtDimredPdb(ProtAnalysis3D):
         numpyArr2dcd(pdbs_arr, self._getExtraPath("coords.dcd"))
 
     def performDimred(self):
+
+        if self.loadReducedSpace.get():
+            copyFile(self.reducedSpace.get(), self.getOutputMatrixFile())
+            return
 
         pdbs_arr = dcd2numpyArr(self._getExtraPath("coords.dcd"))
         nframe, natom,_ = pdbs_arr.shape

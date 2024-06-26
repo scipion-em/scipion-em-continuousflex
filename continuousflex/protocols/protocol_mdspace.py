@@ -89,9 +89,9 @@ class FlexProtMDSPACE(FlexProtGenesis):
 
             self._insertFunctionStep("pdb2dcdStep")
 
-            self._insertFunctionStep("rigidBodyAlignementStep")
+            self._insertFunctionStep("rigidBodyAlignmentStep")
 
-            self._insertFunctionStep("updateAlignementStep")
+            self._insertFunctionStep("updateAlignmentStep")
 
             self._insertFunctionStep("PCAStep")
 
@@ -123,7 +123,7 @@ class FlexProtMDSPACE(FlexProtGenesis):
         print("MiSSING ARRAY : ")
         print(self._missing_pdbs)
 
-    def rigidBodyAlignementStep(self):
+    def rigidBodyAlignmentStep(self):
 
         # open files
         refPDB =  ContinuousFlexPDBHandler(self.getInputPDBprefix()+".pdb")
@@ -157,13 +157,13 @@ class FlexProtMDSPACE(FlexProtGenesis):
         numpyArr2dcd(arrDCD, self._getExtraPath("coords.dcd"))
         alignXMD.write(self.getTransformation())
 
-    def updateAlignementStep(self):
+    def updateAlignmentStep(self):
 
         if self._iter == 0:
             inputSet = self.inputImage.get()
         else:
             inputSet = self._createSetOfParticles("inputSet")
-            readSetOfParticles(self.getAlignementPrefix(self._iter-1), inputSet)
+            readSetOfParticles(self.getAlignmentPrefix(self._iter-1), inputSet)
             inputSet.setSamplingRate(self.inputImage.get().getSamplingRate())
 
         inputTransformation = self._createSetOfParticles("inputTransformation")
@@ -192,8 +192,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
             p1.setTransform(r1)
             alignedSet.append(p1)
 
-        writeSetOfParticles(alignedSet, self.getAlignementPrefix())
-        self._inputEMMetadata = md.MetaData(self.getAlignementPrefix())
+        writeSetOfParticles(alignedSet, self.getAlignmentPrefix())
+        self._inputEMMetadata = md.MetaData(self.getAlignmentPrefix())
 
     def PCAStep(self):
 
@@ -361,9 +361,9 @@ class FlexProtMDSPACE(FlexProtGenesis):
     def getPCAPrefix(self):
         return self._getExtraPath("pca_iter_%s" % (str(self._iter+1).zfill(3)))
 
-    def getAlignementPrefix(self, itr=None):
+    def getAlignmentPrefix(self, itr=None):
         if itr is None : itr = self._iter
-        return "%s/alignement_iter_%s.xmd"%(self.getEmdFiles(),str(itr+1).zfill(3))
+        return "%s/alignment_iter_%s.xmd"%(self.getEmdFiles(),str(itr+1).zfill(3))
     def getTransformation(self, itr=None):
         if itr is None : itr = self._iter
         return "%s/transformation_iter_%s.xmd"%(self.getEmdFiles(),str(itr+1).zfill(3))

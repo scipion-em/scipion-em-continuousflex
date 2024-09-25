@@ -45,8 +45,8 @@ MATCHING_PDB_CHAIN = 1
 MATCHING_PDB_SEG = 2
 
 class FlexProtAlignPdb(ProtAnalysis3D):
-    """ Protocol to perform rigid body alignement on a set of PDB files. """
-    _label = 'pdbs rigid body alignement'
+    """ Protocol to perform rigid body alignment on a set of PDB files. """
+    _label = 'pdbs rigid body alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------
     def _defineParams(self, form):
@@ -87,7 +87,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
                       help='Step to skip points in the trajectory', expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('alignRefPDB', params.PointerParam, pointerClass='AtomStruct',
-                      label="Alignement Reference PDB",
+                      label="Alignment Reference PDB",
                       help='Reference PDB to align the PDBs with')
         form.addParam('matchingType', params.EnumParam, label="Match PDBs and reference PDB ?", default=MATCHING_PDB_NONE,
                       choices=['All PDBs are matching', 'Match chain name + residue no',
@@ -100,14 +100,14 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         form.addParam('createOutput', params.BooleanParam, default=True,
                       label="Create output Set of PDBs ?",
                       help='Create output set. This step can be time consuming and not necessary if you are only '
-                           ' interested by the alignement parameters. The aligned coordinate are conserved as DCD file '
+                           ' interested by the alignment parameters. The aligned coordinate are conserved as DCD file '
                            'in the extra directory.'
                         , expertLevel=params.LEVEL_ADVANCED)
 
         form.addSection(label='Apply alignment to other set')
         form.addParam('applyAlignment', params.BooleanParam, default=False,
                       label="Apply alignment to other data set ?",
-                      help='Use the PDB alignement to align another data set.')
+                      help='Use the PDB alignment to align another data set.')
         form.addParam('otherSet', params.PointerParam, pointerClass='SetOfParticles, SetOfVolumes',
                       condition='applyAlignment',
                       label="Other set of Particles / Volumes",
@@ -118,7 +118,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         # --------------------------- INSERT steps functions --------------------------------------------
     def _insertAllSteps(self):
         self._insertFunctionStep('readInputFiles')
-        self._insertFunctionStep('rigidBodyAlignementStep')
+        self._insertFunctionStep('rigidBodyAlignmentStep')
         if self.applyAlignment.get():
             self._insertFunctionStep('applyAlignmentStep')
         if self.createOutput.get():
@@ -153,7 +153,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
         # save as dcd file
         numpyArr2dcd(pdbs_arr, self._getExtraPath("coords.dcd"))
 
-    def rigidBodyAlignementStep(self):
+    def rigidBodyAlignmentStep(self):
 
         # open files
         inputPDB = ContinuousFlexPDBHandler(self.getPDBRef())
@@ -200,7 +200,7 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             alignXMD.setValue(md.MDL_IMAGE, "", index)
 
         numpyArr2dcd(arrDCD, self._getExtraPath("coords.dcd"))
-        alignXMD.write(self._getExtraPath("alignement.xmd"))
+        alignXMD.write(self._getExtraPath("alignment.xmd"))
 
 
     def createOutputStep(self):
@@ -216,24 +216,24 @@ class FlexProtAlignPdb(ProtAnalysis3D):
             pdb = AtomStruct(filename=filename)
             pdbset.append(pdb)
 
-        self._defineOutputs(outputPDBs = pdbset)
+        self._defineOutputs(outputPDBs=pdbset)
 
     def applyAlignmentStep(self):
         inputSet = self.otherSet.get()
 
         if isinstance(inputSet, SetOfVolumes):
-            inputAlignement = self._createSetOfVolumes("inputAlignement")
-            readSetOfVolumes(self._getExtraPath("alignement.xmd"), inputAlignement)
+            inputAlignment = self._createSetOfVolumes("inputAlignment")
+            readSetOfVolumes(self._getExtraPath("alignment.xmd"), inputAlignment)
             alignedSet = self._createSetOfVolumes("alignedSet")
         else:
-            inputAlignement = self._createSetOfParticles("inputAlignement")
+            inputAlignment = self._createSetOfParticles("inputAlignment")
             alignedSet = self._createSetOfParticles("alignedSet")
-            readSetOfParticles(self._getExtraPath("alignement.xmd"), inputAlignement)
+            readSetOfParticles(self._getExtraPath("alignment.xmd"), inputAlignment)
 
         alignedSet.setSamplingRate(inputSet.getSamplingRate())
         alignedSet.setAlignment(ALIGN_PROJ)
         iter1 = inputSet.iterItems()
-        iter2 = inputAlignement.iterItems()
+        iter2 = inputAlignment.iterItems()
         for i in range(inputSet.getSize()):
             p1 = iter1.__next__()
             p2 = iter2.__next__()

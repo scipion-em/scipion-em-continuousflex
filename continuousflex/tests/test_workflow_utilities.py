@@ -36,7 +36,7 @@ class BM4D_and_MWR(TestWorkflow):
         cls.ds = DataSet.getDataSet('nma_V2.0')
 
     def test_BM4D(self):
-        """ Run NMA simple workflow for both Atomic and Pseudoatoms. """
+        """ Synthesize subtomograms and run missing wedge restoration and Bm4D volume denoising. """
         # Import PDB
         protImportPdb = self.newProtocol(ProtImportPdb, inputPdbData=1,
                                          pdbFile=self.ds.getFile('pdb'))

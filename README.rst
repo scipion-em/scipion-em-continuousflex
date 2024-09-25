@@ -9,7 +9,10 @@ Requirements
 ------------
 
 - You will need to use `3.0 <https://github.com/I2PC/scipion/releases>`_ version of Scipion to be able to run these protocols. If you need help installing Scipion3, please refer to the Scipion Documentation `here <https://scipion-em.github.io/docs/docs/scipion-modes/how-to-install.html>`__
-- GCC/GFORTRAN >= 8 
+- GCC >= 8
+- GFORTRAN = 9.X
+
+Note: you can set GFORTRAN version on Ubuntu using "sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-9 1000"
 
 
 Installation

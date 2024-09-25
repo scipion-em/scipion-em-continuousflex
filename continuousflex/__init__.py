@@ -44,7 +44,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.4.1"
+__version__ = "3.4.2"
 
 
 class Plugin(pwem.Plugin):
@@ -152,7 +152,7 @@ class Plugin(pwem.Plugin):
         env.addPackage('smog', version="2.4.5",
                        buildDir='smog-2.4.5', url="https://smog-server.org/smog2/code/smog-2.4.5.tgz",
                        target="smog-2.4.5",
-                       commands=[( "mkdir -p smogenv && cd smogenv && %s conda env create -f %s/smog2.yaml --force --prefix . " 
+                       commands=[( "mkdir -p smogenv && cd smogenv && %s conda env create -f %s/smog2.yaml --yes --prefix . " 
                                   "&& cd .. && %s/smog-2.4.5//smogenv/bin/perl -MCPAN -e 'install XML::Validator::Schema' &&"
                                   "export perl4smog=\"%s/smog-2.4.5/smogenv/bin/perl\" && "
                                   "echo -n '#!/bin/bash' > configure && "

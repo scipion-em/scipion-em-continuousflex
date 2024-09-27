@@ -86,7 +86,7 @@ def m_inout_read_pdb(filename):
     pdb_list = []
     f = open(filename, 'r')
     for line in f:
-        test_recd = line[0:5]
+        test_recd = line[:6]
 
         # if test_recd.upper().strip() == "ATOM" or test_recd.upper() == "HETATM":
         if ((test_recd.upper().strip() == "ATOM") or (test_recd.upper().strip() == "HETATM")):
@@ -98,33 +98,38 @@ def m_inout_read_pdb(filename):
             except:
                 pass
             try:
-                new_atom.type = line[12:14]
+                new_atom.type = line[11:15]
             except:
                 pass
-            try:
-                new_atom.loc = line[14:16]
-            except:
-                pass
+            # try:
+            #     new_atom.loc = line[14:16]
+            # except:
+            #     pass
             try:
                 new_atom.alt = line[16]
             except:
                 pass
             try:
-                new_atom.res = line[17:21]
+                new_atom.res = line[17:20]
             except:
                 pass
             try:
                 new_atom.chain = line[21]
             except:
                 pass
+            
             try:
-                new_atom.seq = int(line[22:26])
+                new_atom.seq = int(line[23:27])
             except:
-                pass
-            try:
-                new_atom.icode = line[26]
-            except:
-                pass
+                try:
+                    new_atom.seq = int(line[23:26])   
+                except:
+                    pass
+                try:
+                    new_atom.icode = line[26]
+                except:
+                    pass
+                
             try:
                 new_atom.x = float(line[30:38])
             except:

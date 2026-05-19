@@ -50,7 +50,152 @@ NMA_ALIGNMENT_PROJ = 1
 
 
 class FlexProtAlignmentNMA(ProtAnalysis3D):
-    """ Protocol for flexible angular alignment (HEMNMA). """
+    """
+    Protocol for flexible angular alignment using Normal Mode Analysis (NMA).
+    It estimates both conformational variability and rigid-body orientation
+    parameters for particle images by fitting a structural model into each
+    experimental observation.
+
+    AI Generated:
+
+    Flexible Angular Alignment with NMA (FlexProtAlignmentNMA) - User Manual
+        Overview
+
+        The Flexible Angular Alignment protocol performs simultaneous
+        conformational and rigid-body analysis of single-particle cryo-EM
+        images using Normal Mode Analysis (NMA). Its primary objective is to
+        determine how a macromolecular structure must deform and orient itself
+        in order to best explain each experimental particle image. This allows
+        the study of continuous structural variability while preserving the
+        relationship between molecular motions and particle orientations.
+
+        Unlike conventional alignment procedures that assume a rigid particle,
+        this protocol incorporates predefined normal modes describing possible
+        collective motions of the structure. As a result, it becomes possible
+        to characterize flexibility directly during the alignment process and
+        obtain deformation parameters that can later be used for conformational
+        landscape analysis and dimensionality reduction.
+
+        Inputs and Biological Context
+
+        The protocol requires a structural model associated with a previously
+        computed set of normal modes, together with a set of experimental
+        particle images. The structural model may represent either an atomic
+        structure or a pseudoatomic approximation generated from an electron
+        microscopy map.
+
+        The selected normal modes define the biologically plausible motions
+        that will be explored during alignment. In many applications, users
+        focus on the most collective and biologically meaningful modes rather
+        than including every available mode. Restricting the analysis to
+        relevant motions often improves interpretability and reduces the risk
+        of fitting noise or irrelevant variability.
+
+        General Workflow
+
+        During execution, each particle image is compared against structural
+        projections generated from different combinations of molecular
+        conformations and orientations. The protocol searches for the optimal
+        balance between elastic deformation and rigid-body alignment so that
+        the resulting model explains the observed image as accurately as
+        possible.
+
+        This integrated strategy is particularly useful for flexible proteins,
+        molecular machines, and complexes that exhibit continuous transitions
+        between states. Rather than separating alignment and flexibility
+        analysis into independent stages, both aspects are estimated together,
+        providing a more realistic representation of structural heterogeneity.
+
+        Selection of Normal Modes
+
+        Users may choose to analyze all available normal modes or restrict the
+        calculation to a selected subset. Biologically, this decision should
+        be guided by prior knowledge about the system and by the quality of
+        the modes obtained during normal mode analysis.
+
+        Lower-frequency collective modes often correspond to large-scale domain
+        movements and functionally relevant conformational transitions. These
+        motions are usually the most informative for studying flexibility.
+        Including excessive numbers of modes may increase computational cost
+        and introduce motions that are difficult to interpret biologically.
+
+        Elastic and Rigid-Body Optimization
+
+        The protocol combines deformation estimation with orientation
+        determination. Elastic optimization explores how strongly each mode
+        contributes to the observed conformation, while rigid-body alignment
+        determines the orientation and position of the particle relative to
+        the structural model.
+
+        The optimization settings are designed to work well for most datasets.
+        Advanced users may adjust parameters controlling the exploration of
+        conformational space when larger structural changes are expected.
+        These options are primarily intended for challenging systems with
+        pronounced flexibility or highly heterogeneous populations.
+
+        Choice of Alignment Strategy
+
+        Two alignment approaches are available. The projection matching method
+        provides efficient orientation estimation and is generally suitable
+        for large datasets where computational throughput is important. The
+        wavelets and splines approach places greater emphasis on alignment
+        accuracy and may provide improved results for difficult datasets,
+        although at a higher computational cost.
+
+        For routine analyses, projection matching often provides a practical
+        starting point. When the highest possible alignment precision is
+        required, particularly for structurally complex systems, the wavelets
+        and splines strategy may be preferable.
+
+        Angular Sampling Considerations
+
+        Angular sampling controls how finely the orientation space is explored.
+        Coarser sampling reduces execution time but may miss subtle orientation
+        differences. Finer sampling improves angular precision at the expense
+        of additional computational effort.
+
+        In exploratory studies, moderate angular sampling values are often
+        sufficient. For high-resolution analyses or detailed investigations of
+        conformational variability, a finer sampling scheme may provide more
+        accurate orientation estimates.
+
+        Outputs and Interpretation
+
+        The protocol produces a new particle set containing the estimated
+        alignment parameters together with the deformation coordinates that
+        describe the contribution of the selected normal modes for each
+        particle. These parameters establish a direct connection between image
+        observations and underlying structural variability.
+
+        The resulting deformation coordinates can be used in downstream
+        analyses to identify conformational continua, detect structural
+        clusters, visualize molecular motions, and construct low-dimensional
+        representations of the conformational landscape.
+
+        Practical Recommendations
+
+        Successful application of this protocol depends strongly on the
+        biological relevance of the selected normal modes and the quality of
+        the input particle dataset. It is generally advisable to begin with
+        the most collective modes and evaluate whether the recovered motions
+        correspond to meaningful structural changes.
+
+        When studying large molecular assemblies or proteins known to undergo
+        domain rearrangements, the protocol can reveal continuous transitions
+        that are often difficult to capture using discrete classification
+        methods alone. Careful interpretation of the resulting deformation
+        coordinates is essential to distinguish genuine molecular motions from
+        alignment artifacts.
+
+        Final Perspective
+
+        Flexible angular alignment provides a powerful framework for linking
+        particle images with molecular dynamics. By simultaneously estimating
+        conformation and orientation, the protocol enables a biologically
+        meaningful characterization of structural heterogeneity and serves as
+        a foundation for advanced studies of continuous flexibility in cryo-EM
+        datasets.
+    """
     _label = 'nma alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------

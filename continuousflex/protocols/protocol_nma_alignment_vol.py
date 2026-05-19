@@ -45,13 +45,143 @@ WEDGE_MASK_THRE = 1
 
 
 class FlexProtAlignmentNMAVol(ProtAnalysis3D):
-    """ Protocol for rigid-body and elastic alignment for volumes using NMA. This protocol is the code module of HEMNMA-3D.
-     It will take as input a set of normal modes calculated for an input atomic or pseudoatomic structure, and a set of volumes (subtomograms) to analyze.
-     It fits the input structure using its modes (a subset of the modes need to be selected) into each one of the input volumes while simultaneously looking for rigid-body alignment, with
-     compensation for missing wedge artefacts.
-     The result of this protocol are rigid-body and elastic parameters for each input volume.
-     Those results will be fed for a dimensionality reduction method (nma dimred vol) for further processing.
-     """
+    """
+    Protocol for rigid-body and elastic alignment for volumes using Normal Mode Analysis (NMA). It enables the study of structural flexibility by fitting an atomic or pseudoatomic reference model into a collection of three-dimensional volumes while simultaneously estimating conformational changes and spatial alignment parameters. The protocol is particularly suited for cryo-electron tomography subtomograms and cryo-EM maps where structural variability is expected and quantitative characterization of continuous motions is required.
+
+    AI Generated:
+
+    NMA Volume Alignment (FlexProtAlignmentNMAVol) - User Manual
+        Overview
+
+        The NMA Volume Alignment protocol analyzes structural variability by combining elastic
+        deformation modeling with rigid-body alignment. Its purpose is to determine how a
+        reference structure must move and deform in order to best explain a collection of
+        experimental three-dimensional volumes. Rather than treating each volume as an
+        independent reconstruction, the protocol interprets them as different manifestations
+        of a potentially continuous conformational landscape.
+
+        For biological users, this approach is especially valuable when studying molecular
+        machines, multi-domain proteins, membrane complexes, or other systems that exhibit
+        flexibility. By describing each volume through a combination of normal mode amplitudes
+        and spatial orientation parameters, the protocol provides a quantitative representation
+        of conformational heterogeneity suitable for downstream analysis and visualization.
+
+        Inputs and General Workflow
+
+        The protocol requires a previously computed set of normal modes associated with an
+        atomic or pseudoatomic structural model. These modes define the possible directions
+        of motion available to the structure and provide a physically meaningful framework
+        for describing conformational changes.
+
+        In addition, the protocol requires one or more experimental volumes. Each volume is
+        analyzed independently against the same structural model. During processing, the
+        protocol searches simultaneously for the rigid-body transformation that places the
+        structure into the volume and for the elastic deformation amplitudes that best
+        reproduce the observed density.
+
+        The resulting description captures both orientation and flexibility, allowing
+        structural variability to be represented in a compact and biologically interpretable
+        form.
+
+        Selection of Normal Modes
+
+        Biological interpretation depends strongly on the selected modes. Users may analyze
+        all available modes or restrict the analysis to a subset of motions considered
+        biologically relevant.
+
+        In many applications, low-frequency collective modes provide the most meaningful
+        description of large-scale conformational transitions. These modes often correspond
+        to domain rearrangements, hinge motions, opening and closing events, or other
+        functionally important structural changes.
+
+        Restricting the analysis to biologically plausible modes can improve robustness and
+        reduce the risk of fitting noise or reconstruction artefacts. Conversely, including
+        a larger number of modes may be beneficial when the conformational landscape is
+        expected to be complex.
+
+        Missing-Wedge Compensation
+
+        For subtomogram datasets, missing-wedge artefacts represent one of the most important
+        sources of distortion. These artefacts arise from incomplete angular sampling during
+        tomographic acquisition and can bias alignment and deformation estimates.
+
+        The protocol provides an optional missing-wedge compensation strategy designed to
+        account for this limitation during fitting. When enabled, the analysis incorporates
+        information about the acquisition tilt range, improving the reliability of the
+        recovered conformational parameters.
+
+        For cryo-EM density maps or subtomograms that have already undergone appropriate
+        missing-wedge correction, compensation may be unnecessary. Choosing the correct
+        setting depends on the origin and preprocessing history of the data.
+
+        Combined Elastic and Rigid-Body Alignment
+
+        One of the defining characteristics of this protocol is the simultaneous treatment
+        of structural deformation and spatial alignment. Traditional alignment approaches
+        assume a rigid object and attempt only to determine orientation and translation.
+        Such assumptions are often insufficient for flexible biological systems.
+
+        Here, rigid-body positioning and conformational adaptation are optimized together.
+        This allows the protocol to distinguish between genuine structural variability and
+        simple differences in orientation. As a result, the recovered parameters provide a
+        more realistic representation of the underlying molecular motions.
+
+        The optimization procedure can be adjusted through advanced parameters that control
+        the search behavior. For most biological applications, the default settings provide
+        an appropriate balance between robustness and computational efficiency. Expert users
+        studying highly flexible systems may choose to explore alternative settings when
+        larger conformational amplitudes are expected.
+
+        Interpretation of the Results
+
+        The principal output is a set of volumes enriched with deformation and alignment
+        information. Each analyzed volume receives a corresponding collection of rigid-body
+        parameters together with amplitudes describing motion along the selected normal modes.
+
+        Biologically, these amplitudes represent coordinates within a conformational space.
+        Volumes with similar amplitudes correspond to related structural states, whereas
+        larger differences indicate more substantial conformational changes. The resulting
+        dataset can therefore be interpreted as a quantitative map of structural variability.
+
+        Because the deformation parameters are expressed in terms of normal modes, the
+        results remain connected to physically meaningful motions rather than arbitrary
+        mathematical descriptors.
+
+        Integration with Downstream Analysis
+
+        The protocol is commonly used as a preparatory step for dimensionality reduction
+        and conformational landscape exploration. Once deformation parameters have been
+        estimated, they can be projected into lower-dimensional spaces where dominant
+        motions and structural transitions become easier to visualize.
+
+        Such analyses can reveal continuous trajectories, clusters of related states,
+        transition pathways, and other features that help characterize the functional
+        dynamics of the biological system under study.
+
+        Practical Recommendations
+
+        Before running the protocol, users should verify that the selected normal modes
+        capture motions relevant to the biological question. Low-frequency collective modes
+        are generally the most informative starting point.
+
+        When analyzing subtomograms, enabling missing-wedge compensation is usually advisable
+        unless a reliable correction procedure has already been applied. Accurate acquisition
+        tilt limits should be provided whenever possible.
+
+        The quality of the reference structure also plays a critical role. A model that
+        adequately represents the overall architecture of the system will generally produce
+        more meaningful deformation estimates than an incomplete or poorly matched reference.
+
+        Final Perspective
+
+        For many cryo-EM and cryo-electron tomography studies, understanding structural
+        flexibility is as important as determining static structure. This protocol provides
+        a framework for describing conformational variability directly from experimental
+        volumes using physically interpretable normal modes. By combining elastic deformation
+        analysis with rigid-body alignment, it enables researchers to characterize molecular
+        motions, identify conformational states, and build quantitative models of structural
+        dynamics across heterogeneous datasets.
+    """
     _label = 'nma alignment vol'
 
     # --------------------------- DEFINE param functions --------------------------------------------

@@ -30,8 +30,121 @@ Define some classes to store Data points for clustering.
 
 
 class Point:
-    """ Return x, y 2d coordinates and some other properties
-    such as weight and state.
+    """
+    Represents a point within a multidimensional dataset together with
+    its associated metadata, including spatial coordinates, weight, and
+    selection status. The class serves as the fundamental element for
+    managing geometric, statistical, or visualization-oriented data in
+    interactive analysis workflows.
+
+    AI Generated:
+
+    Point and Data Management (Point) - User Manual
+        Overview
+
+        The Point protocol provides a framework for representing,
+        organizing, and manipulating collections of multidimensional
+        points. Its primary purpose is to support analytical and
+        visualization workflows in which individual observations are
+        associated with spatial coordinates and additional descriptive
+        properties.
+
+        A point is more than a simple coordinate. In addition to its
+        position, each element may carry a numerical importance value
+        and a logical state describing whether it is active, selected,
+        or excluded from analysis. This design allows the same dataset
+        to support exploration, filtering, annotation, and interactive
+        selection without permanently modifying the original data.
+
+        Data Organization
+
+        The framework manages collections of points as coherent datasets.
+        Each dataset preserves the relationship between individual
+        elements while providing convenient access to coordinate values,
+        weights, and selection information. This organization is useful
+        for applications involving dimensionality reduction, clustering,
+        trajectory analysis, geometric measurements, or interactive
+        plotting environments.
+
+        Datasets may contain two-dimensional or three-dimensional
+        coordinates as well as additional numerical descriptors. The
+        coordinate system remains consistent across all points,
+        facilitating comparison and interpretation of spatial patterns.
+
+        Selection and Filtering
+
+        A central feature of the framework is the ability to distinguish
+        between active, selected, and discarded elements. Selected
+        points can be used to define regions of interest, identify
+        representative observations, or support manual curation.
+        Discarded points remain stored within the dataset but are
+        excluded from standard analysis operations.
+
+        This approach allows users to explore alternative selections
+        without losing information. As a result, workflows remain
+        flexible and reversible throughout the analysis process.
+
+        Mathematical Exploration
+
+        The framework supports evaluation of mathematical relationships
+        involving point-associated variables. This capability enables
+        users to derive new measurements, explore custom metrics, or
+        investigate relationships among dimensions without creating
+        separate datasets.
+
+        Such flexibility is particularly useful during exploratory
+        analysis, where researchers often need to test hypotheses and
+        evaluate different combinations of variables before deciding on
+        a final interpretation.
+
+        Path-Based Analysis
+
+        In addition to general datasets, the framework supports ordered
+        collections of points that define trajectories or paths through
+        a coordinate space. These paths can represent motion,
+        transitions between states, interpolation routes, or user-defined
+        exploration trajectories.
+
+        The path representation allows refinement of trajectories by
+        introducing additional intermediate positions. This capability
+        helps create smoother paths, improve sampling density, and
+        support analyses that require continuous transitions between
+        neighboring states.
+
+        Outputs and Interpretation
+
+        The resulting datasets provide structured access to coordinates,
+        weights, and selection information while preserving the original
+        relationships between points. Users can extract coordinate
+        distributions, analyze subsets of interest, or construct
+        trajectories for visualization and further computation.
+
+        Because discarded and selected elements remain explicitly
+        represented, the framework supports transparent and reproducible
+        analysis decisions throughout the workflow.
+
+        Practical Recommendations
+
+        When working with exploratory datasets, it is often beneficial
+        to use selection states to identify candidate regions of
+        interest before performing more detailed analyses. Maintaining
+        discarded elements within the dataset can also facilitate later
+        reevaluation of filtering decisions.
+
+        For trajectory-based studies, adding intermediate points may
+        improve visual continuity and provide a more accurate
+        representation of gradual transitions between neighboring
+        states.
+
+        Final Perspective
+
+        The framework provides a flexible foundation for managing
+        multidimensional point collections and ordered trajectories.
+        By combining coordinate storage, state management, weighting,
+        and path handling within a unified structure, it supports a
+        broad range of visualization, exploration, and analytical
+        workflows while preserving the integrity and interpretability
+        of the underlying data.
     """
     # Selection states
     DISCARDED = -1

@@ -38,7 +38,137 @@ METHOD_MCSFILL = 0
 
 
 class FlexProtMissingWedgeRestoration(ProtAnalysis3D):
-    """ Protocol for subtomogram missingwedge restoration. """
+    """
+    Restores missing information in subtomogram volumes affected by the missing wedge artifact
+    generated during electron tomography data acquisition. The protocol aims to reduce anisotropic
+    distortions and recover a more complete representation of the underlying structure, improving
+    the interpretability of tomographic reconstructions.
+
+    AI Generated:
+
+    Missing Wedge Restoration (FlexProtMissingWedgeRestoration) - User Manual
+        Overview
+
+        The Missing Wedge Restoration protocol is designed to compensate for one of the most common
+        limitations in electron tomography: the incomplete angular sampling that occurs during tilt
+        series acquisition. Because physical and experimental constraints prevent collecting images
+        over the full angular range, reconstructed tomograms contain a region of missing information
+        in Fourier space commonly referred to as the missing wedge.
+
+        This missing information introduces directional artifacts, anisotropic resolution, elongation
+        effects, and distortions that can complicate structural interpretation. The purpose of this
+        protocol is to reduce the impact of these artifacts and generate volumes that more accurately
+        represent the biological structures present in the sample.
+
+        Biological Motivation
+
+        In cryo-electron tomography, macromolecular complexes are often studied directly within their
+        native cellular environment. Although this approach provides unique biological insight, the
+        limited tilt range leads to incomplete sampling of structural information.
+
+        The resulting missing wedge can affect particle classification, structural averaging, conformational
+        analysis, and visualization. Features oriented along poorly sampled directions may appear blurred,
+        elongated, or partially absent. Restoration methods seek to alleviate these limitations and
+        provide a more balanced representation of structural details.
+
+        For biological users, missing wedge correction can improve the reliability of downstream analyses,
+        particularly when comparing conformational states, identifying structural features, or studying
+        heterogeneous populations of macromolecular assemblies.
+
+        Inputs and Experimental Parameters
+
+        The protocol accepts one or multiple reconstructed volumes as input. These volumes are assumed
+        to originate from electron tomography experiments where the angular acquisition range is known.
+
+        The user must specify the lower and upper tilt angles used during data collection. These values
+        define the region of Fourier space that was experimentally sampled and therefore determine the
+        shape and extent of the missing wedge artifact affecting the reconstruction.
+
+        Accurate tilt limits are important because they directly influence the restoration process.
+        Whenever possible, users should provide values that match the actual acquisition conditions
+        rather than idealized microscope settings.
+
+        Monte Carlo Based Restoration
+
+        The protocol employs a Monte Carlo based restoration strategy specifically designed to estimate
+        plausible structural information within the missing wedge region. Rather than simply filtering
+        the reconstruction, the method attempts to infer missing content while maintaining consistency
+        with the experimentally observed data.
+
+        This probabilistic approach is particularly attractive for tomographic datasets because it can
+        model uncertainty within unsampled regions while preserving the information already supported
+        by the measurements. The result is typically a more isotropic reconstruction with reduced
+        directional artifacts.
+
+        Since the missing information is fundamentally unknown, restored regions should be interpreted
+        as statistically plausible estimates rather than direct experimental observations. Biological
+        conclusions should therefore rely on features that remain consistent across the dataset and
+        are supported by additional evidence whenever possible.
+
+        Noise Modeling and Regularization
+
+        The restoration process incorporates a noise parameter that controls the balance between
+        preserving detail and enforcing smoothness. Larger values generally produce smoother volumes
+        and stronger regularization, whereas smaller values preserve finer structural features.
+
+        From a biological perspective, selecting an appropriate value depends on the quality of the
+        tomographic reconstruction. Noisy datasets may benefit from stronger regularization, while
+        high-quality reconstructions often allow more conservative settings that preserve subtle
+        structural details.
+
+        As with many restoration methods, excessive smoothing can suppress meaningful biological
+        features, whereas insufficient regularization may leave residual artifacts. Testing multiple
+        values and visually comparing the results is often beneficial.
+
+        Iterative Sampling Parameters
+
+        The protocol provides control over the number of restoration iterations and the length of the
+        burn-in phase used during the sampling procedure. Increasing the number of iterations generally
+        improves convergence and stability of the estimated solution but also increases computational
+        cost.
+
+        The burn-in phase represents an initial period during which intermediate estimates are discarded.
+        This allows the restoration process to move away from its starting conditions before generating
+        the final solution. For most datasets, the default values provide a reasonable compromise between
+        computational efficiency and restoration quality.
+
+        Advanced users may adjust these parameters when working with particularly noisy datasets or when
+        pursuing highly quantitative analyses.
+
+        Outputs and Their Interpretation
+
+        The protocol generates a restored set of volumes in which the effects of the missing wedge have
+        been reduced. These restored volumes can be used in subsequent stages of analysis, including
+        classification, averaging, flexibility studies, dimensionality reduction, and structural
+        interpretation.
+
+        Restoration often improves visual continuity and isotropy within the reconstructed structures.
+        Features that were previously obscured by directional artifacts may become easier to identify
+        and analyze. Nevertheless, users should remember that restoration cannot recreate the exact
+        missing experimental information and therefore does not replace careful biological validation.
+
+        Practical Recommendations
+
+        Before applying restoration, it is advisable to verify that the tilt limits accurately reflect
+        the acquisition geometry. Incorrect angular ranges may lead to suboptimal correction and could
+        introduce additional artifacts.
+
+        Visual comparison between original and restored volumes is strongly recommended. Improvements
+        should be assessed not only by appearance but also by consistency with known biological features
+        and independent experimental evidence.
+
+        When restored volumes are intended for downstream quantitative analyses, users should evaluate
+        whether the restoration procedure alters measurements relevant to their specific biological
+        questions.
+
+        Final Perspective
+
+        Missing wedge artifacts remain one of the major limitations of electron tomography. This protocol
+        provides a dedicated framework for mitigating their impact through probabilistic restoration,
+        helping researchers obtain more isotropic and biologically interpretable reconstructions. When
+        applied carefully and interpreted appropriately, missing wedge restoration can substantially
+        improve the quality and usefulness of tomographic datasets.
+    """
     _label = 'missing wedge restoration'
 
     # --------------------------- DEFINE param functions --------------------------------------------

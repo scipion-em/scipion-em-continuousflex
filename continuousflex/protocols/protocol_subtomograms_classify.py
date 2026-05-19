@@ -41,7 +41,128 @@ from pwem.utils import runProgram
 
 
 class FlexProtSubtomoClassify(ProtAnalysis3D):
-    """ Protocol applying post alignment classification on subtomograms. """
+    """
+    Performs post-alignment classification of subtomograms in order to identify structurally related groups within a heterogeneous dataset. The protocol is designed to analyze subtomograms that originate either from subtomogram synthesis workflows or from subtomogram averaging procedures, allowing researchers to organize particles into distinct classes based on their structural similarity. By separating heterogeneous populations into more homogeneous subsets, the protocol facilitates the study of conformational variability, structural states, and compositional differences that may be present within tomographic datasets.
+
+    AI Generated:
+
+    Classify Subtomograms (FlexProtSubtomoClassify) - User Manual
+
+        Overview
+
+        The Classify Subtomograms protocol groups aligned subtomograms into a user-defined number of structural classes.
+        Its primary objective is to reveal biologically meaningful variability within a dataset by identifying particles
+        that share similar structural characteristics. This classification step is often performed after subtomogram
+        synthesis or subtomogram averaging and can serve as an important stage for studying molecular flexibility,
+        conformational landscapes, or sample heterogeneity.
+
+        In practical biological applications, classification helps distinguish different structural states of a macromolecule,
+        separate distinct assemblies present in the same sample, or identify rare conformations that may otherwise be
+        obscured when all particles are analyzed together. The resulting class averages often provide a clearer
+        representation of underlying structural differences than a single global average.
+
+        Inputs and Data Sources
+
+        The protocol can operate on subtomograms generated from synthetic datasets or on subtomograms obtained from
+        previous subtomogram averaging workflows. The selected source determines the metadata, geometric information,
+        and acquisition parameters used throughout the analysis.
+
+        Regardless of the source, the protocol assumes that subtomograms correspond to the same biological object or
+        assembly and that they are suitable for direct structural comparison. Consistency in box size, sampling rate,
+        and overall particle content is important for obtaining meaningful classification results.
+
+        Alignment Preparation and Missing-Wedge Compensation
+
+        Before classification, subtomograms are brought into a common reference frame using previously determined
+        alignment parameters. This step ensures that structural differences detected during classification are more
+        likely to reflect genuine biological variability rather than orientation differences.
+
+        Tomographic data are affected by the missing-wedge artifact, which introduces anisotropic information loss.
+        The protocol incorporates missing-wedge information during similarity estimation so that comparisons between
+        particles are less influenced by acquisition geometry and more representative of true structural differences.
+
+        Masking Options
+
+        An optional mask can be applied before similarity estimation. From a biological perspective, masking is often
+        one of the most influential choices because it determines which regions contribute most strongly to the
+        classification.
+
+        A well-designed mask typically focuses on the structurally conserved region of interest while excluding
+        background noise, solvent regions, or highly variable peripheral features that may dominate similarity
+        measurements. In many cases, masks derived from a subtomogram average provide the most reliable results.
+
+        Care should be taken to avoid overly restrictive masks that remove biologically relevant regions or masks that
+        crop portions of the structure. Both situations may reduce the quality of the resulting classification.
+
+        Similarity Analysis
+
+        The protocol estimates pairwise structural similarity between all aligned subtomograms and builds a similarity
+        matrix representing relationships across the dataset. This matrix serves as the foundation for subsequent
+        classification.
+
+        Biologically, particles that share similar structural features produce stronger similarity values, whereas
+        particles representing different conformations, assemblies, or states tend to exhibit lower similarity.
+        Consequently, the resulting classification reflects the structural organization of the dataset.
+
+        Classification Strategies
+
+        Two classification approaches are available.
+
+        Hierarchical clustering directly partitions particles into classes based on their pairwise relationships.
+        This approach is particularly useful when users wish to explore the organization of the dataset without
+        imposing strong assumptions about the underlying structure of the data. Hierarchical methods often provide
+        intuitive separation of major conformational groups.
+
+        Alternatively, the protocol can first reduce the dimensionality of the similarity information and then perform
+        clustering. This strategy is often advantageous for larger datasets because it captures the dominant sources of
+        variability while reducing noise and redundancy. It can help reveal major structural trends that characterize
+        the population.
+
+        Number of Classes
+
+        Users define the desired number of output classes. This parameter directly affects the granularity of the
+        classification.
+
+        A small number of classes is generally appropriate when only broad structural differences are expected.
+        Increasing the number of classes may reveal finer conformational distinctions, although excessive subdivision
+        can produce classes that contain too few particles to support meaningful biological interpretation.
+
+        In exploratory studies, testing several class counts is often useful for identifying a biologically meaningful
+        level of heterogeneity.
+
+        Outputs and Interpretation
+
+        The protocol generates a collection of class averages representing the mean structure of each identified group.
+        These averages provide an accessible way to inspect structural variability across the dataset and often serve
+        as starting points for additional analysis or refinement.
+
+        Individual subtomograms are also assigned to their corresponding classes, allowing users to examine class
+        composition and investigate the distribution of structural states within the sample.
+
+        In addition to the class averages, a global average is produced from all aligned subtomograms. This volume
+        represents the overall consensus structure of the dataset and can be used as a reference for comparing class-
+        specific features.
+
+        Practical Recommendations
+
+        For most biological studies, it is beneficial to ensure that subtomograms are accurately aligned before
+        classification. Misalignment can artificially increase variability and reduce class quality.
+
+        When heterogeneity is expected to be localized within a specific region of the structure, applying a carefully
+        designed mask can substantially improve class separation. Conversely, when the goal is to identify global
+        structural differences, broader masks or unmasked analyses may be more appropriate.
+
+        The number of classes should be selected according to the biological question. Broad state identification often
+        requires only a few classes, whereas detailed conformational studies may benefit from a larger partitioning of
+        the dataset.
+
+        Final Perspective
+
+        Subtomogram classification is a powerful tool for transforming a heterogeneous collection of particles into an
+        organized representation of structural variability. By combining alignment information, missing-wedge-aware
+        similarity estimation, and clustering methods, the protocol enables researchers to identify distinct structural
+        populations and better understand the biological diversity present within tomographic datasets.
+    """
     _label = 'classify subtomograms'
 
     # --------------------------- DEFINE param functions --------------------------------------------

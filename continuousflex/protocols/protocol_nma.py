@@ -45,7 +45,166 @@ from pwem import Domain
 
 
 class FlexProtNMA(FlexProtNMABase):
-    """ Flexible angular alignment using normal modes """
+    """
+    Performs Normal Mode Analysis (NMA) on atomic or pseudoatomic
+    structural models in order to characterize the intrinsic collective
+    motions of biological macromolecules. The protocol generates a set of
+    normal modes that can be used for flexibility analysis, conformational
+    exploration, structural interpretation, and subsequent image or volume
+    analysis workflows.
+
+    AI Generated:
+
+    Normal Mode Analysis (FlexProtNMA) - User Manual
+        Overview
+
+        The Normal Mode Analysis protocol is designed to identify and
+        characterize the intrinsic motions available to a macromolecular
+        structure. Rather than treating a biological assembly as a static
+        object, the protocol models its potential collective movements and
+        provides a compact description of the directions along which the
+        structure can naturally deform.
+
+        In cryo-EM and structural biology studies, many biologically
+        important processes involve continuous conformational changes rather
+        than discrete structural states. Normal modes offer an efficient way
+        to describe these transitions and frequently capture large-scale
+        domain rearrangements, hinge motions, and cooperative movements that
+        are directly related to molecular function.
+
+        Inputs and Biological Context
+
+        The protocol accepts either an atomic structure or a pseudoatomic
+        representation derived from an electron microscopy density map.
+        Atomic structures are appropriate when an experimentally determined
+        model is available, whereas pseudoatomic models provide a practical
+        alternative when only volumetric information exists.
+
+        From a biological perspective, the quality and completeness of the
+        input structure strongly influence the relevance of the resulting
+        motions. Structures representing functional states, biologically
+        meaningful assemblies, or well-resolved density interpretations are
+        generally the most suitable starting points for analysis.
+
+        Elastic Network Representation
+
+        The protocol models the structure as an interconnected system whose
+        collective movements can be approximated through normal mode theory.
+        Interactions are defined according to a selected distance criterion,
+        allowing the construction of an elastic representation of the
+        molecule.
+
+        Two approaches are available for defining structural connectivity.
+        Absolute distance thresholds use a fixed interaction distance,
+        whereas relative thresholds determine connectivity from the overall
+        distribution of neighboring distances. Relative thresholds are often
+        preferred for pseudoatomic models because they adapt more naturally
+        to variations in particle density and sampling.
+
+        Choice of Number of Modes
+
+        The protocol computes a user-defined number of normal modes. In most
+        biological applications, only a subset of the lowest-frequency
+        non-trivial modes is required because these typically correspond to
+        the largest and most functionally relevant collective motions.
+
+        Increasing the number of modes may provide a more complete
+        description of flexibility, but it also introduces motions that are
+        progressively more localized and potentially less biologically
+        informative. For many systems, a moderate number of modes is
+        sufficient to capture the dominant conformational variability.
+
+        Atomic Structures and RTB Approximation
+
+        When working with atomic models, the protocol uses a coarse-grained
+        representation that groups neighboring residues into blocks. This
+        strategy enables efficient analysis of large biological assemblies
+        while preserving the essential characteristics of collective
+        molecular motion.
+
+        The block size influences the balance between computational
+        efficiency and structural detail. Larger blocks generally accelerate
+        calculations, whereas smaller blocks may provide a more detailed
+        description of local flexibility. In most practical situations, the
+        default settings offer a suitable compromise.
+
+        Evaluation of Mode Collectivity
+
+        Not all normal modes contribute equally to biologically meaningful
+        motions. The protocol evaluates the collectivity of each mode, which
+        reflects how broadly a deformation is distributed throughout the
+        structure.
+
+        Highly collective modes involve coordinated movement across large
+        portions of the molecule and are often associated with functional
+        transitions. Less collective modes tend to describe localized
+        fluctuations that may be less relevant for global conformational
+        analysis. Users can therefore focus subsequent studies on the most
+        collective motions.
+
+        Visualization and Animation
+
+        One of the most valuable aspects of normal mode analysis is the
+        ability to visualize predicted motions. The protocol generates
+        animations that illustrate how the structure deforms along each
+        selected mode, helping users interpret the physical meaning of the
+        computed motions.
+
+        These animations are intended as qualitative visualizations rather
+        than direct representations of experimentally observed amplitudes.
+        They provide an intuitive way to identify flexible domains, hinge
+        regions, coordinated movements, and potential functional pathways.
+
+        Interpretation of Atomic Displacements
+
+        The protocol also evaluates displacement profiles that indicate how
+        strongly different regions of the structure move within each mode.
+        These profiles can reveal flexible loops, mobile domains, or regions
+        that participate in large conformational transitions.
+
+        From a biological standpoint, regions exhibiting substantial motion
+        may correspond to functional interfaces, regulatory elements,
+        ligand-binding regions, or structural components involved in
+        allosteric communication.
+
+        Outputs and Downstream Applications
+
+        The main output is a set of normal modes associated with the input
+        structure. These modes can be used directly for visualization,
+        flexibility characterization, conformational interpretation, and
+        integration with additional cryo-EM analysis workflows.
+
+        The generated modes frequently serve as the foundation for flexible
+        fitting, particle analysis, volume analysis, dimensionality
+        reduction, and conformational landscape reconstruction. Because the
+        modes provide a compact representation of structural variability,
+        they enable efficient exploration of continuous molecular motions.
+
+        Practical Recommendations
+
+        For most biological systems, it is advisable to focus on the
+        lowest-frequency collective modes, as these are often the most
+        informative and easiest to interpret. Users should visually inspect
+        animations and displacement profiles to verify that the predicted
+        motions are consistent with known structural and functional
+        properties of the molecule.
+
+        When analyzing pseudoatomic models, relative connectivity criteria
+        generally provide robust results. For atomic structures, appropriate
+        block sizes and realistic interaction parameters help ensure stable
+        and biologically meaningful motion predictions.
+
+        Final Perspective
+
+        Normal Mode Analysis provides a powerful bridge between static
+        structural models and dynamic biological behavior. By identifying
+        the collective motions that a molecule can naturally undergo, the
+        protocol offers valuable insight into conformational variability,
+        molecular function, and the mechanisms underlying biological
+        activity. These modes often form the basis for advanced studies of
+        flexibility and continuous heterogeneity in cryo-EM and structural
+        biology.
+    """
     _label = 'nma analysis'
 
     def _defineParams(self, form):

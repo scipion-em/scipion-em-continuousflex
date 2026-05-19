@@ -47,7 +47,154 @@ PROFILE_MP = 2
 
 
 class FlexProtVolumeDenoise(ProtAnalysis3D):
-    """ Protocol for subtomogram missingwedge filling. """
+    """
+    Denoises three-dimensional volumes using advanced noise reduction
+    techniques. The protocol improves volume quality by reducing unwanted
+    noise while attempting to preserve biologically relevant structural
+    information.
+
+    AI Generated:
+
+    Volume Denoise (FlexProtVolumeDenoise) - User Manual
+        Overview
+
+        The Volume Denoise protocol is designed to enhance the quality of
+        three-dimensional volumes by reducing noise that may obscure
+        meaningful structural features. In cryo-electron microscopy,
+        subtomogram analysis, and related volumetric imaging workflows,
+        noise is an unavoidable component of experimental data and can
+        significantly affect visualization, interpretation, classification,
+        and downstream computational analyses.
+
+        The primary objective of this protocol is to improve the signal-to-
+        noise ratio while maintaining the integrity of biologically relevant
+        structures. By producing cleaner volumes, the protocol facilitates
+        subsequent procedures such as averaging, flexible analysis,
+        segmentation, structural comparison, and molecular interpretation.
+
+        Inputs and General Workflow
+
+        The protocol accepts either a single volume or a collection of
+        volumes. This flexibility allows users to process individual
+        reconstructions as well as large datasets generated during
+        subtomogram averaging, classification, or conformational studies.
+
+        Each input volume is processed independently using the selected
+        denoising strategy. The resulting outputs preserve the identity and
+        organization of the original dataset while providing improved image
+        quality for further analysis.
+
+        Choice of Denoising Method
+
+        The protocol provides two alternative approaches for noise reduction,
+        each suited to different scientific objectives and data conditions.
+
+        The BM4D method is an advanced volumetric denoising strategy
+        specifically designed for three-dimensional data. It is generally
+        preferred when preserving subtle structural details is important.
+        This approach is particularly valuable for cryo-EM and tomography
+        datasets where signal levels are low and structural features may be
+        difficult to distinguish from background noise.
+
+        The Fourier low-pass filtering method is a simpler and computationally
+        efficient approach. It attenuates high-frequency components that are
+        frequently dominated by noise while retaining lower-frequency
+        structural information. This method is useful for rapid exploratory
+        analysis or for datasets where fine high-resolution information is
+        not the primary focus.
+
+        BM4D Noise Modeling
+
+        When using BM4D, the protocol allows the user to specify the expected
+        statistical behavior of the noise. Different noise distributions may
+        better describe different imaging conditions, and selecting an
+        appropriate model can improve denoising performance.
+
+        The protocol also provides control over the estimated noise level.
+        This parameter strongly influences the balance between noise removal
+        and structural preservation. Lower values generally preserve more
+        detail but may leave residual noise, whereas higher values produce
+        smoother volumes at the risk of suppressing weak biological features.
+
+        Several processing profiles are available to accommodate different
+        computational and denoising requirements. These profiles allow users
+        to adapt the method to the characteristics of their data and the
+        desired level of noise suppression.
+
+        An optional Wiener refinement stage may also be employed. This
+        additional processing can improve denoising performance in some
+        datasets by further enhancing signal recovery while maintaining
+        structural consistency.
+
+        Fourier Low-Pass Filtering
+
+        The Fourier filtering approach removes high-frequency information
+        beyond a selected cutoff frequency. Biologically, this operation can
+        be interpreted as emphasizing large-scale structural organization
+        while reducing small-scale fluctuations dominated by noise.
+
+        The cutoff frequency determines the effective resolution retained in
+        the processed volume. Lower cutoff values produce smoother volumes
+        with stronger noise suppression, whereas higher values preserve more
+        structural detail. A gradual transition region can also be applied to
+        reduce filtering artifacts and generate more natural-looking results.
+
+        Biological Considerations
+
+        Denoising should always be performed with awareness of the biological
+        question being addressed. Excessive noise reduction may remove weak
+        but meaningful structural features, particularly in flexible regions,
+        small domains, or low-occupancy conformations.
+
+        For exploratory visualization and qualitative interpretation,
+        stronger denoising may be acceptable. However, for quantitative
+        analyses or studies involving subtle conformational differences,
+        conservative processing is generally recommended to avoid introducing
+        bias or obscuring genuine variability.
+
+        In heterogeneous datasets, users should be especially cautious when
+        comparing denoised volumes. Differences introduced by aggressive
+        filtering may sometimes be mistaken for biological variation.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a denoised volume or set of denoised volumes
+        corresponding directly to the provided inputs. The outputs retain the
+        original sampling characteristics while exhibiting reduced noise and
+        improved visual clarity.
+
+        These processed volumes can be used for visualization, classification,
+        flexible analysis, segmentation, or as inputs to additional
+        computational workflows. The denoised results should nevertheless be
+        interpreted alongside the original data whenever critical biological
+        conclusions are being drawn.
+
+        Practical Recommendations
+
+        For most cryo-EM and subtomogram analysis applications, BM4D is
+        generally the preferred starting point because it provides strong
+        noise reduction while preserving structural information more
+        effectively than simple frequency filtering.
+
+        Fourier low-pass filtering is useful for rapid preprocessing,
+        visualization, or situations where computational simplicity is
+        desired. It can also serve as an initial assessment tool before more
+        advanced denoising methods are applied.
+
+        Users should evaluate denoising results visually and, whenever
+        possible, compare them against the original volumes to ensure that
+        biologically meaningful features have not been inadvertently removed.
+
+        Final Perspective
+
+        Noise reduction is often a crucial step in volumetric structural
+        biology workflows. Effective denoising can substantially improve the
+        interpretability of experimental data and facilitate downstream
+        analyses. The most reliable results are obtained when the denoising
+        strategy is selected according to the characteristics of the dataset
+        and the biological objectives of the study, balancing noise
+        suppression with faithful preservation of structural information.
+    """
     _label = 'volume denoise'
 
     # --------------------------- DEFINE param functions --------------------------------------------

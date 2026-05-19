@@ -45,7 +45,168 @@ MODE_RELATION_PARABOLA = 4
 
 
 class FlexProtSynthesizePDBs(ProtAnalysis3D):
-    """ Protocol for synthesizing flexible PDBs using Normal Mode Analysis. """
+    """
+    Synthesizes ensembles of flexible atomic structures from a reference
+    model and a set of normal modes. The protocol generates multiple PDB
+    conformations that represent structural variability along selected
+    collective motions and can be used as ground-truth data for method
+    development, validation, simulation, or heterogeneity studies.
+
+    AI Generated:
+
+    Synthesize PDBs (FlexProtSynthesizePDBs) - User Manual
+        Overview
+
+        The Synthesize PDBs protocol generates collections of atomic
+        structures that represent different conformational states of a
+        macromolecule. It uses previously computed normal modes to deform
+        a reference structure and produce realistic structural variations
+        that follow biologically meaningful collective motions. The
+        resulting ensemble can serve as a synthetic representation of
+        conformational landscapes observed in flexible proteins, molecular
+        machines, or large biological assemblies.
+
+        For structural biology applications, this protocol is particularly
+        useful when studying flexibility, benchmarking computational
+        methods, generating controlled datasets, or exploring how
+        structural variability may appear in downstream analyses. The
+        generated structures preserve the overall architecture of the
+        original model while introducing controlled conformational changes
+        guided by normal mode analysis.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of normal modes associated with a
+        molecular structure. These modes describe collective directions of
+        motion that are often related to biologically relevant
+        conformational transitions. The user selects which modes will be
+        used to generate variability and defines how amplitudes along
+        those modes should be distributed.
+
+        The selected modes determine the deformation space explored by the
+        generated structures. In many practical applications, a small
+        number of low-frequency modes is sufficient to capture large-scale
+        conformational changes. These motions often correspond to domain
+        movements, opening and closing transitions, or rearrangements that
+        are difficult to observe using static structures alone.
+
+        Defining Relationships Between Modes
+
+        A key aspect of the protocol is the ability to control the
+        relationship between mode amplitudes. Different relationships
+        generate different types of conformational landscapes and can be
+        chosen according to the biological or methodological objective.
+
+        The Linear relationship generates structures along a coordinated
+        trajectory where selected modes vary together. This approach is
+        useful when modeling a single dominant transition between
+        conformational states or when creating datasets with a simple and
+        interpretable variability pattern.
+
+        The Three Clusters option creates three well-separated groups of
+        conformations. This configuration is particularly useful for
+        testing classification, clustering, and heterogeneity analysis
+        methods because the resulting structures naturally form discrete
+        conformational classes.
+
+        The Grid option systematically samples combinations of amplitudes
+        across two selected modes. The resulting ensemble covers the
+        deformation space in an organized manner and is useful for
+        visualizing energy landscapes, evaluating dimensionality reduction
+        methods, or studying continuous transitions between states.
+
+        The Random option generates conformations with independently
+        sampled amplitudes. This approach produces broad structural
+        diversity and is often suitable for benchmarking algorithms under
+        heterogeneous conditions.
+
+        The Parabolic option constrains the generated conformations to
+        follow a curved trajectory in deformation space. Such datasets are
+        valuable when investigating nonlinear conformational variability
+        and assessing methods designed to capture continuous but
+        non-Euclidean structural relationships.
+
+        Amplitude Selection and Conformational Diversity
+
+        The amplitude range controls the extent of structural deformation.
+        Small amplitudes generally produce conformations close to the
+        reference structure, whereas larger amplitudes generate more
+        pronounced motions and greater diversity.
+
+        From a biological perspective, excessively large amplitudes may
+        produce structures that move beyond physically realistic
+        conformations. Users should therefore choose amplitude ranges that
+        remain consistent with the expected flexibility of the system under
+        study. Moderate values are often appropriate when the objective is
+        to model plausible conformational transitions.
+
+        Number of Generated Structures
+
+        The protocol allows the generation of a user-defined number of
+        conformations. Larger ensembles provide denser sampling of the
+        conformational landscape and are often beneficial when producing
+        benchmark datasets or studying continuous heterogeneity.
+
+        When the Grid relationship is selected, the number of generated
+        structures is determined by the sampling density of the grid. A
+        finer grid provides more detailed coverage of the deformation
+        space but increases storage and computational requirements.
+
+        Reproducibility and Randomization
+
+        The protocol supports both randomized and reproducible generation
+        strategies. Randomized generation creates different ensembles in
+        different executions, which is useful for exploring variability
+        and producing independent datasets.
+
+        Reproducible generation ensures that identical conformations are
+        created across repeated runs. This capability is particularly
+        important for benchmarking studies, algorithm comparisons, and
+        controlled experiments where consistency between datasets must be
+        maintained.
+
+        Outputs and Their Interpretation
+
+        The primary output is a set of PDB structures representing
+        different conformational states of the same molecular system. Each
+        generated structure corresponds to a specific position within the
+        selected deformation space and can be used independently or as
+        part of the complete ensemble.
+
+        The generated collection can be employed in downstream workflows
+        such as volume synthesis, simulation studies, heterogeneity
+        analysis, machine learning dataset creation, or validation of
+        reconstruction and classification methods. Because the
+        conformational coordinates are known, the resulting datasets are
+        particularly valuable as reference standards for methodological
+        development.
+
+        Practical Recommendations
+
+        For most biological applications, selecting a small number of
+        dominant low-frequency modes provides the most interpretable and
+        realistic conformational variability. Linear or Grid sampling is
+        often preferred when studying continuous transitions, whereas
+        Three Clusters is advantageous when evaluating classification
+        performance.
+
+        Random sampling is useful when broad structural diversity is
+        desired, while Parabolic sampling can reveal the behavior of
+        methods under nonlinear variability. Regardless of the chosen
+        strategy, users should verify that the generated conformations
+        remain biologically plausible and consistent with known structural
+        constraints.
+
+        Final Perspective
+
+        For researchers interested in molecular flexibility, this
+        protocol provides a controlled framework for generating synthetic
+        conformational ensembles directly from normal mode analysis. By
+        transforming a static structure into a collection of related
+        states, it enables systematic investigation of structural
+        heterogeneity and supports the development and validation of
+        advanced computational methods for cryo-EM and structural biology.
+    """
     _label = 'synthesize PDBs'
 
     # --------------------------- DEFINE param functions --------------------------------------------

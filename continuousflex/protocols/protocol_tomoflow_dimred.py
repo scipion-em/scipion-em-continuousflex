@@ -54,8 +54,159 @@ DIMRED_MAPPINGS = [DIMRED_PCA, DIMRED_LLTSA, DIMRED_LPP, DIMRED_PPCA, DIMRED_NPE
 
 
 class FlexProtDimredHeteroFlow(ProtAnalysis3D):
-    """ This protocol will take volumes with optical flows, it will operate on the correlation mat
-    and will project it onto a reduced space
+    """
+    Reduces the dimensionality of deformation information derived from
+    optical flow analysis of 3D volumes, enabling the exploration and
+    visualization of structural variability in a compact and interpretable
+    space.
+
+    AI Generated:
+
+    Heterogeneous Flow Dimensionality Reduction (FlexProtDimredHeteroFlow) - User Manual
+
+        Overview
+
+        The Heterogeneous Flow Dimensionality Reduction protocol is designed
+        to simplify the analysis of complex conformational variability
+        captured through optical flow measurements between three-dimensional
+        volumes. In structural biology studies, optical flow data often
+        describe high-dimensional deformation patterns that are difficult to
+        interpret directly. This protocol transforms those deformation
+        descriptors into a lower-dimensional representation while preserving
+        the most meaningful relationships between samples.
+
+        For biological users, the main objective is to reveal the underlying
+        organization of conformational landscapes. By projecting deformation
+        information into two or a few dimensions, the protocol allows the
+        identification of structural continua, conformational clusters, rare
+        states, and transition pathways that may otherwise remain hidden in
+        the original high-dimensional space.
+
+        Inputs and General Workflow
+
+        The protocol requires as input a previous optical flow analysis in
+        which a collection of volumes has been compared against a reference
+        structure. These deformation measurements represent the structural
+        differences between individual volumes and the chosen reference
+        state.
+
+        The dimensionality reduction process converts these deformation
+        descriptors into a compact coordinate system. Each volume is then
+        represented by a small number of variables that summarize its
+        position within the overall conformational landscape. The resulting
+        coordinates can be used for visualization, clustering, classification,
+        trajectory analysis, or as input for additional computational methods.
+
+        Understanding Dimensionality Reduction
+
+        Biological systems often exhibit complex motions involving many
+        degrees of freedom. Although deformation measurements may contain a
+        large number of variables, the biologically relevant motions are
+        frequently governed by a much smaller set of collective movements.
+        Dimensionality reduction aims to identify these dominant patterns.
+
+        In practice, the reduced representation can help distinguish
+        different functional states, identify intermediate conformations, or
+        reveal continuous motions connecting multiple structural forms. The
+        reduced coordinates should not be interpreted as direct physical
+        quantities but rather as abstract descriptors capturing major sources
+        of variability within the dataset.
+
+        Choice of Dimensionality Reduction Method
+
+        The protocol offers multiple dimensionality reduction approaches,
+        each emphasizing different aspects of the data structure. Linear
+        methods are generally easier to interpret and often provide a useful
+        starting point for exploratory analysis. They are particularly
+        effective when conformational variability follows approximately
+        linear relationships.
+
+        Nonlinear methods are better suited for datasets in which structural
+        changes occur along curved manifolds or complex pathways. These
+        approaches can uncover relationships that may be invisible to linear
+        projections and are often valuable when studying highly flexible
+        macromolecular assemblies.
+
+        Different methods may produce different visualizations of the same
+        dataset. Consequently, comparing several approaches can provide
+        complementary insights into the organization of conformational
+        variability.
+
+        Reduced Dimensionality Selection
+
+        One of the most important decisions is the number of dimensions to
+        retain in the final representation. Two-dimensional projections are
+        commonly used because they are easy to visualize and interpret.
+        Three-dimensional representations may reveal additional structural
+        complexity while remaining accessible for interactive exploration.
+
+        Retaining too few dimensions may hide biologically relevant
+        variability, whereas retaining too many dimensions can complicate
+        interpretation. In exploratory studies, users often begin with two
+        dimensions and subsequently evaluate whether additional dimensions
+        provide meaningful new information.
+
+        Interpretation of the Reduced Space
+
+        Volumes located close together in the reduced space generally
+        correspond to similar deformation patterns and therefore similar
+        conformational states. Conversely, distant points typically indicate
+        larger structural differences.
+
+        Clusters may represent discrete biological states, while continuous
+        trajectories can indicate gradual transitions between conformations.
+        The biological significance of these patterns should always be
+        assessed together with structural inspection and complementary
+        experimental evidence.
+
+        Projection and Reusability
+
+        Some dimensionality reduction strategies generate transformation
+        models that can later be applied to additional datasets. This allows
+        newly obtained structures to be projected into an existing
+        conformational landscape, facilitating comparisons across experiments,
+        conditions, or processing campaigns.
+
+        Such projections are particularly useful in longitudinal studies,
+        comparative analyses, and iterative workflows where new data become
+        available after the original analysis has been completed.
+
+        Outputs and Their Interpretation
+
+        The primary output is a reduced-coordinate representation of all
+        analyzed volumes. Each volume is associated with a position in the
+        reduced space that summarizes its deformation characteristics
+        relative to the reference structure.
+
+        Depending on the selected method, an additional transformation model
+        may also be produced. This model can serve as a bridge between the
+        original deformation descriptors and the reduced representation,
+        enabling future projections and comparative analyses.
+
+        Practical Recommendations
+
+        For most biological applications, principal component analysis is an
+        effective starting point because it provides a stable and easily
+        interpretable description of dominant structural variability.
+        Nonlinear methods become particularly valuable when the data suggest
+        the presence of curved trajectories, branching pathways, or multiple
+        interconnected conformational states.
+
+        It is generally advisable to visualize the reduced coordinates,
+        inspect possible clusters or trajectories, and compare the resulting
+        organization with known biochemical, functional, or experimental
+        information. Combining dimensionality reduction with structural
+        visualization often yields the most biologically meaningful
+        interpretation.
+
+        Final Perspective
+
+        Dimensionality reduction is a powerful tool for transforming complex
+        deformation measurements into an interpretable representation of
+        molecular flexibility. By revealing the dominant organization of
+        conformational variability, this protocol helps researchers explore
+        structural landscapes, identify biologically relevant states, and
+        generate hypotheses regarding molecular function and dynamics.
     """
     _label = 'tomoflow dimred'
 

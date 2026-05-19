@@ -40,7 +40,164 @@ import os
 from pwem.constants import ALIGN_3D
 
 class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
-    """ Protocol for subtomogram alignment after STA """
+    """
+    Applies subtomogram alignment parameters obtained from external
+    subtomogram averaging workflows to a set of 3D volumes. The protocol
+    standardizes the spatial orientation of subtomograms so they can be
+    consistently interpreted, compared, visualized, or used in downstream
+    structural analysis.
+
+    AI Generated:
+
+    Apply Subtomogram Alignment (FlexProtApplyVolSetAlignment) - User Manual
+        Overview
+
+        The Apply Subtomogram Alignment protocol transfers alignment
+        parameters generated during subtomogram averaging workflows onto
+        individual subtomograms or reconstructed volumes. Its main purpose
+        is to place all input volumes into a common spatial reference frame
+        so that structural variability, conformational organization, or
+        biological patterns can be studied consistently across a dataset.
+
+        In cryo-electron tomography workflows, subtomograms are often
+        aligned using external software packages specialized in subtomogram
+        averaging and refinement. However, the resulting transformations are
+        not always directly applied to the original volumes within the same
+        environment. This protocol bridges that gap by importing alignment
+        information from several commonly used tomography platforms and
+        applying those transformations to the input data.
+
+        Biological Context
+
+        For biological users, subtomogram alignment is essential when
+        studying macromolecular complexes in their native cellular
+        environment. Proper alignment enables direct comparison of
+        structures extracted from different cellular regions, experimental
+        conditions, or conformational states. Without a consistent spatial
+        orientation, biological interpretation becomes difficult because
+        structural variability may reflect geometric inconsistency rather
+        than genuine molecular differences.
+
+        This protocol is particularly useful after subtomogram averaging
+        refinement, where the averaging software has already estimated the
+        orientation and position of each subtomogram relative to a
+        consensus structure. Applying these alignments back onto the
+        original subtomograms allows users to visualize aligned particles,
+        perform focused analyses, generate curated datasets, or prepare
+        inputs for classification and heterogeneity studies.
+
+        Supported Alignment Sources
+
+        The protocol supports importing alignment information from several
+        major tomography processing ecosystems. This flexibility is valuable
+        in collaborative environments where datasets may originate from
+        different facilities or processing pipelines.
+
+        Xmipp alignment metadata can be imported directly from metadata
+        files containing rotational and translational parameters. This mode
+        is particularly convenient for users already working within Scipion
+        and Xmipp-based tomography workflows.
+
+        EMAN alignment information can also be imported from refinement
+        metadata generated during subtomogram alignment procedures. This
+        allows users to continue processing EMAN-refined datasets within a
+        unified analysis environment.
+
+        Dynamo tables are additionally supported, enabling integration with
+        Dynamo-based subtomogram averaging projects. This is especially
+        important for users studying large in situ assemblies where Dynamo
+        remains a widely adopted refinement platform.
+
+        The protocol is designed with extensibility in mind so that
+        additional tomography alignment formats may be incorporated into
+        future workflows.
+
+        Input Requirements and Consistency
+
+        The protocol requires a set of input subtomograms together with
+        alignment parameters describing their orientations and positional
+        shifts. The number of alignment records must match the number of
+        input volumes to ensure that every subtomogram receives the correct
+        transformation.
+
+        From a biological perspective, maintaining consistency between the
+        alignment metadata and the subtomogram dataset is critical. Applying
+        transformations to mismatched particles can generate misleading
+        structural interpretations and compromise downstream analyses.
+
+        Ideally, the subtomograms should already share a consistent voxel
+        size and box dimensions before alignment application. Significant
+        differences in sampling or volume dimensions may complicate
+        comparison and visualization after transformation.
+
+        Spatial Transformations and Coordinate Systems
+
+        The protocol applies rigid-body spatial transformations that include
+        rotations and translational shifts. These operations reposition each
+        subtomogram into a standardized orientation relative to the
+        alignment reference used during subtomogram averaging.
+
+        In tomography workflows, coordinate system conventions may differ
+        between software packages. The protocol therefore handles the
+        interpretation of orientation conventions internally to ensure that
+        imported transformations remain biologically meaningful when applied
+        within the current environment.
+
+        Particular attention is given to subtomogram orientations affected
+        by missing wedge geometry, since this artifact can strongly
+        influence alignment interpretation in cryo-electron tomography.
+        Correct handling of orientation conventions improves consistency
+        between visualization and refinement environments.
+
+        Outputs and Biological Interpretation
+
+        The primary output is a set of aligned subtomograms expressed in a
+        common coordinate frame. Once aligned, volumes become easier to
+        compare visually and quantitatively because corresponding structural
+        regions occupy consistent spatial positions.
+
+        Biologically, aligned subtomograms can reveal conserved structural
+        features across particles while making conformational differences
+        easier to interpret. This is particularly important in studies of
+        flexible molecular assemblies, membrane-associated complexes, or
+        large cellular machineries observed directly inside cells.
+
+        The aligned outputs can also serve as inputs for downstream
+        classification, averaging, dimensionality reduction, variability
+        analysis, or visualization workflows. Because all subtomograms share
+        a unified orientation, subsequent analyses become more robust and
+        easier to interpret biologically.
+
+        Practical Recommendations
+
+        In routine tomography practice, users should first verify that the
+        imported alignment parameters correspond exactly to the subtomogram
+        dataset being processed. Small inconsistencies in ordering or file
+        correspondence can propagate into major structural interpretation
+        errors.
+
+        It is also advisable to visually inspect a subset of aligned
+        subtomograms after processing. Successful alignment should place
+        major structural landmarks into similar orientations across the
+        dataset. Unexpected variability may indicate problems in the
+        original averaging refinement, coordinate conventions, or metadata
+        consistency.
+
+        When combining subtomograms refined in different software packages,
+        users should remain aware that alignment conventions may differ
+        slightly between platforms. Careful validation and visualization are
+        therefore recommended before proceeding to biological conclusions.
+
+        Final Perspective
+
+        For cryo-electron tomography studies, applying subtomogram
+        alignments is a crucial step that transforms independently oriented
+        cellular particles into a coherent structural dataset. By placing
+        subtomograms into a shared spatial framework, the protocol enables
+        more reliable structural interpretation, clearer visualization of
+        biological variability, and improved integration between tomography
+        processing environments.
+    """
     _label = 'apply subtomogram alignment'
     IMPORT_FROM_XMIPP=0
     IMPORT_FROM_EMAN=1

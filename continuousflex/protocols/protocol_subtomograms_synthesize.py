@@ -85,7 +85,162 @@ ROTATION_UNIFORM = 0
 ROTATION_GAUSS = 1
 
 class FlexProtSynthesizeSubtomo(ProtAnalysis3D):
-    """ Protocol for synthesizing subtomograms. """
+    """
+    Synthesizes realistic subtomogram datasets for cryo-electron tomography studies by generating
+    molecular volumes, simulating structural variability, and reproducing common imaging and
+    acquisition effects. The protocol is intended for benchmarking, method validation, algorithm
+    development, and training workflows where controlled ground-truth subtomograms are required.
+
+    AI Generated:
+
+    Synthesize Subtomograms (FlexProtSynthesizeSubtomo) - User Manual
+
+        Overview
+
+        This protocol generates synthetic subtomograms that mimic the appearance and variability
+        observed in cryo-electron tomography experiments. It can create datasets from atomic
+        structures, existing density maps, normal mode analysis models, or collections of
+        heterogeneous structures. The resulting subtomograms can contain conformational variability,
+        rigid-body variability, missing wedge effects, imaging distortions, and reconstruction
+        artifacts similar to those encountered in real experimental data.
+
+        For biological users, the protocol provides a controlled environment for studying molecular
+        flexibility, testing classification and reconstruction methods, evaluating machine learning
+        approaches, and validating analysis pipelines. Because the true underlying conformations are
+        known, the generated datasets are particularly useful for benchmarking algorithms designed
+        to recover structural heterogeneity.
+
+        Inputs and Structural Variability
+
+        The protocol can operate either with conformational variability enabled or disabled. When
+        variability is disabled, a single atomic structure or electron microscopy volume serves as
+        the source for all generated particles. This mode is useful for evaluating the influence of
+        imaging artifacts, noise, or orientation variability without introducing structural changes.
+
+        When conformational variability is enabled, the protocol can generate multiple structural
+        states from normal mode analysis or from a collection of user-provided structures. Normal
+        mode based generation is particularly useful when exploring continuous motions and flexible
+        transitions that are difficult to sample experimentally. Alternatively, users may provide a
+        set of heterogeneous structures, such as molecular dynamics snapshots, experimentally
+        derived models, or representative conformations from structural studies.
+
+        Conformational Sampling Strategies
+
+        Several strategies are available to distribute conformations across the selected motion
+        space. Linear sampling produces coordinated changes across the selected modes and is useful
+        when modeling gradual transitions between states. Clustered sampling generates distinct
+        groups of conformations and is appropriate when investigating classification methods or
+        discrete structural populations.
+
+        Grid sampling systematically explores the conformational landscape and is often used when a
+        dense representation of a two-dimensional motion space is desired. Random sampling produces
+        heterogeneous distributions that resemble naturally occurring variability. The upper-half
+        circle strategy generates conformations constrained along a curved trajectory and may be
+        useful when modeling specific relationships between flexible motions.
+
+        Volume Generation
+
+        Atomic models are converted into volumetric representations using user-defined sampling
+        rates and volume dimensions. This allows the synthetic data to approximate experimental
+        maps at different voxel sizes and box dimensions. The protocol supports both compact
+        benchmark datasets and larger simulation studies intended to reproduce realistic tomographic
+        conditions.
+
+        Optional low-pass filtering can be applied before projection. This introduces additional
+        loss of high-resolution information and can mimic the effects of radiation damage, dose
+        accumulation, or limited experimental resolution. In many situations, however, the
+        contrast transfer function already introduces similar attenuation effects.
+
+        Missing Wedge Simulation
+
+        One of the most important characteristics of cryo-electron tomography data is the missing
+        wedge artifact caused by incomplete angular coverage during tilt-series acquisition. The
+        protocol allows realistic simulation of this effect by defining the lower and upper tilt
+        limits together with the angular sampling interval.
+
+        When missing wedge simulation is disabled, a complete angular range is used. Although this
+        produces more isotropic reconstructions, it does not accurately represent typical
+        experimental conditions. Users interested in developing or validating tomographic analysis
+        methods should generally include realistic tilt limitations.
+
+        Noise and Microscope Effects
+
+        The protocol can simulate imaging conditions by applying contrast transfer function effects
+        and controlled levels of noise. Users may specify microscope parameters such as voltage,
+        spherical aberration, magnification, defocus, and additional imaging characteristics.
+
+        The signal-to-noise ratio controls the severity of noise contamination. Lower values
+        generate more challenging datasets that resemble difficult experimental conditions, whereas
+        higher values produce cleaner reconstructions suitable for algorithm development and initial
+        testing. The resulting datasets can therefore span a broad range of experimental scenarios.
+
+        Reconstruction Workflow
+
+        Synthetic volumes are projected into tilt series and reconstructed into subtomograms using
+        tomographic reconstruction methods. This reproduces the complete imaging pipeline rather
+        than generating idealized volumes directly. As a result, the final outputs contain many of
+        the distortions introduced during acquisition and reconstruction.
+
+        Different reconstruction approaches can be selected depending on the intended application.
+        The generated subtomograms therefore provide a realistic testing environment for methods
+        operating on reconstructed tomographic data.
+
+        Rigid-Body Variability
+
+        In addition to conformational variability, the protocol can introduce random rotations and
+        translations. These transformations mimic the natural distribution of particle positions
+        and orientations observed in biological specimens.
+
+        Users may define either uniform or Gaussian distributions for each translational and
+        rotational degree of freedom. This flexibility allows simulation of both broadly
+        distributed particles and datasets with preferred orientations or constrained positional
+        variability. Such control is valuable when evaluating alignment, classification, and pose
+        estimation methods.
+
+        Full Tomogram Generation
+
+        Beyond isolated subtomograms, the protocol can assemble particles into complete synthetic
+        tomograms. Individual molecular volumes are distributed throughout larger three-dimensional
+        volumes while avoiding excessive overlap between neighboring particles.
+
+        This mode is especially useful for testing particle picking, localization, segmentation,
+        and subtomogram extraction workflows. Multiple tomograms can be generated simultaneously,
+        enabling the creation of realistic datasets suitable for large-scale method development and
+        benchmarking.
+
+        Outputs and Interpretation
+
+        The primary output is a set of reconstructed subtomograms together with metadata describing
+        the generated structures and acquisition parameters. Depending on the selected options,
+        metadata may include conformational states, deformation information, rotational parameters,
+        translational offsets, and imaging conditions.
+
+        Because the underlying ground truth is known, users can directly compare algorithmic
+        predictions against the simulated reality. This makes the protocol particularly valuable
+        for quantitative evaluation of methods designed to recover structural heterogeneity,
+        orientation parameters, particle positions, or tomographic reconstructions.
+
+        Practical Recommendations
+
+        For studies focused on conformational analysis, normal mode based generation combined with
+        realistic noise and missing wedge effects provides a useful approximation of experimental
+        datasets. For benchmarking classification algorithms, clustered conformational sampling is
+        often advantageous because the expected classes are known in advance.
+
+        When evaluating alignment or reconstruction methods, introducing realistic rigid-body
+        variability and imaging distortions creates more representative testing conditions. For
+        particle detection and extraction workflows, generating complete tomograms generally offers
+        the most biologically relevant benchmark scenario.
+
+        Final Perspective
+
+        This protocol serves as a comprehensive framework for generating synthetic cryo-electron
+        tomography data with controllable biological variability and experimental realism. By
+        combining structural heterogeneity, imaging physics, reconstruction artifacts, and
+        tomographic acquisition effects, it provides a powerful resource for developing,
+        validating, and comparing computational methods across a wide range of cryo-ET
+        applications.
+    """
     _label = 'synthesize subtomograms'
 
     # --------------------------- DEFINE param functions --------------------------------------------

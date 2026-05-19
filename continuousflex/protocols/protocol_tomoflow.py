@@ -45,7 +45,139 @@ IMPORT_FLOWS = 0
 FIND_FLOWS = 1
 
 class FlexProtHeteroFlow(ProtAnalysis3D):
-    """ Protocol for TomoFlow. """
+    """
+    Analyzes structural heterogeneity in sets of subtomograms by estimating optical flow fields
+    relative to a common reference volume. The protocol enables characterization of continuous
+    conformational variability by describing how each volume can be elastically transformed with
+    respect to a reference structure, providing a quantitative framework for studying molecular
+    flexibility and dynamic biological processes.
+
+    AI Generated:
+
+    TomoFlow Heterogeneity Analysis (FlexProtHeteroFlow) - User Manual
+        Overview
+
+        The TomoFlow protocol is designed to investigate structural variability in collections of
+        aligned 3D subtomograms. Rather than treating each volume as an independent reconstruction,
+        the protocol models the spatial deformations required to transform a reference structure
+        into each observed volume. These deformation patterns provide a rich description of
+        continuous molecular motions and can reveal biologically meaningful conformational changes
+        that are difficult to capture using discrete classification approaches.
+
+        For biological users, this protocol is particularly useful when studying flexible protein
+        complexes, molecular machines, membrane assemblies, or other systems that exhibit gradual
+        structural transitions. By quantifying deformation patterns across an entire dataset, the
+        protocol creates a foundation for downstream heterogeneity analysis and conformational
+        landscape exploration.
+
+        Inputs and General Workflow
+
+        The protocol can operate in two different modes. In the first mode, previously calculated
+        optical flow fields are imported from an earlier refinement workflow. This option is useful
+        when deformation information has already been generated and only heterogeneity analysis is
+        required. In the second mode, optical flow fields are computed directly from a set of
+        aligned subtomograms and a selected reference volume.
+
+        The reference volume serves as the structural baseline against which all volumes are
+        compared. In practice, the reference is often a subtomogram average representing the most
+        reliable estimate of the underlying structure. Choosing a biologically representative and
+        high-quality reference generally improves the interpretability of the resulting deformation
+        patterns.
+
+        Optical Flow and Structural Variability
+
+        Optical flow analysis estimates local displacements throughout the volume, generating a
+        three-dimensional deformation field for each subtomogram. These deformation fields describe
+        how different regions of the structure move relative to the reference and provide a compact
+        representation of conformational differences.
+
+        From a biological perspective, the resulting deformation fields can be interpreted as
+        signatures of structural flexibility. Similar conformational states tend to produce similar
+        deformation patterns, whereas distinct structural arrangements generate different patterns.
+        This allows the protocol to compare volumes based on their internal motions rather than
+        relying solely on voxel intensity similarities.
+
+        Choice of Reference Structure
+
+        The quality of the reference has a strong influence on the biological interpretation of the
+        results. A reference that represents the dominant conformational state often provides the
+        most intuitive deformation fields. If the reference differs substantially from many members
+        of the dataset, the resulting motion estimates may become harder to interpret.
+
+        In practical workflows, users frequently select a subtomogram average obtained from
+        previous processing steps. External reference volumes may also be used when appropriate,
+        particularly when a biologically validated structure is available.
+
+        Optical Flow Parameters
+
+        The protocol provides several parameters that control the sensitivity and robustness of the
+        deformation estimation process. These settings influence how local motions are detected,
+        how information is propagated across scales, and how noise is handled during analysis.
+
+        Pyramid-related parameters control the multiscale representation of the data. These options
+        determine how the algorithm captures both large global motions and smaller local
+        deformations. Window and neighborhood parameters regulate the balance between sensitivity
+        to fine structural changes and robustness against noise.
+
+        For most biological datasets, the default values provide a suitable starting point.
+        However, highly noisy tomograms or structures with exceptionally large conformational
+        changes may benefit from parameter optimization.
+
+        Similarity Analysis and Heterogeneity Characterization
+
+        Once deformation fields have been obtained, the protocol compares them across all volumes
+        to generate a similarity matrix describing the relationships between conformational states.
+        This matrix serves as a quantitative representation of structural variability within the
+        dataset.
+
+        Biologically, the similarity matrix can reveal clusters of related conformations, gradual
+        transitions between states, or continuous motion trajectories. It forms the basis for
+        subsequent dimensionality reduction and conformational landscape analysis workflows.
+
+        Warped Reference Volumes
+
+        An optional feature allows the generation of estimated volumes obtained by deforming the
+        reference according to each optical flow field. These reconstructed volumes provide a
+        direct visualization of how well the measured deformations explain the observed structures.
+
+        This capability is particularly valuable for biological interpretation because it allows
+        users to assess whether the inferred motions capture meaningful structural differences. The
+        protocol also computes quantitative similarity measures between observed and estimated
+        volumes, helping evaluate the quality of the deformation model.
+
+        Outputs and Their Interpretation
+
+        The primary outputs are the optical flow fields and the similarity matrix describing the
+        relationships among all analyzed volumes. Together, these outputs provide a mathematical
+        description of conformational heterogeneity that can be explored using downstream analysis
+        tools.
+
+        When warped reference generation is enabled, an additional set of estimated volumes is
+        produced. These volumes represent structural models reconstructed from the deformation
+        information and can be inspected visually to validate the biological plausibility of the
+        inferred motions.
+
+        Practical Recommendations
+
+        Reliable results depend strongly on the quality of the alignment preceding this protocol.
+        Volumes should already be brought into a common coordinate system before deformation
+        analysis begins. Misalignment can introduce artificial motions that may be incorrectly
+        interpreted as biological variability.
+
+        Users are encouraged to begin with default optical flow parameters and evaluate the
+        resulting deformation patterns. If motions appear excessively noisy, increasing smoothing
+        and neighborhood-related parameters may improve stability. Conversely, when subtle
+        conformational differences are expected, more sensitive settings may reveal additional
+        structural details.
+
+        Final Perspective
+
+        For studies of molecular flexibility, TomoFlow provides a powerful framework for moving
+        beyond static structural descriptions. By representing each subtomogram through its
+        deformation relative to a common reference, the protocol enables quantitative exploration
+        of continuous conformational variability and supports a deeper understanding of the dynamic
+        behavior of biological macromolecules.
+    """
     _label = 'tomoflow protocol'
 
     # --------------------------- DEFINE param functions --------------------------------------------

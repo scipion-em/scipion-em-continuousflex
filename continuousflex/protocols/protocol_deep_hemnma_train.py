@@ -42,8 +42,117 @@ DEVICE_CPU = 1
 
 
 class FlexProtDeepHEMNMATrain(ProtAnalysis3D):
-    """ DeepHEMNMA protocol, a neural network that learns the rigid-body parameters and the normal mode
-        amplitudes estimated by HEMNMA protocol.
+    """
+    DeepHEMNMA protocol, a neural network that learns the rigid-body parameters and the normal mode
+    amplitudes estimated by HEMNMA protocol.
+
+    AI Generated:
+
+    Deep HEMNMA Training (FlexProtDeepHEMNMATrain) - User Manual
+        Overview
+
+        The Deep HEMNMA Training protocol is designed to learn the relationship between cryo-EM
+        particle images and the structural variability parameters previously estimated through
+        HEMNMA analyses. Its purpose is to train a deep learning model capable of predicting
+        conformational and rigid-body motion descriptors directly from experimental data, providing
+        a faster and more scalable alternative for studying molecular heterogeneity in large datasets.
+
+        In structural biology, understanding continuous flexibility is often essential for revealing
+        biologically relevant motions that cannot be captured by a single static structure. This
+        protocol enables researchers to build predictive models that reproduce the variability
+        information obtained from previous analyses and apply that knowledge to extensive particle
+        collections.
+
+        Inputs and Training Data
+
+        The protocol relies on previously characterized datasets in which flexibility parameters
+        have already been estimated. These reference measurements serve as the learning targets
+        used during training. Depending on the scientific objective, the model can focus on
+        conformational variability, rigid-body variability, or both simultaneously.
+
+        Conformational variability is represented through normal mode amplitudes that describe
+        collective structural motions. These amplitudes provide a compact description of molecular
+        flexibility and are particularly useful when studying continuous transitions between
+        functional states.
+
+        Rigid-body variability corresponds to rotational and translational motions. These parameters
+        describe how entire molecular assemblies or domains move relative to the imaging reference
+        frame and can be important when flexibility is dominated by large-scale motions rather than
+        internal deformations.
+
+        Choice of Training Objective
+
+        The protocol allows training on different categories of structural parameters. Researchers
+        interested primarily in molecular flexibility can focus on conformational descriptors,
+        whereas studies involving particle orientation variability may benefit from training on
+        angular parameters, translational parameters, or a combination of all available descriptors.
+
+        Training on a single category often simplifies the learning problem and may improve model
+        specialization. In contrast, training on all available parameters simultaneously can provide
+        a more comprehensive representation of structural variability and may be advantageous when
+        multiple motion types contribute to the observed heterogeneity.
+
+        Computational Resources
+
+        Training can be performed using either graphical processing units or conventional central
+        processing units. GPU-based execution is generally recommended because deep learning models
+        benefit substantially from hardware acceleration, particularly when working with large image
+        datasets or extended training schedules.
+
+        CPU execution remains useful when dedicated accelerators are unavailable or when performing
+        exploratory tests with smaller datasets. However, training times may increase considerably
+        depending on dataset size and model complexity.
+
+        Learning Parameters
+
+        Several parameters control the optimization process. The learning rate determines how
+        rapidly the model updates its internal representation during training. Small values often
+        provide stable convergence, while larger values may accelerate training but increase the
+        risk of instability.
+
+        The number of epochs defines how many times the complete training dataset is presented to
+        the model. Higher values generally allow deeper learning but may increase computational
+        cost and the possibility of overfitting if training continues beyond the point where
+        generalization improves.
+
+        Batch size controls how many samples are processed together during each optimization step.
+        Smaller batches typically require less memory and may improve generalization, whereas
+        larger batches can accelerate training when sufficient hardware resources are available.
+
+        Interpretation of the Trained Model
+
+        The resulting model captures the relationship between particle appearance and the structural
+        descriptors selected for training. Biologically, this means that information previously
+        extracted through computationally intensive analyses can be approximated by a learned model,
+        enabling rapid estimation of flexibility-related parameters for new data.
+
+        The quality of the learned representation depends strongly on the quality and diversity of
+        the training dataset. Datasets that adequately sample the full range of conformational and
+        rigid-body variability generally produce more robust and biologically meaningful models.
+
+        Practical Recommendations
+
+        For most studies, it is advisable to begin with carefully validated HEMNMA results before
+        initiating training. The neural network can only learn the variability patterns present in
+        the reference dataset, making the quality of the initial characterization a critical factor
+        in overall performance.
+
+        When computational resources permit, GPU execution combined with sufficient training epochs
+        usually provides the most effective learning conditions. Researchers should monitor model
+        behavior and adjust optimization parameters when convergence is unstable or predictive
+        performance plateaus prematurely.
+
+        Studies focused on continuous molecular motions may benefit from emphasizing normal mode
+        amplitudes, while investigations involving orientation or positional variability may obtain
+        better results by incorporating angular and translational descriptors.
+
+        Final Perspective
+
+        Deep HEMNMA Training bridges traditional flexibility analysis and modern deep learning by
+        transforming previously estimated structural variability into a predictive framework. For
+        researchers studying continuous conformational landscapes, this approach provides an
+        efficient way to model complex molecular motions and extend flexibility analysis to larger
+        cryo-EM datasets while preserving the biological interpretation of the learned variability.
     """
     _label = 'deep hemnma train'
     _devStatus = BETA

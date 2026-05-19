@@ -48,7 +48,114 @@ DEVICE_CUDA = 0
 DEVICE_CPU = 1
 
 class FlexProtDeepHEMNMAInfer(ProtAnalysis3D):
-    """ This protocol is DeepHEMNMA
+    """
+    This protocol is DeepHEMNMA
+
+    AI Generated:
+
+    Deep HEMNMA Inference (FlexProtDeepHEMNMAInfer) - User Manual
+        Overview
+
+        The Deep HEMNMA Inference protocol applies a previously trained Deep HEMNMA model to
+        estimate structural variability parameters directly from cryo-EM particle images. Its
+        primary objective is to use knowledge learned during a prior training stage to rapidly
+        predict conformational and rigid-body descriptors for new datasets, avoiding the need to
+        perform a complete variability analysis from the beginning.
+
+        In studies of molecular flexibility, researchers often need to characterize large numbers
+        of particles that may represent a continuum of structural states. Once a predictive model
+        has been trained, this protocol enables efficient estimation of the underlying variability
+        parameters, making large-scale analyses substantially more practical.
+
+        Inputs and General Workflow
+
+        The protocol requires a trained Deep HEMNMA model together with a new particle dataset that
+        will be analyzed. The trained model serves as a learned representation of the relationship
+        between particle appearance and structural variability, while the input particles provide
+        the experimental observations from which predictions are generated.
+
+        The protocol is intended to be used after a successful training stage. The quality of the
+        predictions depends strongly on how well the training dataset represents the structural
+        variability present in the new particles. Datasets that differ substantially from the data
+        used during training may produce less reliable results.
+
+        Prediction Targets
+
+        Different categories of structural descriptors can be predicted depending on the scientific
+        objective. Conformational variability can be represented through normal mode amplitudes,
+        which describe collective molecular motions and continuous structural transitions between
+        biological states.
+
+        The protocol can also estimate rotational and translational parameters associated with
+        rigid-body variability. These descriptors are useful when structural differences are
+        dominated by large-scale movements of domains, subunits, or complete molecular assemblies.
+
+        In many applications, predicting all available parameters simultaneously provides the most
+        comprehensive description of particle heterogeneity. However, restricting the prediction
+        task to a specific category may be advantageous when the biological question focuses on a
+        particular type of motion.
+
+        Normal Modes and Structural Interpretation
+
+        The number of normal modes determines the dimensionality of the conformational description.
+        A larger number of modes can capture more complex motions, while a smaller number often
+        focuses on the dominant collective movements that explain most of the observed variability.
+
+        From a biological perspective, normal mode amplitudes should be interpreted as coordinates
+        within a continuous conformational landscape. Similar amplitude values generally correspond
+        to related structural states, whereas larger differences may indicate distinct conformations
+        or transitions between functional forms.
+
+        Computational Resources
+
+        The protocol supports execution on graphical processing units and conventional central
+        processing units. GPU execution is generally preferred because neural network inference can
+        be performed significantly faster, especially when processing large particle collections.
+
+        CPU execution remains useful when accelerator hardware is unavailable or when analyzing
+        smaller datasets. The choice of computational device affects performance but does not
+        change the biological interpretation of the predicted parameters.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a particle set enriched with predicted structural descriptors. These
+        predictions can be used for downstream analyses of conformational variability, structural
+        clustering, visualization of continuous motions, or comparison with previously characterized
+        states.
+
+        The resulting dataset preserves the connection between each particle and its estimated
+        variability parameters, enabling researchers to explore structural landscapes at the
+        individual-particle level. This information can be valuable for identifying dominant motions,
+        mapping functional transitions, or studying heterogeneous molecular assemblies.
+
+        In addition to generating predictions for the new dataset, the protocol integrates the
+        inferred information with the variability information associated with the training data.
+        This facilitates direct comparison between previously characterized particles and newly
+        analyzed observations within a common variability framework.
+
+        Practical Recommendations
+
+        For best results, the training model should originate from a dataset that adequately samples
+        the conformational space expected in the inference dataset. Predictions are generally more
+        reliable when the new particles belong to the same biological system and imaging conditions
+        used during training.
+
+        Researchers should carefully select the prediction target according to their biological
+        objectives. Studies focused on molecular flexibility often benefit from emphasizing normal
+        mode amplitudes, whereas investigations involving particle orientation or positional
+        variability may require angular and translational predictions as well.
+
+        When working with very large datasets, GPU execution is typically the most efficient option.
+        It allows rapid processing while maintaining the same predictive framework established during
+        training.
+
+        Final Perspective
+
+        Deep HEMNMA Inference transforms a trained deep learning model into a practical tool for
+        exploring structural heterogeneity in cryo-EM data. By predicting conformational and
+        rigid-body descriptors directly from particle images, it enables efficient characterization
+        of molecular variability and supports the study of continuous structural landscapes across
+        large experimental datasets.
     """
     _label = 'deep hemnma infer'
     _devStatus = BETA

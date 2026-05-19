@@ -43,7 +43,157 @@ FORCEFIELD_CAGO = 2
 
 
 class ProtGenerateTopology(EMProtocol):
-    """ Protocol to generate topology files for GENESIS simulations """
+    """
+    Generates topology-ready molecular models for GENESIS simulations from
+    atomic structures. The protocol prepares biomolecular systems so they can
+    be used in molecular dynamics and structure-based modeling workflows.
+
+    AI Generated:
+
+    Generate Topology Model (ProtGenerateTopology) - User Manual
+        Overview
+
+        The Generate Topology Model protocol prepares an atomic structure for
+        molecular simulations by creating a topology-compatible molecular model.
+        Its primary purpose is to transform an experimentally derived structure
+        into a form that can be used by simulation engines, including all-atom
+        and coarse-grained modeling approaches. This step is often one of the
+        first requirements before performing molecular dynamics simulations,
+        conformational exploration, or flexible fitting studies.
+
+        The protocol is designed to support different force field strategies.
+        Depending on the scientific objective, users may generate a standard
+        all-atom representation suitable for detailed molecular dynamics or
+        create topology models based on Go-like potentials that emphasize the
+        native structure and are commonly used for large-scale conformational
+        studies. This flexibility makes the protocol useful for both high-
+        resolution atomistic simulations and reduced-complexity models intended
+        for studying collective motions.
+
+        Inputs and General Workflow
+
+        The protocol requires an atomic structure as input. The structure may
+        originate from experimental methods such as X-ray crystallography,
+        cryo-EM, or NMR, as well as from computational modeling procedures.
+        Before topology generation, the molecular description is standardized to
+        ensure compatibility with the selected simulation framework.
+
+        During preparation, residue and atom naming conventions are harmonized
+        and molecular organization is validated. This helps avoid common
+        problems arising from differences between structural databases and force
+        field expectations. The resulting model is therefore more suitable for
+        subsequent simulation steps and less likely to encounter topology-
+        generation failures.
+
+        Choice of Force Field Representation
+
+        The protocol supports multiple force field philosophies that address
+        different scientific questions.
+
+        The CHARMM option is intended for detailed all-atom simulations where
+        atomic interactions are represented explicitly. This approach is
+        generally preferred when studying local structural changes, ligand
+        interactions, energetic properties, or processes requiring high physical
+        realism.
+
+        The All-Atom Go model preserves an atomistic representation while
+        simplifying the interaction scheme around the experimentally observed
+        native structure. Such models are useful when the goal is to investigate
+        large conformational transitions while reducing computational cost.
+
+        The C-Alpha Go model provides an even more reduced representation by
+        focusing on backbone-level structural behavior. This option is often
+        selected for very large macromolecular assemblies, long-timescale
+        simulations, or exploratory studies of conformational landscapes.
+
+        For many biological applications, a topology generated first using an
+        all-atom representation can serve as a reliable starting point before
+        constructing simplified Go-model variants.
+
+        Residue and Sequence Preparation
+
+        Structural files frequently contain residue numbering irregularities,
+        insertion codes, or sequence discontinuities introduced during
+        experimental structure determination. These issues may complicate
+        topology generation and simulation setup.
+
+        The protocol provides options to reorganize residue numbering and create
+        a more consistent molecular description. This is particularly important
+        when structures have been assembled from multiple experimental sources
+        or contain insertion labels that may not be interpreted consistently by
+        simulation software.
+
+        From a biological perspective, correcting residue organization does not
+        alter the molecular structure itself but improves the consistency of the
+        model used throughout the simulation workflow.
+
+        Protein and Nucleic Acid Systems
+
+        The protocol supports proteins as well as nucleic acid molecules. RNA
+        and DNA components are recognized and prepared according to the
+        conventions expected by the selected force field representation.
+
+        This capability is important for studies involving ribonucleoprotein
+        complexes, chromatin-associated systems, ribosomes, viral genomes, or
+        other assemblies containing mixed biomolecular components. By ensuring
+        compatibility between molecular components and topology definitions, the
+        resulting models are better suited for integrated simulations of complex
+        biological systems.
+
+        Structure Standardization
+
+        Experimental structures often contain naming conventions that differ
+        from those expected by simulation packages. The protocol performs
+        standardization steps that improve compatibility while preserving the
+        biological meaning of the model.
+
+        Such preparation is particularly valuable when structures originate from
+        different databases, software pipelines, or experimental sources. A
+        standardized topology-ready model simplifies downstream simulation
+        setup and reduces the need for manual intervention.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a topology-compatible molecular structure ready
+        for use in subsequent simulation workflows. The resulting model
+        represents the same biological system as the input structure but has
+        been adapted to satisfy the requirements of the selected force field and
+        simulation environment.
+
+        The output should be viewed as a prepared simulation model rather than a
+        modified biological interpretation. Structural features present in the
+        original input are preserved while the molecular description is made
+        consistent with the computational framework.
+
+        Practical Recommendations
+
+        For detailed molecular dynamics studies, the CHARMM representation is
+        generally the preferred choice because it retains the highest level of
+        atomic detail. For investigations focused on large conformational
+        motions, folding-like transitions, or broad exploration of structural
+        landscapes, Go-model representations often provide substantial
+        computational advantages.
+
+        Before topology generation, users should inspect the input structure for
+        missing regions, unusual residue names, or inconsistencies in sequence
+        numbering. Ensuring that the experimental model accurately represents
+        the intended biological system will improve the quality of downstream
+        simulations.
+
+        When working with mixed protein-nucleic acid assemblies, it is
+        particularly important to verify molecular completeness and chain
+        organization before beginning the topology preparation process.
+
+        Final Perspective
+
+        Topology generation is a foundational step in molecular simulation
+        workflows. Although it is often viewed as a technical preparation stage,
+        the quality and consistency of the generated model strongly influence
+        the reliability of subsequent analyses. Careful selection of the force
+        field representation and thoughtful preparation of the molecular
+        structure help ensure that simulation results remain biologically
+        meaningful and scientifically robust.
+    """
     _label = 'generate topology model'
 
     def _defineParams(self, form):

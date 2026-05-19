@@ -49,12 +49,154 @@ REFERENCE_STA = 1
 
 
 class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
-    """ Protocol for refining subtomogram alignment and filling the missing wedge based on optical flow and Fast Rotational Matching (FRM).
-     The protocol takes as input a set of subtomograms, with their subtomogram averaging protocol.
-     It uses this global subtomogrm average to fill the missing wedge in Fourier space (the missing wedge is replaced by the corresponding region from the global average).
-     Optical flow is used to match the global average with each of the missing wedge filled and aligned subtomograms (matched subtomograms are generated).
-     Rigid-body alignment is performed using FRM from the matched subtomogram, and the rigid-body alignment for the input subtomograms is updated.
-     Few iterations are usually sufficient (1-5), and the rigid-body alignment will be refined"""
+    """
+    Refines subtomogram alignment and improves reconstruction quality by combining missing-wedge compensation,
+    optical-flow-based elastic matching, and iterative rigid-body refinement. The protocol is intended for
+    subtomogram averaging workflows where an initial global average and alignment already exist, and where
+    additional refinement can improve the consistency of particle orientations and positions. It uses a
+    reference average to compensate for information lost during tomographic acquisition, estimates local
+    deformations between each subtomogram and the reference, and updates alignment parameters through
+    successive refinement cycles.
+
+    AI Generated:
+
+    Refine Subtomogram Alignment (FlexProtRefineSubtomoAlign) - User Manual
+
+        Overview
+
+        This protocol is designed to improve the quality of subtomogram averaging results by refining the
+        alignment of individual subtomograms against a common reference. Its main objective is to increase
+        structural consistency across the dataset while reducing the impact of missing information caused by
+        the limited angular range of electron tomography experiments.
+
+        The workflow combines two complementary strategies. First, it can compensate for the missing wedge
+        by filling unsampled Fourier regions using information from a reference average. Second, it performs
+        iterative alignment refinement using optical flow and rigid-body matching. Together, these operations
+        help produce more accurate particle orientations, better averages, and improved structural detail.
+
+        Inputs and Initial Requirements
+
+        The protocol requires a set of subtomograms together with alignment parameters obtained from a
+        previous subtomogram averaging workflow. A reference volume is also required and normally corresponds
+        to the final average generated during a previous refinement stage.
+
+        The quality of the input reference strongly influences the final result. References containing clear
+        structural features generally provide more reliable refinement, whereas noisy or poorly aligned
+        references may limit convergence. Users should therefore begin with the best available average.
+
+        Missing Wedge Compensation
+
+        Electron tomography data typically suffer from incomplete angular sampling, creating a region of
+        missing information known as the missing wedge. This artifact introduces anisotropic resolution and
+        can bias alignment procedures.
+
+        When missing wedge correction is enabled, the protocol uses the reference average to estimate the
+        absent Fourier information for each subtomogram. The reference is transformed into the orientation
+        of each particle and contributes information only in regions affected by the missing wedge. This
+        process reduces directional artifacts and provides a more complete representation of each particle
+        before refinement.
+
+        The user specifies the lower and upper tilt limits corresponding to the experimental acquisition
+        geometry. Accurate values are important because they define the extent of the missing information
+        being compensated.
+
+        Reference Masking
+
+        An optional mask can be applied to the reference volume and to the aligned subtomograms throughout
+        the refinement process. This allows the analysis to focus on biologically relevant regions while
+        reducing the influence of noise, solvent regions, or highly flexible domains.
+
+        For many biological systems, masking the stable core of the structure improves refinement stability.
+        Care should be taken to avoid overly restrictive masks that exclude meaningful structural features.
+
+        Alignment Refinement Strategy
+
+        The protocol performs iterative refinement cycles. During each cycle, subtomograms are aligned using
+        the current rigid-body parameters and compared against the reference. Optical flow estimation is then
+        used to model local differences between the reference and each aligned subtomogram.
+
+        These local deformation fields provide a particle-specific representation of how the reference would
+        need to change to resemble the observed data. The resulting matched volumes are subsequently used for
+        rigid-body alignment refinement. Updated transformations are combined with the previous alignment
+        parameters, producing progressively improved orientations and shifts.
+
+        In most practical situations only a small number of iterations is required. Typical refinement runs
+        use between one and five cycles. Excessive iteration counts may increase computational cost without
+        providing meaningful biological improvements.
+
+        Optical Flow Parameters
+
+        Optical flow estimation is responsible for identifying local differences between the reference and
+        each subtomogram. Several parameters control the behavior of the deformation model.
+
+        Pyramid scale and pyramid levels determine how motion is analyzed across multiple spatial scales.
+        Larger multi-scale analyses can capture broader deformations but require additional computation.
+
+        Window size influences robustness to noise. Larger windows generally provide smoother and more stable
+        motion estimates, although they may reduce sensitivity to small local variations.
+
+        Iteration count controls how extensively motion estimates are refined at each scale. Higher values
+        can improve accuracy but increase execution time.
+
+        Polynomial neighborhood size and smoothing parameters regulate how smoothly local deformations are
+        modeled. Conservative values are usually sufficient for most biological datasets.
+
+        GPU Acceleration
+
+        Optical flow calculations can be executed using one or more GPUs. Multiple volumes may be processed
+        simultaneously, allowing substantial reductions in runtime for large datasets.
+
+        The number of parallel GPU processes should be chosen according to available hardware resources.
+        Larger values increase throughput but also increase memory requirements.
+
+        Rigid-Body Refinement
+
+        After optical-flow matching, the protocol refines particle orientations and translations through
+        rigid-body alignment. This stage improves the global positioning of each subtomogram while preserving
+        the information learned from the deformation-based matching process.
+
+        Users can control the maximum search frequency and the maximum translational displacement explored
+        during refinement. Conservative values are generally recommended because the protocol assumes that
+        particles are already approximately aligned from a previous averaging workflow.
+
+        Generation of Updated References
+
+        At the end of each refinement cycle, all particles are combined using the updated alignment
+        parameters to generate a new average volume. This updated average becomes the reference for the next
+        iteration.
+
+        Through successive cycles, the reference and particle alignments evolve together, often leading to
+        improved structural consistency and enhanced signal quality.
+
+        Outputs and Interpretation
+
+        The protocol produces a refined set of aligned subtomograms together with updated rigid-body
+        transformations. When alignment refinement is enabled, an additional refined average volume is also
+        generated.
+
+        The refined average can be used as input for subsequent rounds of subtomogram averaging, structural
+        interpretation, classification, or visualization. Improvements are typically observed as sharper
+        structural features, increased consistency across particles, and reduced effects of missing-wedge
+        artifacts.
+
+        Practical Recommendations
+
+        Users should begin with a reasonably well-aligned dataset and a high-quality reference average.
+        Missing wedge correction is generally beneficial when acquisition geometry introduces strong
+        anisotropy, although its usefulness depends on the quality of the reference volume.
+
+        Applying a biologically meaningful mask often improves refinement stability, particularly for
+        complexes containing flexible regions. A small number of refinement iterations is usually sufficient,
+        and results should be inspected after each cycle to verify that structural quality is improving.
+
+        Final Perspective
+
+        This protocol extends conventional subtomogram averaging refinement by combining missing-wedge
+        compensation, elastic matching, and rigid-body optimization within an iterative framework. For
+        biological users, it provides a practical mechanism for improving alignment accuracy and enhancing
+        the quality of averaged structures, particularly in datasets where incomplete angular sampling and
+        residual alignment errors limit achievable resolution.
+    """
     _label = 'refine subtomogram alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------

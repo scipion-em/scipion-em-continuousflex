@@ -34,7 +34,144 @@ from pwem.utils import runProgram
 
 
 class FlexrotNMAChoose(FlexProtConvertToPseudoAtomsBase, FlexProtNMABase):
-    """ Protocol for choosing a volume to construct an NMA analysis """
+    """
+    Protocol for choosing a volume to construct an NMA analysis.
+
+    AI Generated:
+
+    Choose NMA (FlexrotNMAChoose) - User Manual
+
+        Overview
+
+        The Choose NMA protocol identifies the most representative volume from
+        a collection of related three-dimensional density maps and uses it as
+        the foundation for a Normal Mode Analysis (NMA) study. Its primary goal
+        is to select a structural state that best captures the overall behavior
+        of the dataset, providing a biologically meaningful starting point for
+        exploring conformational variability and molecular flexibility.
+
+        In structural biology projects, it is common to obtain multiple volumes
+        representing different conformations, experimental conditions, or stages
+        of a dynamic process. Rather than arbitrarily selecting one of these
+        states for further analysis, this protocol evaluates the entire ensemble
+        and determines which volume lies closest to the center of the observed
+        structural landscape. The selected volume can then serve as a robust
+        reference for downstream flexibility analysis.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of volumes representing different structural
+        states of the same biological system. These volumes should describe
+        comparable molecular assemblies and ideally share the same sampling,
+        dimensions, and overall structural content.
+
+        Each volume is converted into a pseudoatomic representation suitable for
+        Normal Mode Analysis. The resulting models provide a simplified yet
+        biologically informative description of the structure that can capture
+        large-scale motions while remaining computationally efficient.
+
+        Once pseudoatomic models have been generated, a Normal Mode Analysis is
+        performed independently for each candidate structure. The resulting
+        normal modes describe the intrinsic directions of motion available to
+        each conformation and provide the basis for comparing structural states
+        across the dataset.
+
+        Evaluating Structural Similarity
+
+        After normal modes have been computed, each candidate structure is
+        compared against every other volume in the collection. The protocol
+        evaluates how well one structure can deform to resemble another using
+        biologically plausible motions described by the normal modes.
+
+        This pairwise comparison creates a global picture of structural
+        relationships within the dataset. Volumes that can easily deform into
+        one another are considered closely related, while larger deformations
+        indicate greater structural separation.
+
+        From a biological perspective, this analysis can reveal whether the
+        dataset forms a continuous conformational spectrum or contains several
+        distinct structural states. The representative volume is chosen from
+        within this context rather than based on visual inspection alone.
+
+        Optional Volume Alignment
+
+        An optional alignment stage can be enabled before evaluating structural
+        deformations. This is particularly useful when volumes may differ not
+        only because of genuine conformational changes but also because of
+        orientation differences introduced during reconstruction or processing.
+
+        For datasets originating from multiple experiments, independent
+        refinement procedures, or heterogeneous reconstruction pipelines,
+        alignment often improves the biological interpretability of the results.
+        When volumes are already expressed in a common coordinate system, this
+        option may provide only limited additional benefit.
+
+        Choosing the Representative Structure
+
+        The central objective of the protocol is to identify the structure that
+        best represents the complete ensemble. This representative model is the
+        one exhibiting the smallest average deformation distance to all other
+        structures in the dataset.
+
+        Biologically, this selected volume can be interpreted as the most
+        typical conformation within the observed population. It is often a
+        suitable reference for flexibility studies because it minimizes bias
+        toward any extreme conformational state.
+
+        The resulting pseudoatomic model and its associated normal modes become
+        the principal outputs of the protocol and can be used directly in later
+        analyses involving conformational landscapes, flexible fitting, or
+        motion characterization.
+
+        Interpretation of Motion Ranges
+
+        Beyond selecting a representative structure, the protocol estimates the
+        range of observed deformations associated with each retained normal
+        mode. These ranges provide an approximation of how strongly each mode
+        contributes to the structural variability present in the dataset.
+
+        Modes exhibiting broad deformation ranges may correspond to dominant
+        biological motions, while modes with limited variation are generally
+        less influential in explaining the observed conformational diversity.
+        Such information can guide the interpretation of molecular dynamics and
+        aid in selecting relevant modes for downstream exploration.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a representative pseudoatomic model together with
+        a curated set of normal modes describing its accessible motions. These
+        outputs form a compact description of the structural variability
+        observed across the entire collection of volumes.
+
+        The representative model can be used as a reference structure for
+        subsequent Normal Mode Analysis workflows, flexible fitting procedures,
+        dimensionality reduction studies, or visualization of conformational
+        transitions. The associated modes provide a biologically meaningful
+        framework for understanding the dominant motions encoded in the data.
+
+        Practical Recommendations
+
+        The protocol performs best when all input volumes correspond to the
+        same molecular assembly and differ primarily because of conformational
+        variability. Large differences arising from reconstruction artifacts,
+        inconsistent preprocessing, or unrelated biological states can reduce
+        the reliability of the representative selection.
+
+        Careful preparation of the input dataset is therefore important.
+        Volumes should be inspected to ensure consistency in scale, sampling,
+        and molecular content before analysis. When substantial orientation
+        differences are expected, enabling alignment is generally advisable.
+
+        Final Perspective
+
+        Choosing an appropriate reference structure is a critical step in many
+        flexibility analysis workflows. By identifying the volume that best
+        represents the overall conformational ensemble, this protocol provides
+        a principled and biologically meaningful foundation for Normal Mode
+        Analysis. The resulting model and motion descriptors help transform a
+        collection of individual structural states into a coherent description
+        of molecular dynamics and functional flexibility.
+    """
     _label = 'choose NMA'
 
     def __init__(self, **args):

@@ -44,7 +44,151 @@ NMA_CUTOFF_REL = 1
 
 
 class FlexProtNMABase(EMProtocol):
-    """ Protocol for flexible analysis using NMA. """
+    """
+    Provides the foundational framework for Normal Mode Analysis (NMA) of
+    macromolecular structures and pseudoatomic models. The protocol is intended
+    to characterize intrinsic molecular flexibility by identifying collective
+    motions that describe biologically relevant conformational changes. These
+    motions can later be used in flexible fitting, variability analysis, motion
+    exploration, and the interpretation of structural heterogeneity observed in
+    cryo-EM experiments.
+
+    AI Generated:
+
+    Normal Mode Analysis Base (FlexProtNMABase) - User Manual
+        Overview
+
+        The Normal Mode Analysis Base protocol provides the core functionality
+        required to compute and evaluate normal modes describing the intrinsic
+        flexibility of molecular structures. In structural biology, normal mode
+        analysis is widely used to investigate how large biomolecular assemblies
+        move between different conformational states while preserving their
+        overall architecture.
+
+        The protocol is designed to support both atomic and pseudoatomic
+        representations. This flexibility allows researchers to study systems
+        ranging from high-resolution atomic models to lower-resolution cryo-EM
+        reconstructions that have been converted into pseudoatomic forms. The
+        resulting modes provide a compact description of collective molecular
+        motions and often reveal biologically meaningful pathways of structural
+        change.
+
+        Biological Significance of Normal Modes
+
+        Biological macromolecules are dynamic entities rather than static
+        structures. Proteins, ribosomes, viral capsids, and molecular machines
+        frequently perform their functions through coordinated movements of
+        domains, subunits, or flexible regions. Normal mode analysis seeks to
+        identify these collective motions and rank them according to their
+        energetic accessibility.
+
+        Lower-frequency modes are often the most biologically relevant because
+        they describe large-scale coordinated movements that can be associated
+        with ligand binding, allosteric regulation, assembly rearrangements,
+        transport mechanisms, or transitions between functional states.
+        Understanding these motions can provide valuable insight into molecular
+        mechanisms that are difficult to infer from a single static structure.
+
+        Defining the Elastic Network
+
+        A key aspect of normal mode analysis is the definition of interactions
+        between atoms or pseudoatoms. The protocol allows users to control how
+        neighboring elements are connected through an interaction cutoff.
+
+        For atomic structures, a fixed interaction distance is often suitable
+        because atomic coordinates provide detailed geometric information. For
+        pseudoatomic models derived from cryo-EM maps, relative cutoffs are
+        generally preferred because they adapt automatically to the density and
+        distribution of pseudoatoms. This often produces more stable and
+        physically meaningful elastic networks.
+
+        Choosing an appropriate interaction range is important because it
+        determines the balance between local rigidity and global flexibility.
+        Cutoffs that are too restrictive may fragment the network and prevent
+        meaningful mode calculation, whereas excessively large cutoffs may
+        suppress biologically relevant flexibility.
+
+        Number of Modes
+
+        The protocol allows users to select how many normal modes should be
+        computed. In most biological applications, only a subset of the
+        available modes is required because the lowest-frequency collective
+        motions typically capture the most relevant conformational variability.
+
+        A moderate number of modes is often sufficient for exploring structural
+        flexibility, generating deformed models, or performing downstream
+        conformational analyses. Computing an excessive number of modes may
+        increase computational cost without providing additional biological
+        insight.
+
+        Mode Qualification and Selection
+
+        Not all computed modes are equally informative. The protocol evaluates
+        the collective nature of each mode and identifies those that are most
+        likely to represent meaningful concerted motions.
+
+        Collectivity measures the extent to which a motion involves large
+        portions of the structure rather than only a few localized elements.
+        Highly collective modes are often associated with functional molecular
+        rearrangements, whereas poorly collective modes may correspond to local
+        fluctuations with limited biological significance.
+
+        The protocol therefore provides mechanisms for identifying and
+        prioritizing the most informative modes. This helps users focus on
+        motions that are more likely to contribute to biologically relevant
+        conformational transitions.
+
+        Interpretation of Eigenvalues and Flexibility
+
+        Each normal mode is associated with an eigenvalue that reflects the
+        energetic cost of the corresponding motion. Lower eigenvalues indicate
+        softer motions that can occur more easily, while higher eigenvalues
+        correspond to increasingly constrained deformations.
+
+        From a biological perspective, the lowest-frequency non-rigid-body modes
+        are often the most informative because they represent motions that the
+        molecular system can naturally access. These modes frequently correlate
+        with experimentally observed conformational variability.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a collection of normal modes together with
+        quantitative descriptors that help evaluate their importance. The
+        resulting mode set can be used directly in downstream flexibility
+        analyses, conformational sampling, flexible fitting procedures, and
+        structural interpretation workflows.
+
+        Researchers can inspect the relative importance of different modes,
+        evaluate their collectivity, and determine which motions should be used
+        for subsequent analyses. The outputs provide a structured description of
+        the accessible conformational space surrounding the input structure.
+
+        Practical Recommendations
+
+        For pseudoatomic models derived from cryo-EM maps, relative interaction
+        cutoffs are generally recommended because they adapt more naturally to
+        the pseudoatom distribution. For atomic structures, carefully chosen
+        absolute cutoffs often provide reliable results.
+
+        In most studies, attention should focus on the lowest-frequency
+        collective modes rather than attempting to interpret every computed
+        motion. Reviewing collectivity values and ensuring that the interaction
+        network is sufficiently connected are important quality-control steps.
+
+        When mode computation becomes unstable or produces fewer modes than
+        expected, increasing the interaction cutoff is often an effective way to
+        improve network connectivity and obtain a more complete description of
+        molecular flexibility.
+
+        Final Perspective
+
+        Normal mode analysis provides a powerful bridge between static
+        structural models and the dynamic behavior of biological molecules. By
+        identifying collective motions that are energetically accessible, the
+        protocol enables researchers to explore conformational landscapes,
+        interpret experimental heterogeneity, and gain mechanistic insight into
+        the functional flexibility of complex macromolecular systems.
+    """
     _label = 'nma analysis'
 
     def _defineParamsCommon(self, form):

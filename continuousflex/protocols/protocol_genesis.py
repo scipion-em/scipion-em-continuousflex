@@ -43,7 +43,147 @@ import pwem.emlib.metadata as md
 import re
 
 class FlexProtGenesis(EMProtocol):
-    """ Protocol to perform MD/NMMD simulation based on GENESIS. """
+    """
+    Performs molecular dynamics and normal mode molecular dynamics simulations
+    using the GENESIS framework. The protocol provides an integrated environment
+    for combining atomic structural models, force-field based physical
+    simulations, and electron microscopy data in order to investigate
+    conformational variability, structural refinement, and dynamic behavior of
+    biological macromolecules.
+
+    AI Generated:
+
+    MD-NMMD Genesis (FlexProtGenesis) - User Manual
+        Overview
+
+        The MD-NMMD Genesis protocol is a general-purpose simulation framework
+        for studying structural dynamics in biological systems. It enables
+        molecular dynamics and related simulation strategies that can be
+        applied to atomic models, coarse-grained representations, and
+        experimentally derived structures. Its primary goal is to explore how
+        macromolecules move, fluctuate, and adapt while remaining consistent
+        with physical principles and, when available, experimental data.
+
+        In structural biology, static structures often represent only a single
+        snapshot of a dynamic process. Proteins, nucleic acids, molecular
+        assemblies, and membrane complexes frequently undergo conformational
+        changes that are essential for their biological function. This protocol
+        provides a computational environment for investigating those motions
+        and generating structural trajectories that can be analyzed in
+        conjunction with experimental observations.
+
+        Inputs and General Workflow
+
+        The protocol supports simulations starting from prepared topology
+        models, previously completed simulations, or directly supplied
+        structural coordinates. This flexibility allows users to initiate new
+        calculations, continue existing studies, or explore alternative
+        simulation conditions without rebuilding the entire workflow.
+
+        Depending on the scientific objective, simulations may focus on local
+        fluctuations, large-scale conformational transitions, flexible fitting,
+        or the characterization of structural ensembles. The protocol serves as
+        a central platform that connects structural preparation, simulation
+        execution, and downstream analysis.
+
+        Force Fields and Physical Modeling
+
+        A key component of the protocol is the use of molecular force fields
+        that define the energetic behavior of the system. These physical models
+        describe how atoms or coarse-grained particles interact and determine
+        the forces governing structural motion throughout the simulation.
+
+        Different force-field representations may be appropriate depending on
+        system size, desired accuracy, and computational resources. Detailed
+        atomic models provide a realistic description of molecular interactions,
+        whereas simplified models can facilitate the exploration of large-scale
+        motions and long-timescale processes.
+
+        Molecular Dynamics and Normal Mode Approaches
+
+        The protocol supports both conventional molecular dynamics and
+        simulation strategies that incorporate collective motions derived from
+        normal mode analysis. This combination is particularly useful when the
+        objective is to investigate biologically relevant conformational
+        changes that involve coordinated movements of multiple domains or
+        subunits.
+
+        For many macromolecular systems, large-scale functional transitions are
+        dominated by collective motions rather than random fluctuations.
+        Incorporating these motions into simulations can improve sampling
+        efficiency and help identify conformations that are difficult to reach
+        through standard molecular dynamics alone.
+
+        Integration with Electron Microscopy Data
+
+        One of the major strengths of the protocol is its ability to incorporate
+        information derived from electron microscopy experiments. Structural
+        models can be guided by volumetric or particle-based observations,
+        allowing simulations to remain consistent with experimentally observed
+        conformations.
+
+        This capability is especially valuable for cryo-EM and cryo-electron
+        tomography studies, where experimental maps may reveal multiple
+        structural states or partially resolved conformational landscapes.
+        Combining simulation and experimental information often provides a more
+        complete understanding of molecular behavior than either approach alone.
+
+        Simulation Parameters
+
+        Users can control the duration, sampling behavior, physical conditions,
+        and simulation strategy according to the requirements of the biological
+        problem. Short exploratory simulations can be used to evaluate system
+        stability, while longer calculations may be necessary to characterize
+        conformational transitions or generate statistically meaningful
+        structural ensembles.
+
+        The choice of simulation parameters should reflect the size of the
+        system, the expected magnitude of structural changes, and the desired
+        balance between computational cost and sampling depth.
+
+        Parallel Execution
+
+        The protocol supports execution on parallel computing resources,
+        enabling simulations of large biological assemblies and computationally
+        demanding systems. Efficient parallelization is particularly important
+        for high-resolution models, extensive trajectory generation, and
+        large-scale conformational studies.
+
+        Outputs and Their Interpretation
+
+        The protocol produces simulation trajectories and refined structural
+        models that describe the evolution of the system over time. These
+        results can be used to investigate flexibility, identify dominant
+        motions, characterize intermediate states, and evaluate consistency
+        with experimental data.
+
+        Structural trajectories should be interpreted as dynamic ensembles
+        rather than single definitive conformations. Biological insight is
+        often obtained by examining recurring motions, persistent structural
+        features, and relationships between simulated conformations and
+        experimental observations.
+
+        Practical Recommendations
+
+        Successful simulations typically begin with a structurally reasonable
+        starting model and carefully selected simulation conditions. When
+        experimental data are available, incorporating them as guiding
+        information can improve biological relevance and help constrain the
+        exploration of conformational space.
+
+        Users are encouraged to evaluate convergence, inspect structural
+        trajectories visually, and compare simulation outcomes with independent
+        biochemical, structural, or functional evidence whenever possible.
+
+        Final Perspective
+
+        MD-NMMD Genesis provides a versatile platform for studying molecular
+        structure and dynamics through physics-based simulations integrated
+        with experimental information. By combining molecular dynamics, normal
+        mode guided exploration, and electron microscopy data, the protocol
+        enables detailed investigation of conformational variability and the
+        dynamic mechanisms underlying biological function.
+    """
     _label = 'MD-NMMD-Genesis'
 
     def __init__(self, **kwargs):

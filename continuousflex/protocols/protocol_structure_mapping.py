@@ -71,12 +71,167 @@ def mds(d, dimensions = 2):
 
 class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
                                 FlexProtNMABase):
-    """ 
-    A quantitive analysis of dissimilarities (distances) among the EM maps
-    that placing the entire set of density maps in to a common space of
-    comparison.The approach is based on statistical analysis of distance
-    among elastically aligned EM maps, and results in visualizing those maps
-    as points in a lower dimensional distance space.    
+    """
+    Performs quantitative structural mapping of multiple EM volumes by measuring
+    their similarity in a common conformational space. The protocol is designed
+    to compare a collection of density maps, identify relationships among them,
+    and represent those relationships in a reduced-dimensionality landscape that
+    facilitates biological interpretation of structural variability.
+
+    AI Generated:
+
+    Structure Mapping (FlexProtStructureMapping) - User Manual
+        Overview
+
+        The Structure Mapping protocol provides a framework for exploring
+        structural diversity within a collection of cryo-EM volumes. Rather
+        than focusing on a single reconstruction, it analyzes an entire set of
+        maps and determines how similar or different they are from one another.
+        The resulting representation places each structure within a common
+        coordinate space, allowing users to visualize structural relationships,
+        identify clusters of related conformations, and study continuous
+        transitions between states.
+
+        This type of analysis is particularly useful when investigating
+        conformational heterogeneity, functional motions, ligand-induced
+        structural changes, or variability observed across independent
+        reconstructions. By converting pairwise structural differences into a
+        geometric representation, the protocol enables biological interpretation
+        of complex datasets that would otherwise be difficult to compare
+        directly.
+
+        Inputs and General Workflow
+
+        The protocol accepts one or more input volumes. These may represent
+        different conformations of the same macromolecular complex, structures
+        obtained under different experimental conditions, or reconstructions
+        originating from distinct processing workflows.
+
+        Each volume is transformed into a pseudoatomic representation suitable
+        for flexible analysis. Normal mode analysis is then used to describe
+        the possible collective motions of the structure. Using these motions,
+        the protocol evaluates how well each volume can be elastically related
+        to every other volume in the dataset. The resulting measurements are
+        converted into a matrix of structural dissimilarities that summarizes
+        the relationships among all inputs.
+
+        The final stage embeds these relationships into a low-dimensional
+        coordinate system, allowing users to visualize structural organization
+        in two or three dimensions while preserving the major trends present in
+        the original dataset.
+
+        Pseudoatomic Representation
+
+        A key aspect of the protocol is the conversion of density maps into
+        pseudoatomic models. This representation provides a compact and flexible
+        description of the volume while preserving its overall structural
+        organization.
+
+        For biological users, pseudoatoms should be viewed as mathematical
+        elements used to capture the shape and flexibility of the density map.
+        They are not intended to replace atomic models but rather to provide a
+        practical framework for studying large-scale motions and structural
+        relationships.
+
+        Appropriate pseudoatom parameters help balance computational efficiency
+        and structural fidelity. Very coarse representations may overlook
+        relevant details, whereas overly dense representations may increase
+        computational cost without significantly improving biological insight.
+
+        Normal Mode Analysis
+
+        Normal mode analysis is used to characterize collective motions that
+        can explain structural variability. These motions often correspond to
+        biologically meaningful movements such as domain rearrangements,
+        opening and closing transitions, hinge motions, or large-scale
+        conformational shifts.
+
+        Users can control the number of modes considered and the criteria used
+        to retain meaningful motions. In practice, low-frequency collective
+        modes often capture the most relevant biological variability, whereas
+        higher-frequency modes may describe local fluctuations with less impact
+        on global structure.
+
+        The quality of the resulting structural map depends strongly on whether
+        the selected modes adequately represent the conformational space
+        explored by the dataset.
+
+        Rigid and Elastic Alignment
+
+        Before comparing structures, the protocol may perform a rigid
+        alignment. This step removes differences caused by orientation,
+        translation, or small scale variations and ensures that subsequent
+        comparisons focus on genuine structural differences.
+
+        Following rigid alignment, elastic alignment evaluates how one volume
+        can deform into another through collective motions. This distinction is
+        biologically important because many macromolecular systems differ not
+        only by position or orientation but also by intrinsic conformational
+        changes.
+
+        For datasets containing closely related structures, rigid alignment may
+        be sufficient to establish correspondence. For flexible molecular
+        machines, however, elastic alignment often provides a much more
+        realistic description of structural relationships.
+
+        Distance Space Interpretation
+
+        The central output of the protocol is a structural distance space in
+        which each volume is represented as a point. Volumes located close to
+        one another correspond to similar conformations, whereas distant points
+        indicate larger structural differences.
+
+        Clusters in the map may reveal discrete structural states, such as
+        ligand-bound and ligand-free forms, active and inactive conformations,
+        or distinct assembly intermediates. Continuous trajectories may suggest
+        gradual conformational transitions or dynamic pathways connecting
+        different functional states.
+
+        Because the representation is based on structural similarity rather
+        than experimental metadata, unexpected groupings can reveal previously
+        unrecognized relationships within the dataset.
+
+        Outputs and Their Interpretation
+
+        The protocol generates distance measurements between all pairs of input
+        volumes and produces low-dimensional coordinate representations that
+        can be visualized and analyzed further. These coordinates provide a
+        simplified view of the structural landscape while preserving the major
+        patterns of variability.
+
+        The resulting maps can be used for clustering, trajectory analysis,
+        identification of outliers, and exploration of conformational
+        continua. They are particularly valuable when studying heterogeneous
+        cryo-EM datasets where multiple structural states coexist.
+
+        Practical Recommendations
+
+        For meaningful biological interpretation, the input volumes should
+        represent comparable molecular systems and should be reconstructed at
+        reasonably similar resolutions. Large differences arising from
+        experimental artifacts or reconstruction quality may dominate the
+        analysis and obscure biologically relevant variability.
+
+        It is generally advisable to inspect the resulting structural map in
+        conjunction with the original volumes. Clusters and trajectories should
+        be validated by visual examination of the corresponding structures to
+        confirm that the observed relationships reflect genuine conformational
+        differences.
+
+        When studying flexible complexes, retaining sufficient collective modes
+        and enabling alignment procedures usually improves the ability of the
+        protocol to capture biologically meaningful motions.
+
+        Final Perspective
+
+        Structure mapping transforms a collection of cryo-EM volumes into an
+        interpretable structural landscape. By combining pseudoatomic
+        representations, normal mode analysis, flexible alignment, and
+        dimensionality reduction, it provides a powerful approach for exploring
+        conformational diversity and understanding the organization of complex
+        structural datasets. For many biological applications, it serves as an
+        effective bridge between individual reconstructions and a global view
+        of molecular variability.
     """
     _label = 'structure mapping'
     _lastUpdateVersion = VERSION_1_1

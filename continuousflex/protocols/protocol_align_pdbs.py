@@ -45,7 +45,152 @@ MATCHING_PDB_CHAIN = 1
 MATCHING_PDB_SEG = 2
 
 class FlexProtAlignPdb(ProtAnalysis3D):
-    """ Protocol to perform rigid body alignment on a set of PDB files. """
+    """
+    Performs rigid-body alignment of atomic structures represented as
+    PDB files or molecular dynamics trajectories. The protocol places
+    multiple structural conformations into a common coordinate system,
+    enabling direct structural comparison, visualization, variability
+    analysis, and integration with downstream cryo-EM or structural
+    biology workflows.
+
+    AI Generated:
+
+    PDB Rigid Body Alignment (FlexProtAlignPdb) - User Manual
+        Overview
+
+        The PDB Rigid Body Alignment protocol aligns a collection of
+        atomic structures to a selected reference structure using
+        rigid-body transformations. Its primary objective is to remove
+        differences caused by overall rotation and translation so that
+        biologically meaningful conformational variations can be studied
+        in a consistent spatial frame.
+
+        In structural biology projects, ensembles of structures may
+        originate from molecular dynamics simulations, normal mode
+        analyses, flexible fitting procedures, integrative modeling, or
+        collections of experimentally determined conformations. Before
+        these structures can be compared quantitatively, they must be
+        expressed within a common coordinate system. This protocol
+        provides that standardization step and facilitates subsequent
+        analyses focused on molecular flexibility and structural
+        heterogeneity.
+
+        Inputs and General Workflow
+
+        The protocol accepts structural data from several sources. Users
+        may provide a collection of PDB files, an existing set of
+        atomic structures stored within a project, or molecular dynamics
+        trajectory files accompanied by an appropriate structural
+        reference. This flexibility allows the protocol to be used both
+        for static structural ensembles and for large conformational
+        trajectories.
+
+        A reference structure is required to define the target
+        coordinate system. All input conformations are aligned against
+        this reference so that equivalent structural regions occupy the
+        same spatial frame. Choosing a biologically representative and
+        well-curated reference generally improves the interpretability
+        of the resulting aligned ensemble.
+
+        Structural Correspondence Between Models
+
+        One of the most important considerations when aligning atomic
+        structures is determining which atoms should be considered
+        equivalent between the reference and the input structures. In
+        simple cases, all structures may already share identical atom
+        ordering and composition, allowing direct alignment.
+
+        More complex datasets may contain differences in atom ordering,
+        chain organization, or segmentation conventions. The protocol
+        supports correspondence strategies based on chain identity or
+        segment identity together with residue numbering. These options
+        help ensure that equivalent biological regions are compared even
+        when file organization differs between structures.
+
+        From a biological perspective, careful correspondence selection
+        is critical. Incorrect matching can produce alignments that are
+        geometrically valid but biologically meaningless.
+
+        Working with Molecular Dynamics Trajectories
+
+        The protocol is particularly useful for molecular dynamics
+        studies where thousands of conformations may be generated during
+        a simulation. In these situations, users can analyze only a
+        selected portion of the trajectory by specifying a starting
+        frame, ending frame, and sampling interval.
+
+        This capability allows researchers to focus on equilibrated
+        regions of a simulation, reduce computational cost, or study
+        specific conformational transitions. Sampling trajectories at
+        regular intervals is often sufficient to capture large-scale
+        motions while avoiding unnecessary redundancy.
+
+        Alignment and Biological Interpretation
+
+        Rigid-body alignment removes global motion while preserving
+        internal structural differences. As a result, conformational
+        changes observed after alignment are more likely to reflect
+        biologically relevant flexibility rather than arbitrary
+        differences in molecular orientation.
+
+        This distinction is particularly important when studying domain
+        movements, allosteric transitions, hinge motions, or ensemble
+        variability. By eliminating overall translation and rotation,
+        researchers can focus on the structural changes that are most
+        relevant to biological function.
+
+        Outputs and Their Interpretation
+
+        The protocol produces an aligned structural ensemble expressed
+        in the coordinate system of the selected reference. The aligned
+        structures can be inspected visually, used for statistical
+        analyses, or incorporated into additional flexibility studies.
+
+        Alignment parameters describing the rigid-body transformations
+        are also generated. These transformations provide a compact
+        representation of the spatial relationship between each
+        conformation and the reference structure.
+
+        Optional Application to Other Data
+
+        In many cryo-EM and integrative structural biology workflows,
+        structural models are associated with other experimental data
+        such as particle images or reconstructed volumes. The protocol
+        can propagate the computed rigid-body transformations to these
+        associated datasets, ensuring that all related information is
+        represented within a consistent coordinate system.
+
+        This capability is particularly useful when combining atomic
+        models with volumetric maps, subtomograms, or particle datasets,
+        allowing structural and imaging information to remain
+        synchronized throughout subsequent analyses.
+
+        Practical Recommendations
+
+        For most applications, users should select a reference
+        structure that represents the dominant or most biologically
+        relevant conformation. When structures originate from different
+        sources or processing pipelines, verifying atom correspondence
+        before alignment is strongly recommended.
+
+        For molecular dynamics trajectories, it is often beneficial to
+        exclude non-equilibrated regions and analyze representative
+        frames. When large conformational changes are expected, visual
+        inspection of the aligned ensemble can help distinguish genuine
+        biological motions from artifacts arising from incomplete atom
+        correspondence.
+
+        Final Perspective
+
+        Rigid-body alignment is a foundational step in the analysis of
+        structural ensembles. By placing all conformations into a common
+        spatial frame, the protocol enables meaningful comparison of
+        molecular states, supports quantitative studies of flexibility,
+        and facilitates integration between atomic models and cryo-EM
+        data. Careful selection of the reference structure and proper
+        definition of atomic correspondence are the key factors for
+        obtaining biologically reliable results.
+    """
     _label = 'pdbs rigid body alignment'
 
     # --------------------------- DEFINE param functions --------------------------------------------

@@ -35,8 +35,147 @@ from .convert import rowToMode
 from xmipp3.base import XmippMdRow
 
 class FlexProtMDSPACE(FlexProtGenesis):
+    """
+    Performs iterative molecular dynamics based conformational refinement and exploration by combining
+    GENESIS simulations, structural alignment, and principal component analysis. The protocol is designed
+    to characterize continuous molecular flexibility, progressively refine structural ensembles, and build
+    a reduced representation of the dominant motions present within a molecular system.
 
-    """ Protocol to perform MDSPACE using GENESIS """
+    AI Generated:
+
+    MDSPACE Refinement (FlexProtMDSPACE) - User Manual
+        Overview
+
+        The MDSPACE protocol provides an iterative framework for studying structural variability in
+        macromolecular systems through molecular dynamics simulations guided by conformational analysis.
+        Its primary objective is to identify the dominant collective motions of a molecule while
+        progressively refining the structural model used to describe those motions.
+
+        In structural biology, many macromolecules do not exist in a single rigid conformation.
+        Instead, they populate a range of states connected through continuous transitions. MDSPACE
+        is intended for situations where understanding these transitions is as important as obtaining
+        a single structure. The protocol combines simulation, structural comparison, and dimensionality
+        reduction techniques to reveal the major directions of conformational variability.
+
+        Inputs and General Workflow
+
+        The protocol starts from an atomic structure together with the simulation parameters required
+        for molecular dynamics calculations. Depending on the experimental setup, additional information
+        such as electron microscopy data or previously determined motion models may also be incorporated
+        into the refinement process.
+
+        The workflow proceeds through multiple refinement rounds. During each round, molecular dynamics
+        simulations generate structural ensembles that sample the conformational landscape accessible to
+        the system. These conformations are then compared and analyzed collectively in order to identify
+        the most significant structural variations present in the ensemble.
+
+        Rather than treating each simulation independently, the protocol continuously updates its
+        description of the system using information gathered from all generated conformations. This
+        iterative strategy allows the exploration of flexibility to become progressively focused on the
+        biologically relevant motions observed during previous rounds.
+
+        Iterative Refinement Strategy
+
+        A defining characteristic of MDSPACE is its iterative nature. After each simulation cycle,
+        the generated conformations are analyzed to determine the dominant collective movements within
+        the ensemble. These motions are then used to construct an updated description of the system
+        that serves as the starting point for the next refinement round.
+
+        From a biological perspective, this approach allows the protocol to gradually concentrate on
+        conformational pathways that are repeatedly observed across simulations. As the refinement
+        progresses, the representation of molecular flexibility becomes increasingly adapted to the
+        behavior of the system under study.
+
+        Principal Component Analysis and Conformational Space
+
+        Principal component analysis plays a central role in the protocol. The objective is to reduce
+        the complexity of large structural ensembles into a smaller set of collective motions that
+        explain most of the observed variability.
+
+        Each principal component can often be interpreted as a large-scale conformational movement,
+        such as domain rearrangements, hinge motions, breathing movements, or coordinated shifts
+        involving multiple regions of a macromolecular assembly. By focusing on the most important
+        components, users can study biologically meaningful flexibility while filtering out smaller
+        fluctuations and noise.
+
+        The number of principal components retained determines the dimensionality of the reduced
+        conformational space. Lower values emphasize only the strongest motions, whereas larger values
+        preserve a more detailed description of the structural variability.
+
+        Structural Alignment and Ensemble Consistency
+
+        Before conformational variability can be analyzed, all generated structures must be expressed
+        within a common coordinate system. The protocol therefore performs rigid-body alignment of the
+        simulated conformations.
+
+        This alignment step is biologically important because it removes differences arising from
+        overall translation and rotation. As a result, the subsequent analysis focuses on genuine
+        internal structural changes rather than trivial rigid-body movements.
+
+        Proper alignment is particularly critical for large complexes, multidomain proteins, and
+        flexible assemblies where small orientation differences can otherwise obscure meaningful
+        conformational trends.
+
+        Molecular Dynamics Simulations
+
+        The protocol relies on molecular dynamics simulations to generate physically plausible
+        conformational trajectories. Depending on the selected simulation settings, the refinement
+        may explore motions driven by normal modes, energy minimization procedures, or additional
+        simulation strategies available within the GENESIS framework.
+
+        The simulations serve as a mechanism for sampling the conformational landscape rather than
+        producing a single optimized structure. Consequently, the biological value of the protocol
+        comes from the ensemble of generated conformations and the relationships among them.
+
+        Handling of Structural Diversity
+
+        MDSPACE is particularly useful when the system exhibits substantial conformational variability.
+        Examples include molecular motors, ribonucleoprotein complexes, membrane proteins, multi-domain
+        enzymes, and assemblies undergoing functional transitions.
+
+        By repeatedly identifying dominant motions and updating the conformational model, the protocol
+        can capture gradual transitions between states that may be difficult to characterize using
+        conventional static structural approaches.
+
+        Outputs and Their Interpretation
+
+        The protocol produces a refined structural representation together with a set of principal
+        components describing the dominant motions identified during the iterative analysis. These
+        components can be interpreted similarly to normal modes, providing a compact description of
+        the most important directions of conformational change.
+
+        The resulting mean structure represents the central conformation of the analyzed ensemble,
+        while the extracted motion components describe how the system deviates from that average.
+        Together, these outputs provide a reduced but biologically informative model of molecular
+        flexibility.
+
+        The generated motion set can subsequently be used for visualization, conformational analysis,
+        structural interpretation, or integration into downstream flexibility studies.
+
+        Practical Recommendations
+
+        For most applications, a moderate number of refinement iterations provides a good balance
+        between computational cost and conformational exploration. Systems with highly complex
+        flexibility may benefit from additional iterations, while relatively rigid structures often
+        converge more rapidly.
+
+        The number of retained principal components should reflect the expected complexity of the
+        biological motions. Retaining too few components may overlook relevant conformational states,
+        whereas retaining too many may introduce motions that contribute little to the overall
+        structural variability.
+
+        Visual inspection of the resulting principal motions is strongly recommended. Interpreting
+        the dominant components in the context of known biological functions often provides valuable
+        insight into the mechanisms underlying molecular activity.
+
+        Final Perspective
+
+        MDSPACE is designed to bridge molecular dynamics simulation and conformational landscape
+        analysis. Rather than focusing solely on individual trajectories, it seeks to identify the
+        collective motions that define the functional flexibility of a molecular system. For studies
+        of continuous structural variability, it provides a powerful framework for building compact,
+        interpretable, and biologically meaningful models of molecular motion.
+    """
     _label = 'MDSPACE'
 
     def __init__(self, **kwargs):

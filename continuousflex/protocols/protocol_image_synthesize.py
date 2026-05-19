@@ -71,7 +71,192 @@ ROTATION_GAUSS = 1
 
 
 class FlexProtSynthesizeImages(ProtAnalysis3D):
-    """ Protocol for synthesizing images. """
+    """
+    Protocol for synthesizing cryo-EM particle images from atomic structures,
+    EM volumes, or conformational ensembles. The protocol generates realistic
+    image datasets that can include structural variability, imaging artifacts,
+    and rigid-body transformations, making it suitable for benchmarking,
+    validation, and methodological development in structural biology.
+
+    AI Generated:
+
+    Synthesize Images (FlexProtSynthesizeImages) - User Manual
+
+        Overview
+
+        The Synthesize Images protocol creates artificial cryo-EM particle
+        images that mimic the appearance and variability of experimental
+        datasets. Its primary objective is to provide controlled image
+        collections where the underlying structural states and imaging
+        parameters are known in advance. Such datasets are valuable for
+        developing, testing, and validating image-processing algorithms,
+        machine-learning approaches, and methods for studying structural
+        heterogeneity.
+
+        The protocol can generate images either from a single atomic
+        structure, from an existing EM volume, or from a collection of
+        conformational states. This flexibility allows users to reproduce a
+        broad range of biological scenarios, from rigid particles with no
+        structural variability to highly dynamic molecular systems exhibiting
+        continuous conformational changes.
+
+        Conformational Variability
+
+        One of the central capabilities of the protocol is the simulation of
+        conformational heterogeneity. Biological macromolecules frequently
+        populate multiple structural states, and understanding this variability
+        is often a major objective of cryo-EM studies.
+
+        Conformational variability can be generated from normal mode analysis,
+        where selected modes define the directions of structural motion.
+        Different relationships between the modes can be used to create
+        distinct patterns of structural diversity. These include continuous
+        trajectories, clustered states, regularly sampled conformational
+        landscapes, random distributions, and curved pathways representing
+        nonlinear transitions between states.
+
+        Alternatively, users may provide a collection of heterogeneous atomic
+        models. This option is particularly useful when conformations originate
+        from molecular dynamics simulations, experimentally derived ensembles,
+        or previously generated structural trajectories. In this case, the
+        protocol preserves the supplied diversity and converts the structural
+        models into synthetic imaging data.
+
+        Input Structures and Volume Generation
+
+        The protocol supports both atomic structures and density maps as
+        starting points. When atomic models are provided, volumetric
+        representations are generated before image synthesis. This enables
+        realistic simulation of cryo-EM observations directly from structural
+        coordinates.
+
+        When an EM volume is supplied, the protocol can generate multiple
+        projections from the same structure without introducing conformational
+        changes. This mode is useful for studying orientation effects,
+        reconstruction performance, or image-processing behavior under
+        controlled conditions.
+
+        Sampling and Image Dimensions
+
+        Users can define the sampling rate and image dimensions of the
+        generated data. These parameters determine the physical scale and size
+        of the synthetic images and should be selected to resemble the
+        experimental conditions that the simulated dataset is intended to
+        represent.
+
+        Matching these parameters to real cryo-EM acquisitions allows the
+        resulting images to be used in realistic benchmarking experiments and
+        algorithm validation studies.
+
+        Conformational Sampling Strategies
+
+        Different conformational sampling strategies can be used depending on
+        the biological question being investigated. Linear sampling is useful
+        for representing smooth transitions between states. Clustered sampling
+        is appropriate when the molecule occupies a small number of discrete
+        conformations. Grid-based sampling provides systematic coverage of a
+        conformational landscape and is valuable for method development and
+        visualization.
+
+        Random sampling can be used to emulate complex heterogeneous systems
+        where states are broadly distributed throughout conformational space.
+        Curved trajectories are useful for representing nonlinear transitions
+        and continuous motions that cannot be adequately described by a simple
+        linear relationship.
+
+        Rigid-Body Variability
+
+        In addition to structural heterogeneity, the protocol can introduce
+        rigid-body variability through random rotations and translations. This
+        reproduces the orientation diversity observed in experimental cryo-EM
+        datasets and generates realistic projection images from multiple
+        viewing directions.
+
+        Users can define the statistical distributions governing rotational
+        and translational parameters. Uniform distributions are useful for
+        broad orientation coverage, while Gaussian distributions can reproduce
+        preferred orientations or limited particle mobility.
+
+        For many benchmarking applications, realistic orientation diversity is
+        essential because it strongly influences reconstruction quality and
+        downstream analysis.
+
+        Noise and Microscope Effects
+
+        The protocol can simulate important imaging artifacts commonly present
+        in cryo-EM experiments. These include contrast transfer function
+        effects and controlled levels of noise corresponding to a specified
+        signal-to-noise ratio.
+
+        Incorporating these effects allows synthetic images to resemble real
+        microscope data more closely. This is particularly important when
+        evaluating algorithms designed for particle alignment, classification,
+        reconstruction, heterogeneity analysis, or denoising.
+
+        By adjusting imaging parameters, users can emulate different microscope
+        conditions and acquisition settings, enabling systematic studies of
+        algorithm robustness under varying experimental scenarios.
+
+        Additional Resolution Effects
+
+        The protocol can optionally apply low-pass filtering to mimic the loss
+        of high-resolution information that often occurs during imaging. This
+        feature can be used to reproduce additional degradation effects beyond
+        those introduced by the contrast transfer function.
+
+        Such simulations are valuable when assessing the sensitivity of
+        computational methods to resolution limitations or when generating
+        datasets that reflect challenging experimental conditions.
+
+        Ground Truth Information
+
+        A major advantage of synthetic datasets is the availability of exact
+        ground truth information. The protocol preserves the relationship
+        between generated images and their underlying structural states,
+        conformational coordinates, orientations, and shifts.
+
+        This information provides a reference against which reconstruction,
+        classification, dimensionality reduction, and flexibility-analysis
+        methods can be quantitatively evaluated. Because the true structural
+        parameters are known, users can measure algorithm accuracy directly
+        rather than relying solely on qualitative assessments.
+
+        Outputs and Interpretation
+
+        The primary output is a set of synthetic particle images suitable for
+        use in cryo-EM processing workflows. Depending on the selected options,
+        the dataset may represent rigid particles, discrete structural states,
+        or continuous conformational landscapes.
+
+        The generated images can be processed using standard cryo-EM software
+        pipelines in the same manner as experimental particle images. Since
+        the underlying structural variability is controlled and documented,
+        the resulting datasets are particularly useful for benchmarking new
+        methodologies and comparing alternative analysis strategies.
+
+        Practical Recommendations
+
+        For exploratory studies of structural heterogeneity, using a small
+        number of normal modes with continuous sampling often provides a clear
+        and interpretable conformational landscape. When evaluating
+        classification methods, clustered conformations can be advantageous
+        because the expected states are well defined.
+
+        Realistic benchmarking experiments generally benefit from including
+        orientation variability, microscope effects, and moderate noise levels.
+        Excessively simplified datasets may overestimate algorithm performance,
+        whereas carefully simulated experimental conditions provide more
+        meaningful assessments.
+
+        Final Perspective
+
+        Synthetic image generation is a powerful approach for understanding
+        the strengths and limitations of cryo-EM analysis methods. By
+        controlling structural variability, imaging conditions, and noise
+        characteristics, this protocol enables the creation of realistic
+        benchmark datasets that support method development, validation, and
+        biological interpretation of conformational dynamics.
+    """
     _label = 'synthesize images'
 
     # --------------------------- DEFINE param functions --------------------------------------------

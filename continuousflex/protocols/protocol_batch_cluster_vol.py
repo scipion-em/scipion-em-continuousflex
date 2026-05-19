@@ -35,8 +35,110 @@ import numpy as np
 
 
 class FlexBatchProtNMAClusterVol(BatchProtocol):
-    """ Protocol executed when a cluster is created
-    from NMA volumes and theirs deformations.
+    """
+    Generates a representative structural and volumetric description of a cluster of
+    conformations obtained from normal mode analysis. The protocol summarizes the
+    structural variability present within a selected group of volumes by producing both
+    an average density map and a representative molecular model corresponding to the
+    central tendency of the cluster.
+
+    AI Generated:
+
+    NMA Volume Cluster (FlexBatchProtNMAClusterVol) - User Manual
+        Overview
+
+        The NMA Volume Cluster protocol is designed to analyze a subset of volumes that
+        belong to the same conformational cluster after dimensionality reduction and
+        normal mode analysis. Its main objective is to provide a biologically meaningful
+        representation of the conformational state described by the cluster by combining
+        information from all member volumes into a single consensus result.
+
+        In studies of molecular flexibility, clusters often represent groups of
+        structures sharing similar conformations. Rather than inspecting every volume
+        individually, researchers can use this protocol to obtain a compact summary of
+        the structural characteristics of an entire conformational population.
+
+        Inputs and General Workflow
+
+        The protocol operates on a cluster extracted from a previous normal mode
+        analysis workflow. The selected volumes are gathered together and their
+        associated conformational descriptors are preserved so that both structural
+        and dynamical information remain available throughout the analysis.
+
+        The workflow produces two complementary outputs. First, it generates an average
+        volume that represents the overall density distribution of the cluster.
+        Second, it creates a representative structural model corresponding to the
+        average conformational state observed among all cluster members.
+
+        Cluster Averaging
+
+        A central component of the protocol is the generation of a consensus volume.
+        All volumes belonging to the cluster contribute to this result, allowing the
+        protocol to emphasize structural features that are consistently present across
+        the population while reducing the influence of noise and individual variations.
+
+        From a biological perspective, the resulting average volume can be interpreted
+        as the characteristic density map of the conformational state represented by
+        the cluster. This is particularly useful when exploring continuous molecular
+        motions where individual structures may differ slightly but still belong to
+        the same functional state.
+
+        Interpretation of Conformational Variability
+
+        In addition to density information, the protocol considers the conformational
+        descriptors associated with the normal mode analysis. These descriptors
+        characterize the position of each structure within the conformational landscape.
+
+        By combining information from all members of the cluster, the protocol derives
+        a representative conformational state that reflects the average behavior of the
+        population. This provides a useful reference for understanding the dominant
+        structural characteristics of the cluster and facilitates comparison with other
+        conformational states identified during the analysis.
+
+        Representative Structural Model
+
+        The protocol generates a molecular structure corresponding to the centroid of
+        the cluster. Biologically, this model can be interpreted as the structure that
+        best represents the average conformation sampled by the cluster population.
+
+        This centroid model is particularly valuable when visualizing molecular motions,
+        comparing conformational states, preparing figures, or selecting representative
+        structures for downstream analyses. Because it reflects an average state rather
+        than a single observation, it often provides a clearer description of the
+        conformational ensemble.
+
+        Outputs and Their Interpretation
+
+        The protocol produces an average volume representing the consensus density of
+        the cluster and a representative atomic or pseudoatomic structure describing
+        the centroid conformation. These outputs complement each other by providing
+        both volumetric and structural views of the same conformational state.
+
+        The average volume can be used for visualization, comparison with experimental
+        maps, or subsequent image-processing tasks. The centroid structure can be used
+        for structural interpretation, animation of molecular motions, fitting
+        procedures, or integration with additional modeling workflows.
+
+        Practical Recommendations
+
+        This protocol is most informative when applied to clusters that represent
+        coherent conformational populations. Well-defined clusters generally produce
+        representative averages that preserve biologically meaningful structural
+        features. If a cluster contains highly heterogeneous conformations, the
+        resulting average may become less representative of any individual state.
+
+        When comparing multiple clusters, examining both the centroid structures and
+        the corresponding average volumes can provide valuable insight into the nature
+        of the conformational transitions captured by the normal mode analysis.
+
+        Final Perspective
+
+        For researchers studying molecular flexibility, this protocol serves as a bridge
+        between large collections of conformationally related volumes and an
+        interpretable biological description of the underlying structural state. By
+        generating a consensus density map together with a representative structural
+        model, it enables efficient exploration and communication of conformational
+        variability within complex molecular systems.
     """
     _label = 'nma vol cluster'
 

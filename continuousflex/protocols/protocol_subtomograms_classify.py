@@ -29,7 +29,8 @@ from pyworkflow.protocol import params
 from sklearn.cluster import AgglomerativeClustering, KMeans
 import time
 import os
-from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
+# Xmipp 6 no longer ships sh_alignment; its tompy fft helpers were plain numpy wrappers
+from numpy.fft import fftn as fft, ifftn as ifft, fftshift, ifftshift
 import pwem.emlib.metadata as md
 from continuousflex.protocols.utilities.spider_files3 import save_volume, open_volume
 import xmipp3

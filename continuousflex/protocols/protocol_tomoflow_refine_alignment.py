@@ -26,7 +26,8 @@ import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
 from pyworkflow.utils.path import makePath, copyFile, cleanPath
-from sh_alignment.tompy.transform import fft, ifft, fftshift, ifftshift
+# Xmipp 6 no longer ships sh_alignment; its tompy fft helpers were plain numpy wrappers
+from numpy.fft import fftn as fft, ifftn as ifft, fftshift, ifftshift
 from pyworkflow.utils import replaceBaseExt
 from .utilities.spider_files3 import *
 import os

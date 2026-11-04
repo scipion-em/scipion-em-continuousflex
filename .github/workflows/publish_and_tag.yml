@@ -32,6 +32,7 @@ jobs:
         pip install setuptools wheel twine
         pip install scipion-pyworkflow 
         pip install scipion-em
+        pip install scipion-app
     - name: Build and publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}

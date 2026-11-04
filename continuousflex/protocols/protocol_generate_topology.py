@@ -246,6 +246,9 @@ class ProtGenerateTopology(EMProtocol):
         environ = pwutils.Environ(os.environ)
         environ.set('PATH', os.path.join(Plugin.getVar("SMOG_HOME"), 'bin'),
                     position=pwutils.Environ.BEGIN)
+        # smog2 needs java, which lives in the conda env built by smog2.yaml
+        environ.set('PATH', os.path.join(Plugin.getVar("SMOG_HOME"), 'smogenv', 'bin'),
+                    position=pwutils.Environ.BEGIN)
         cmd = "smog2 -i %s -dname %s -%s -limitbondlength -limitcontactlength" %\
                    (inputPDB, outputPrefix,
                     "CA" if self.forcefield.get() == FORCEFIELD_CAGO else "AA")

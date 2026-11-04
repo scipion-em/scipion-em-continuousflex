@@ -4,3 +4,4 @@ include *.rst
 recursive-include continuousflex/protocols *
 include continuousflex/*.yaml
 recursive-include continuousflex/templates *
+global-exclude *.py[cod]

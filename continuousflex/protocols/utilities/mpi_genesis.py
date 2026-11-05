@@ -128,7 +128,7 @@ if use_rankfiles:
         A = int( i/num_core_per_node )
         j = int( i%num_core_per_node)
         B= int(j/num_core_per_socket)
-        C= int(j%24)
+        C = int(j % num_core_per_socket)
         if localhost:
             rank = "rank 0=localhost slot=%i:%i"%(B,C)
         else:

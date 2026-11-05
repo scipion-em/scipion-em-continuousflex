@@ -27,7 +27,7 @@ from pyworkflow.protocol.params import PointerParam, FileParam, USE_GPU, GPU_LIS
 from pwem.protocols import BatchProtocol
 from pwem.objects import SetOfClasses2D
 from xmipp3.convert import writeSetOfParticles, writeSetOfVolumes, readSetOfVolumes
-from pyworkflow.utils import runCommand
+from pwem import Domain
 from pwem.emlib.image import ImageHandler
 import pwem.emlib.metadata as md
 import os
@@ -87,19 +87,19 @@ class FlexBatchProtClusterSet(BatchProtocol):
                     if self.useGpu.get():
                         args += ' --thr %d' % self.numberOfThreads.get()
 
+                    # this plugin's own environment has no Xmipp binaries on PATH
+                    xmippEnv = Domain.importFromPlugin('xmipp3').Plugin.getEnviron()
                     if self.useGpu.get():
                         if self.numberOfMpi.get() > 1:
                             self.runJob('xmipp_cuda_reconstruct_fourier', args,
-                                        numberOfMpi=len((self.gpuList.get()).split(',')) + 1)
+                                        numberOfMpi=len((self.gpuList.get()).split(',')) + 1, env=xmippEnv)
                         else:
-                            self.runJob('xmipp_cuda_reconstruct_fourier', args)
+                            self.runJob('xmipp_cuda_reconstruct_fourier', args, env=xmippEnv)
                     else:
                         if self.numberOfMpi.get() > 1 :
-                            progname = "xmipp_mpi_reconstruct_fourier "
-                            self.runJob(progname, args)
+                            self.runJob("xmipp_mpi_reconstruct_fourier", args, env=xmippEnv)
                         else:
-                            progname = "xmipp_reconstruct_fourier "
-                            runCommand(progname + args)
+                            self.runJob("xmipp_reconstruct_fourier", args, env=xmippEnv)
                 else:
                     classAvg = ImageHandler().computeAverage(i)
                     classAvg.write(classVol)

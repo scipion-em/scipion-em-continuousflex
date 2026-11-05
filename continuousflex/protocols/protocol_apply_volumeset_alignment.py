@@ -211,6 +211,7 @@ class FlexProtApplyVolSetAlignment(ProtAnalysis3D):
 
         volumes_in = self._getExtraPath('input.xmd')
         xmipp3.convert.writeSetOfVolumes(self.inputVolumes.get(), volumes_in)
+        md_out = self._getExtraPath('input_dynamo.xmd')
         tbl2metadata(self.dynamoTable.get(), volumes_in, md_out)
 
         mdImgs = md.MetaData(md_out)

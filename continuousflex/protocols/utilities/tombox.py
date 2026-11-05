@@ -5,7 +5,7 @@
 from pwem.emlib import metadata as md
 import numpy as np
 from math import sin, cos
-import math
+from continuousflex.protocols.convert import matrix2eulerAngles
 
 def TomboxRotationMatrix(phi, psi, theta, shiftx, shifty, shiftz):
     rotMat = np.zeros([4, 4])
@@ -27,33 +27,6 @@ def TomboxRotationMatrix(phi, psi, theta, shiftx, shifty, shiftz):
     rotMat[2,3] = shiftz
     rotMat[3,3] = 1
     return rotMat
-
-def matrix2eulerAngles(A):
-    abs_sb = np.sqrt(A[0, 2] * A[0, 2] + A[1, 2] * A[1, 2])
-    if (abs_sb > 16 * np.exp(-5)):
-        gamma = math.atan2(A[1, 2], -A[0, 2])
-        alpha = math.atan2(A[2, 1], A[2, 0])
-        if (abs(np.sin(gamma)) < np.exp(-5)):
-            sign_sb = np.sign(-A[0, 2] / np.cos(gamma))
-        else:
-            if np.sin(gamma) > 0:
-                sign_sb = np.sign(A[1, 2])
-            else:
-                sign_sb = -np.sign(A[1, 2])
-        beta = math.atan2(sign_sb * abs_sb, A[2, 2])
-    else:
-        if (np.sign(A[2, 2]) > 0):
-            alpha = 0
-            beta = 0
-            gamma = math.atan2(-A[1, 0], A[0, 0])
-        else:
-            alpha = 0
-            beta = np.pi
-            gamma = math.atan2(A[1, 0], -A[0, 0])
-    gamma = np.rad2deg(gamma)
-    beta = np.rad2deg(beta)
-    alpha = np.rad2deg(alpha)
-    return alpha, beta, gamma, A[0, 3], A[1, 3], A[2, 3]
 
 def motivelist2metadata(mtlist, mdfi, mdfo):
     motlist = np.transpose(np.genfromtxt(mtlist, delimiter=','))

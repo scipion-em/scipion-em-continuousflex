@@ -16,7 +16,7 @@ env:
 jobs:
   deploy:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # last runner image with Python 3.8 builds
 
     steps:
     - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         python -m build
-        twine upload dist/* -c "${{ secrets.PYPI_COMMENT }}"
+        twine upload --verbose dist/* -c "${{ secrets.PYPI_COMMENT }}"
     - name: Get version and tag
       run: |
         export PACKAGE_VERSION=$(python -c "import $FOLDER_WITH_VERSION; print('VERSION', 'v'+$FOLDER_WITH_VERSION.__version__)" | grep VERSION | sed "s/VERSION //g")

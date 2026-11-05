@@ -156,7 +156,7 @@ class FlexProtSubtomoClassifyViewer(ProtocolViewer):
                 plt.ylim([y_low,y_high])
         if dim == 3:
             fig = plt.figure()
-            ax = fig.gca(projection='3d')
+            ax = fig.add_subplot(projection='3d')
             ax.scatter(X[:,components[0]-1],X[:,components[1]-1],X[:,components[2]-1])
             if self.xlimits_mode.get() == X_LIMITS:
                 ax.set_xlim([x_low,x_high])
@@ -204,6 +204,8 @@ class FlexProtSubtomoClassifyViewer(ProtocolViewer):
 
 
         if dim == 3:
+            fig = plt.figure('3D')
+            ax = fig.add_subplot(projection='3d')
             for l in np.unique(label):
                 if l == self.blacked.get():
                     color = (0, 0, 0)
@@ -211,9 +213,7 @@ class FlexProtSubtomoClassifyViewer(ProtocolViewer):
                 else:
                     color = plt.cm.jet(float(l) / np.max(label + 1))
                     s = 50
-                fig = plt.figure('3D')
-                ax = fig.gca(projection='3d')
-                ax.scatter(Y[label == l, 0], Y[label == l, 1], Y[label == l, 2],
+                ax.scatter(Y[label == l, components[0]-1], Y[label == l, components[1]-1], Y[label == l, components[2]-1],
                             color=color,
                             edgecolor='k',
                            s = s)

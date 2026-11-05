@@ -32,7 +32,9 @@ import os
 # Xmipp 6 no longer ships sh_alignment; its tompy fft helpers were plain numpy wrappers
 from numpy.fft import fftn as fft, ifftn as ifft, fftshift, ifftshift
 import pwem.emlib.metadata as md
-from continuousflex.protocols.utilities.spider_files3 import save_volume, open_volume
+# TODO: deprecate spider_files3 and replace it completely; ImageHandler reads and writes every format
+from continuousflex.protocols.utilities.spider_files3 import save_volume
+from pwem.emlib.image import ImageHandler
 import xmipp3
 from pwem.objects import Volume
 import numpy as np
@@ -209,14 +211,14 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
                 print('estimated time to finish is ', B*N/2)
             name_i = subtomogaligneMD.getValue(md.MDL_IMAGE, i)
             wedge_i = mwalignedMD.getValue(md.MDL_IMAGE, i)
-            Vi = open_volume(name_i)
-            Wi = open_volume(wedge_i)
+            Vi = ImageHandler().read(name_i).getData()
+            Wi = ImageHandler().read(wedge_i).getData()
             print('line is', str(i),' out of ',str(N))
             for j in range(i,N+1):
                 name_j = subtomogaligneMD.getValue(md.MDL_IMAGE, j)
                 wedge_j = mwalignedMD.getValue(md.MDL_IMAGE, j)
-                Vj = open_volume(name_j)
-                Wj = open_volume(wedge_j)
+                Vj = ImageHandler().read(name_j).getData()
+                Wj = ImageHandler().read(wedge_j).getData()
                 Omega = Wi * Wj
                 FVi = fft(Vi)
                 FVi = fftshift(FVi) * Omega
@@ -255,7 +257,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             name = subtomogaligneMD.getValue(md.MDL_IMAGE, i)
             # the metadata index start from 1, we should subtract one to match the matrix
             label = labels[i-1]
-            vol = open_volume(name)
+            vol = ImageHandler().read(name).getData()
             Averages[:, :, :, label] += vol
             classesMD[label].setValue(md.MDL_IMAGE, name, classesMD[label].addObject())
         for i in range(self.numOfClasses.get()):
@@ -301,7 +303,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
             name = subtomogaligneMD.getValue(md.MDL_IMAGE, i)
             # the metadata index start from 1, we should subtract one to match the matrix
             label = labels[i - 1]
-            vol = open_volume(name)
+            vol = ImageHandler().read(name).getData()
             Averages[:, :, :, label] += vol
             classesMD[label].setValue(md.MDL_IMAGE, name, classesMD[label].addObject())
         for i in range(self.numOfClasses.get()):
@@ -327,7 +329,7 @@ class FlexProtSubtomoClassify(ProtAnalysis3D):
         count = 0
         for i in subtomogaligneMD:
             name = subtomogaligneMD.getValue(md.MDL_IMAGE, i)
-            vol = open_volume(name)
+            vol = ImageHandler().read(name).getData()
             Average[:, :, :] += vol
             count+=1
         name = self._getExtraPath('global_average.spi')

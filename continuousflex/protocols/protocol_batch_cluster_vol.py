@@ -30,6 +30,7 @@ from pwem.objects import Volume, SetOfVolumes, AtomStruct
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
+from pyworkflow.utils.path import moveFile, cleanPath
 from pwem.utils import runProgram
 import numpy as np
 
@@ -113,7 +114,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
-                os.system("mv %(tempVol)s %(outputVol)s" % locals())
+                moveFile(tempVol, outputVol)
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
@@ -121,7 +122,7 @@ class FlexBatchProtNMAClusterVol(BatchProtocol):
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
 
     def centroidPdbStep(self):

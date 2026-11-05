@@ -25,7 +25,6 @@
 
 import os
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
 from pylab import figure
 
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
@@ -107,7 +106,7 @@ class FlexProtStructureMappingViewer(ProtocolViewer):
                 
         else:         
             fig = figure()
-            ax = Axes3D(fig)
+            ax = fig.add_subplot(projection='3d')
 
             for i in range(len(coordinates[:, 0])):
                 ax.scatter(coordinates[i, 0], coordinates[i, 1], coordinates[i, 2], marker = 'o', s=50, c='g')

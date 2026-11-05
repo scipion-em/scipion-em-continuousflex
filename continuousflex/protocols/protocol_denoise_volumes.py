@@ -46,6 +46,7 @@ PROFILE_NP = 1
 PROFILE_MP = 2
 
 
+# TODO: deprecate this protocol together with utilities/bm4d.py (MATLAB-only, unmaintained)
 class FlexProtVolumeDenoise(ProtAnalysis3D):
     """ Protocol for subtomogram missingwedge filling. """
     _label = 'volume denoise'
@@ -170,11 +171,9 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
 
             # perform the mwr:
             # in case the file exists (continuing or injecting)
-            if (isfile(new_imgPath)):
-                continue
-            else:
+            if not isfile(new_imgPath):
                 bm4d(temp_path, new_imgPath, distribution, sigma, profile, do_weiner)
-            # update the name in the metadata file
+            # update the name in the metadata file (also for skipped volumes, else the output keeps the raw path)
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
         mdImgs.write(self.imgsFn)
 
@@ -202,13 +201,11 @@ class FlexProtVolumeDenoise(ProtAnalysis3D):
 
             # perform the mwr:
             # in case the file exists (continuing or injecting)
-            if (isfile(new_imgPath)):
-                continue
-            else:
+            if not isfile(new_imgPath):
                 params = " -i " + temp_path + " -o " + new_imgPath
                 params += " --fourier low_pass " + str(cutoff) + ' ' + str(raisedw)
                 runProgram('xmipp_transform_filter', params)
-            # update the name in the metadata file
+            # update the name in the metadata file (also for skipped volumes, else the output keeps the raw path)
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
         mdImgs.write(self.imgsFn)
 

@@ -19,17 +19,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up MPI
       uses: mpi4py/setup-mpi@v1
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.8'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine
+        pip install build twine
         pip install scipion-pyworkflow 
         pip install scipion-em
         pip install scipion-app
@@ -38,7 +38,7 @@ jobs:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        python setup.py sdist bdist_wheel
+        python -m build
         twine upload dist/* -c "${{ secrets.PYPI_COMMENT }}"
     - name: Get version and tag
       run: |

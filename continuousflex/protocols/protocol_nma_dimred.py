@@ -35,6 +35,7 @@ from continuousflex.protocols import FlexProtAlignmentNMA
 
 import numpy as np
 import glob
+import os
 from sklearn import decomposition
 from joblib import dump
 
@@ -173,8 +174,10 @@ class FlexProtDimredNMA(ProtAnalysis3D):
                 f.write('\n')
             f.close()
         elif dataChoice == 'PDBs':
-            # copy the pdb
+            # the modes were computed on the NMA run's stripped copy (ATOM/TER/END lines only), not on the raw input
             input_pdbfn = self.getInputPdb().getFileName()
+            if not self.getInputPdb().getPseudoAtoms():
+                input_pdbfn = os.path.join(os.path.dirname(self.getInputModes()), 'atoms.pdb')
             pdbfn = self._getExtraPath('pdb_file.pdb')
             self.copyinputPdb(input_pdbfn, pdbfn)
             # use the deformations to generate deformed versions of the pdb:

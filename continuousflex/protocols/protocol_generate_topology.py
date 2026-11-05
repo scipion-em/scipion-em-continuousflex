@@ -122,7 +122,7 @@ class ProtGenerateTopology(EMProtocol):
 
         if dna > 0 :
             self.nucleicChoice = NUCLEIC_DNA
-        if rna >0 :
+        elif rna >0 :
             self.nucleicChoice = NUCLEIC_RNA
         else:
             self.nucleicChoice = NUCLEIC_NO
@@ -151,20 +151,20 @@ class ProtGenerateTopology(EMProtocol):
         mol.alias_res("HSD", "HIS")
         mol.alias_res("HSP", "HIS")
 
-        rna = 0
-        rna += mol.alias_res("CYT", "C")
-        rna += mol.alias_res("GUA", "G")
-        rna += mol.alias_res("ADE", "A")
-        rna += mol.alias_res("URA", "U")
-
-        dna = 0
-        dna += mol.alias_res("CYT", "DC")
-        dna += mol.alias_res("GUA", "DG")
-        dna += mol.alias_res("ADE", "DA")
-        dna += mol.alias_res("THY", "DT")
+        # CHARMM names A/G/C the same way for DNA and RNA; only THY vs URA tells them apart
+        dna = mol.alias_res("THY", "DT")
+        rna = mol.alias_res("URA", "U")
+        if dna > 0:
+            dna += mol.alias_res("CYT", "DC")
+            dna += mol.alias_res("GUA", "DG")
+            dna += mol.alias_res("ADE", "DA")
+        else:
+            rna += mol.alias_res("CYT", "C")
+            rna += mol.alias_res("GUA", "G")
+            rna += mol.alias_res("ADE", "A")
         if dna > 0:
             self.nucleicChoice = NUCLEIC_DNA
-        if rna > 0:
+        elif rna > 0:
             self.nucleicChoice = NUCLEIC_RNA
         else:
             self.nucleicChoice = NUCLEIC_NO

@@ -155,6 +155,9 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
             self._insertFunctionStep('convertInputStep')
             self._insertFunctionStep('doAlignmentStep')
         else:
+            # set here and not in the step: a resumed run skips the step but still needs the path
+            N = self.refinementProt.get().NumOfIters.get()
+            self.imgsFn = self.refinementProt.get()._getExtraPath('volumes_aligned_'+str(N+1)+'.xmd')
             self._insertFunctionStep('copyOpticalFlows')
         self._insertFunctionStep('findCorrelationMatrix')
         if (self.WarpAndEstimate.get()):
@@ -259,7 +262,6 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
     def copyOpticalFlows(self):
         # In this case we get from the refinment protocol the optical flows and the reference
         N = self.refinementProt.get().NumOfIters.get()
-        self.imgsFn = self.refinementProt.get()._getExtraPath('volumes_aligned_'+str(N+1)+'.xmd')
         createLink(self.refinementProt.get()._getExtraPath() + '/optical_flows_' + str(N),
                    self._getExtraPath() + '/optical_flows')
         createLink(self.refinementProt.get()._getExtraPath('reference'+str(N+1)+'.spi'),

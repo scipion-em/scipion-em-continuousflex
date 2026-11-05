@@ -27,6 +27,7 @@ from pwem.objects import Volume, SetOfVolumes
 from xmipp3.convert import writeSetOfVolumes
 import pwem.emlib.metadata as md
 import os
+from pyworkflow.utils.path import moveFile, cleanPath
 from pwem.utils import runProgram
 
 
@@ -85,7 +86,7 @@ class FlexBatchProtTomoFlowCluster(BatchProtocol):
             runProgram('xmipp_image_convert',params)
 
             if counter == 1 :
-                os.system("mv %(tempVol)s %(outputVol)s" % locals())
+                moveFile(tempVol, outputVol)
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
@@ -93,7 +94,7 @@ class FlexBatchProtTomoFlowCluster(BatchProtocol):
 
         params = '-i %(outputVol)s --divide %(counter)s -o %(outputVol)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
 
     def createOutputStep(self, outputVol):

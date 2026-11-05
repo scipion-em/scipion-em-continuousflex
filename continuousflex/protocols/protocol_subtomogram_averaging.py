@@ -23,6 +23,7 @@
 # **************************************************************************
 
 import os
+from pyworkflow.utils.path import copyFile, cleanPath
 from pwem.protocols import ProtAnalysis3D
 from xmipp3.convert import writeSetOfVolumes, xmippToLocation
 from pwem.objects import Volume
@@ -240,7 +241,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                     runProgram('xmipp_image_operate', params)
             params = '-i %(tempVol)s --divide %(counter)s -o %(initialref)s ' % locals()
             runProgram('xmipp_image_operate', params)
-            os.system("rm -f %(tempVol)s" % locals())
+            cleanPath(tempVol)
             reference = initialref
 
         for i in range(1, max_itr + 1):
@@ -311,7 +312,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
                 runProgram('xmipp_transform_geometry', params)
 
                 if counter == 1:
-                    os.system("cp %(tempVol)s %(avr_itr)s" % locals())
+                    copyFile(tempVol, avr_itr)
 
                 else:
                     params = '-i %(tempVol)s --plus %(avr_itr)s -o %(avr_itr)s ' % locals()
@@ -319,14 +320,14 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
             params = '-i %(avr_itr)s --divide %(counter)s -o %(avr_itr)s ' % locals()
             runProgram('xmipp_image_operate', params)
-            os.system("rm -f %(tempVol)s" % locals())
+            cleanPath(tempVol)
             # Updating the reference then realigning:
             reference = avr_itr
 
         outputVolume = self.outputVolume
         outputMD = self.outputMD
-        os.system("cp %(avr_itr)s %(outputVolume)s " % locals())
-        os.system("cp %(md_itr)s %(outputMD)s " % locals())
+        copyFile(avr_itr, outputVolume)
+        copyFile(md_itr, outputMD)
         # Averaging is done
         inputSet = md.MetaData(self.imgsFn)
         mdImgs = md.MetaData(self.outputMD)
@@ -381,7 +382,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
-                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+                copyFile(tempVol, volume_out)
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
@@ -389,7 +390,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
 
     def adaptTomboxStep(self, Table):
@@ -424,7 +425,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
-                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+                copyFile(tempVol, volume_out)
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
@@ -432,7 +433,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
          # Averaging is done
         pass
 
@@ -498,7 +499,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
-                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+                copyFile(tempVol, volume_out)
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
@@ -506,7 +507,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
     def adaptEmanStep(self, Table):
         volumes_in = self.imgsFn
@@ -579,7 +580,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1:
-                os.system("cp %(tempVol)s %(volume_out)s" % locals())
+                copyFile(tempVol, volume_out)
 
             else:
                 params = '-i %(tempVol)s --plus %(volume_out)s -o %(volume_out)s ' % locals()
@@ -587,7 +588,7 @@ class FlexProtSubtomogramAveraging(ProtAnalysis3D):
 
         params = '-i %(volume_out)s --divide %(counter)s -o %(volume_out)s ' % locals()
         runProgram('xmipp_image_operate', params)
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
 
 

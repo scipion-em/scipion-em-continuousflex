@@ -37,6 +37,7 @@ from pwem.utils import runProgram
 METHOD_MCSFILL = 0
 
 
+# TODO: deprecate this protocol together with utilities/mwr_wrapper.py and utilities/mwr/ (MATLAB-only, unmaintained)
 class FlexProtMissingWedgeRestoration(ProtAnalysis3D):
     """ Protocol for subtomogram missingwedge restoration. """
     _label = 'missing wedge restoration'
@@ -155,11 +156,9 @@ class FlexProtMissingWedgeRestoration(ProtAnalysis3D):
             runProgram('xmipp_image_convert', params)
             # perform the mwr:
             # in case the file exists (continuing or injecting)
-            if (isfile(new_imgPath)):
-                continue
-            else:
+            if not isfile(new_imgPath):
                 mwr(temp_path,fnmask,new_imgPath,sigma_noise,T,Tb,beta,True)
-            # update the name in the metadata file
+            # update the name in the metadata file (also for skipped volumes, else the output keeps the raw path)
             mdImgs.setValue(md.MDL_IMAGE, new_imgPath, objId)
         mdImgs.write(self.imgsFn)
 

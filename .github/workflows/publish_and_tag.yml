@@ -16,7 +16,7 @@ env:
 jobs:
   deploy:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # last runner image with Python 3.8 builds
 
     steps:
     - uses: actions/checkout@v4

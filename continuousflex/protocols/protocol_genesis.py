@@ -45,6 +45,7 @@ import re
 class FlexProtGenesis(EMProtocol):
     """ Protocol to perform MD/NMMD simulation based on GENESIS. """
     _label = 'MD-NMMD-Genesis'
+    _possibleOutputs = {'outputPDBs': SetOfPDBs}
 
     def __init__(self, **kwargs):
         EMProtocol.__init__(self, **kwargs)

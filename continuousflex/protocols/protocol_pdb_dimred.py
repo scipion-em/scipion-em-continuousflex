@@ -26,8 +26,9 @@ from pyworkflow.protocol.params import (PointerParam, EnumParam, IntParam)
 from pwem.protocols import ProtAnalysis3D
 from pyworkflow.utils.path import makePath, copyFile
 from pyworkflow.protocol import params
-from pwem.emlib import MetaData, MDL_ENABLED, MDL_NMA_MODEFILE,MDL_ORDER
-from pwem.objects import SetOfNormalModes, AtomStruct
+from pwem.emlib import (MetaData, MDL_ENABLED, MDL_NMA_MODEFILE, MDL_ORDER,
+                        MDL_NMA_EIGENVAL)
+from pwem.objects import SetOfPrincipalComponents, AtomStruct, Float
 from .convert import rowToMode
 from xmipp3.base import XmippMdRow
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd,dcd2numpyArr
@@ -185,8 +186,9 @@ class FlexProtDimredPdb(ProtAnalysis3D):
             pdb.coords = pca.mean_.reshape(pdbs_matrix.shape[1] // 3, 3)
             pdb.write_pdb(self._getPath("atoms.pdb"))
             makePath(pathPC)
-            matrix = pca.components_.reshape(self.reducedDim.get(),pdbs_matrix.shape[1]//3,3)
-            self.writePrincipalComponents(prefix=pathPC, matrix = matrix)
+            matrix = pca.components_.reshape(self.reducedDim.get(), pdbs_matrix.shape[1]//3,3)
+            self.eigenvalues = list(pca.explained_variance_)
+            self.writePrincipalComponents(prefix=pathPC, matrix=matrix)
             np.savetxt(self.getOutputMatrixFile(),Y)
 
         elif self.method.get() == REDUCE_METHOD_UMAP:
@@ -211,10 +213,11 @@ class FlexProtDimredPdb(ProtAnalysis3D):
                 mdOut.setValue(MDL_NMA_MODEFILE, modefile, objId)
                 mdOut.setValue(MDL_ORDER, i + 1, objId)
                 mdOut.setValue(MDL_ENABLED, 1, objId)
+                #mdOut.setValue(MDL_NMA_EIGENVAL, Float(self.eigenvalues[i]), objId)
             mdOut.write(self._getPath("modes.xmd"))
 
             # Sqlite object
-            pcSet =SetOfNormalModes(filename=self._getPath("modes.sqlite"))
+            pcSet = SetOfPrincipalComponents(filename=self._getPath("modes.sqlite"))
             row = XmippMdRow()
             for objId in mdOut:
                 row.readFromMd(mdOut, objId)

@@ -698,7 +698,8 @@ class FlexProtGenesis(EMProtocol):
         with open(self._getExtraPath("mpi_command"), "w") as f:
             f.write(cmd)
 
-        runCommand(cmd)
+        # the launcher inherits this environment: atdyn needs GENESIS_HOME/bin and the conda libraries
+        runCommand(cmd, env=self.getGenesisEnv())
 
     # --------------------------- Create output step --------------------------------------------
 

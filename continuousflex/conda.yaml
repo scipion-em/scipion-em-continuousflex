@@ -19,3 +19,5 @@ dependencies:
       - scipion-em==3.2.0
       - numpy==1.23.0
       - farneback3d==0.1.4
+      # deepHEMNMA only: Xmipp bindings to read images.xmd and the particle images (keep separable)
+      - pyxmipp3

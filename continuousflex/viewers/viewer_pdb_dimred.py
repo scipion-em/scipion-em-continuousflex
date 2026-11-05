@@ -34,7 +34,7 @@ from pwem.emlib.image import ImageHandler
 from joblib import load
 from continuousflex.viewers.tk_dimred import PCAWindowDimred, ANIMATION_INV, ANIMATION_AVG
 from continuousflex.protocols.data import Point, Data, PathData
-from pwem.viewers import VmdView
+from continuousflex.viewers.vmd_view import VmdView
 from pyworkflow.utils.path import cleanPath, makePath, makeTmpPath
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler
@@ -174,13 +174,15 @@ class FlexProtPdbDimredViewer(ProtocolViewer):
                                       ylim_low=self.ylim_low.get(), ylim_high=self.ylim_high.get(),
                                       zlim_low=self.zlim_low.get(), zlim_high=self.zlim_high.get(),
                                       alpha=self.alpha, s=self.s, cbar_label=None)
+        # data is cached between calls, so every index must be set each time
+        data.XIND = axes[0]-1
         if dim == 1:
-            data.XIND = axes[0]-1
             plotter.plotArray1D("","%i component"%(axes[0]),"")
         if dim == 2:
             data.YIND = axes[1]-1
             plotter.plotArray2D_xy("","%i component"%(axes[0]),"%i component"%(axes[1]))
         if dim == 3:
+            data.YIND = axes[1]-1
             data.ZIND = axes[2]-1
             plotter.plotArray3D_xyz("","%i component"%(axes[0]),"%i component"%(axes[1]),"%i component"%(axes[2]))
         plotter.show()
@@ -651,11 +653,11 @@ class VolumeTrajectoryViewer(ProtocolViewer):
         for i in self.protocol:
             i.setSamplingRate(self.protocol.getSamplingRate())
             vol = ImageHandler().read(i)
-            volName = os.path.abspath(self._getPath("tmp%i.vol"%i.getObjId()))
+            volName = os.path.abspath(self._getTmpPath("tmp%i.vol"%i.getObjId()))
             vol.write(volName)
             volNames.append(volName)
         # Show Chimera
-        tmpChimeraFile = self._getPath("chimera.cxc")
+        tmpChimeraFile = self._getTmpPath("chimera.cxc")
         with open(tmpChimeraFile, "w") as f:
             if self.morph.get():
                 if self.rock.get():

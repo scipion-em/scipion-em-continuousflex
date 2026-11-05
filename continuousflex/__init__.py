@@ -44,7 +44,7 @@ MODEL_CONTINUOUSFLEX_ENV_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ENV_ACTIVATION"
 # Use this general activation variable when installed outside Scipion
 MODEL_CONTINUOUSFLEX_ACTIVATION_VAR = "MODEL_CONTINUOUSFLEX_ACTIVATION"
 
-__version__ = "3.4.3"
+__version__ = "3.4.4"
 
 
 class Plugin(pwem.Plugin):
@@ -68,6 +68,16 @@ class Plugin(pwem.Plugin):
     @classmethod
     def getEnviron(cls):
         environ = pwutils.Environ(os.environ)
+        return environ
+
+    @classmethod
+    def getVmdEnviron(cls):
+        """ Like pwem's Vmd.getEnviron, but VMD_HOME is optional: it is used only
+        when VMD_HOME/bin/vmd exists, otherwise the vmd found on PATH is used. """
+        environ = pwutils.Environ(os.environ)
+        vmdBin = os.path.join(cls.getVar(VMD_HOME) or '', 'bin')  # None when the plugin is imported outside Scipion
+        if os.path.isfile(os.path.join(vmdBin, 'vmd')):
+            environ.set('PATH', vmdBin, position=pwutils.Environ.BEGIN)
         return environ
 
     @classmethod

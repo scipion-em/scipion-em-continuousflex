@@ -128,7 +128,7 @@ if use_rankfiles:
         A = int( i/num_core_per_node )
         j = int( i%num_core_per_node)
         B= int(j/num_core_per_socket)
-        C= int(j%24)
+        C = int(j % num_core_per_socket)
         if localhost:
             rank = "rank 0=localhost slot=%i:%i"%(B,C)
         else:
@@ -140,6 +140,7 @@ if use_rankfiles:
 
 # prepare env
 num_complete = 0
+num_failed = 0
 launch_index = first_index -1
 env = os.environ
 env["OMP_NUM_THREADS"] = str(num_threads)
@@ -150,6 +151,7 @@ if mpi_argument is None:
 
 # utils functions
 def check_complete():
+    global num_failed
     complete = 0
     for i in range(num_mpi):
         p = process[i]
@@ -160,6 +162,7 @@ def check_complete():
                     status[i] = stat
                     complete +=1
                     if stat != 0 :
+                        num_failed += 1
                         print("Warning : one task returned a non-zero exit")
             else:
                 status[i] = stat
@@ -199,4 +202,7 @@ while (1):
             launch_index+=1
             process[slot] = p
 
-print("All task completed")
+print("All task completed, %i failed" % num_failed)
+if num_failed == num_run:
+    # every simulation failed (typically a broken environment): fail the step instead of returning 0
+    sys.exit(1)

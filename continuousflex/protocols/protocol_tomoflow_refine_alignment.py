@@ -25,7 +25,7 @@ from pwem.protocols import ProtAnalysis3D
 import xmipp3.convert
 import pwem.emlib.metadata as md
 import pyworkflow.protocol.params as params
-from pyworkflow.utils.path import makePath, copyFile, cleanPath
+from pyworkflow.utils.path import makePath, copyFile, cleanPath, moveFile
 # Xmipp 6 no longer ships sh_alignment; its tompy fft helpers were plain numpy wrappers
 from numpy.fft import fftn as fft, ifftn as ifft, fftshift, ifftshift
 from pyworkflow.utils import replaceBaseExt
@@ -718,7 +718,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             runProgram('xmipp_transform_geometry', params)
 
             if counter == 1 :
-                os.system("mv %(tempVol)s %(outputVol)s" % locals())
+                moveFile(tempVol, outputVol)
 
             else:
                 params = '-i %(tempVol)s --plus %(outputVol)s -o %(outputVol)s ' % locals()
@@ -733,7 +733,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
             params = '-i ' + outputVol + ' -o ' + outputVol + ' --mult ' + maskfn
             runProgram('xmipp_image_operate', params)
 
-        os.system("rm -f %(tempVol)s" % locals())
+        cleanPath(tempVol)
 
 
     def createOutputStep(self, num =0):
@@ -758,7 +758,7 @@ class FlexProtRefineSubtomoAlign(ProtAnalysis3D):
 
         l = np.shape(x)
         # print(l)
-        flow = np.zeros([3, l[0], l[1], l[2]])
+        flow = np.zeros([3, l[0], l[1], l[2]], dtype=np.float32)  # farneback3d's GPU warp reads float32
         flow[0, :, :, :] = x
         flow[1, :, :, :] = y
         flow[2, :, :, :] = z

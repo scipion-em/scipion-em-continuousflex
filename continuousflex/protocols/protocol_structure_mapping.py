@@ -25,7 +25,7 @@
 # **************************************************************************
 
 import os
-# from glob import glob
+from glob import glob
 import numpy as np
 
 import pwem.emlib.metadata as md
@@ -190,9 +190,9 @@ class FlexProtStructureMapping(FlexProtConvertToPseudoAtomsBase,
         
         makePath(self._getExtraPath("modes%d"%nVoli))
         
-        for i in range(1, self.numberOfModes.get() + 1):
-            copyFile (self._getPath("modes/vec.%d"%i),
-                      self._getExtraPath("modes%d/vec.%d"%(nVoli, i)))
+        # the NMA can converge fewer modes than requested (qualifyModesStep only warns): copy what exists
+        for fnVec in glob(self._getPath("modes/vec.*")):
+            copyFile(fnVec, self._getExtraPath("modes%d/%s" % (nVoli, os.path.basename(fnVec))))
             
         mdVol = MetaData()
         fnOutMeta = self._getExtraPath('RigidAlignVol_%d_To_Vol_%d.xmd' % (nVolj, nVoli))

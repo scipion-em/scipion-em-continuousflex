@@ -2,6 +2,7 @@
 
 import numpy as np
 from pyworkflow.utils import runCommand
+from continuousflex import Plugin
 import multiprocessing
 
 NUMBER_OF_CPU = int(np.min([multiprocessing.cpu_count(),4]))
@@ -74,7 +75,7 @@ def lastPDBFromDCD(inputPDB,inputDCD,  outputPDB):
         s += "[atomselect top all frame [expr $nf - 1]] writepdb %s\n" % outputPDB
         s += "exit\n"
         f.write(s)
-    runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl" % outputPDB)
+    runCommand("vmd -dispdev text -e %s_tmp_dcd2pdb.tcl" % outputPDB, env=Plugin.getVmdEnviron())
 
     # CLEAN TMP FILES
     runCommand("rm -f %s_tmp_dcd2pdb.tcl" % (outputPDB))

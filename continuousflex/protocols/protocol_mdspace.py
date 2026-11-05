@@ -73,35 +73,40 @@ class FlexProtMDSPACE(FlexProtGenesis):
             self._insertFunctionStep("convertInputEMStep")
 
         for iter_global in range(self.numberOfIter.get()):
+            # Every step of the loop receives its iteration and sets self._iter from it:
+            # a continued run starts a new process where self._iter is back to 0.
+            self._iter = iter_global  # only for the paths evaluated here (serial runSimulation arguments)
 
             # Create INP files
-            self._insertFunctionStep("createGenesisInputStep")
+            self._insertFunctionStep("createGenesisInputStep", iter_global)
 
             # RUN simulation
             if self.parallelType.get() == PARALLEL_MPI and self.getNumberOfSimulation() > 1:
-                self._insertFunctionStep("runSimulationMPI")
+                self._insertFunctionStep("runSimulationMPI", iter_global)
             elif self.parallelType.get() == PARALLEL_GNU and self.getNumberOfSimulation() > 1 and existsCommand(
                     "parallel"):
-                self._insertFunctionStep("runSimulationParallel")
+                self._insertFunctionStep("runSimulationParallel", iter_global)
             else:
                 for i in range(self.getNumberOfSimulation()):
                     self._insertFunctionStep("runSimulation", self.getGenesisInputFile(i), self.getOutputPrefix(i))
 
-            self._insertFunctionStep("pdb2dcdStep")
+            self._insertFunctionStep("pdb2dcdStep", iter_global)
 
-            self._insertFunctionStep("rigidBodyAlignmentStep")
+            self._insertFunctionStep("rigidBodyAlignmentStep", iter_global)
 
-            self._insertFunctionStep("updateAlignmentStep")
+            self._insertFunctionStep("updateAlignmentStep", iter_global)
 
-            self._insertFunctionStep("PCAStep")
+            self._insertFunctionStep("PCAStep", iter_global)
 
-            self._insertFunctionStep("runMinimizationStep")
+            self._insertFunctionStep("runMinimizationStep", iter_global)
 
-            self._insertFunctionStep("newIterationStep")
+            self._insertFunctionStep("newIterationStep", iter_global)
 
-        self._insertFunctionStep("createOutputStep")
+        self._iter = 0  # the steps before the loop run with the first iteration's paths
+        self._insertFunctionStep("createOutputStep", self.numberOfIter.get() - 1)
 
-    def pdb2dcdStep(self):
+    def pdb2dcdStep(self, itr):
+        self._iter = itr
         pdbs_matrix = []
         missing_pdbs = []
 
@@ -123,7 +128,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
         print("MiSSING ARRAY : ")
         print(self._missing_pdbs)
 
-    def rigidBodyAlignmentStep(self):
+    def rigidBodyAlignmentStep(self, itr):
+        self._iter = itr
 
         # open files
         refPDB =  ContinuousFlexPDBHandler(self.getInputPDBprefix()+".pdb")
@@ -157,7 +163,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
         numpyArr2dcd(arrDCD, self._getExtraPath("coords.dcd"))
         alignXMD.write(self.getTransformation())
 
-    def updateAlignmentStep(self):
+    def updateAlignmentStep(self, itr):
+        self._iter = itr
 
         if self._iter == 0:
             inputSet = self.inputImage.get()
@@ -195,7 +202,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
         writeSetOfParticles(alignedSet, self.getAlignmentPrefix())
         self._inputEMMetadata = md.MetaData(self.getAlignmentPrefix())
 
-    def PCAStep(self):
+    def PCAStep(self, itr):
+        self._iter = itr
 
         numberOfPCA = self.numberOfPCA.get()
 
@@ -223,7 +231,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
                 for j in range(matrix.shape[1]):
                     f.write(" %e   %e   %e\n" %  (matrix[i,j, 0], matrix[i,j, 1], matrix[i,j, 2]))
 
-    def runMinimizationStep(self):
+    def runMinimizationStep(self, itr):
+        self._iter = itr
 
         # INP file name
         inp_file = "%s/INP_min"%self.getGenFiles()
@@ -253,7 +262,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
         # Run minimization
         self.runSimulation(inp_file, self.getInputPDBprefix()+"_min")
 
-    def newIterationStep(self):
+    def newIterationStep(self, itr):
+        self._iter = itr
         for i in range(self.getNumberOfSimulation()):
             outpref = self._getExtraPath("output_%s" % str(i + 1).zfill(6))
             outpref_itr =self.getOutputPrefix(i)
@@ -274,6 +284,9 @@ class FlexProtMDSPACE(FlexProtGenesis):
             pdbfile = outpref_itr+".pdb"
             if os.path.isfile(pdbfile):
                 runCommand("cp %s %s.pdb" % (pdbfile, outpref))
+            rstfile = outpref_itr+".rst"
+            if os.path.isfile(rstfile):
+                runCommand("cp %s %s.rst" % (rstfile, outpref))
 
         inputPref = self.getInputPDBprefix()
         pcaPref = self.getPCAPrefix()
@@ -294,11 +307,20 @@ class FlexProtMDSPACE(FlexProtGenesis):
             elif self.getForceField() == FORCEFIELD_CAGO or self.getForceField() == FORCEFIELD_AAGO :
                 runCommand("cp %s.top %s.top" % (inputPref, inputPref_incr))
 
-    def createGenesisInputStep(self):
+    def runSimulationMPI(self, itr):
+        self._iter = itr
+        FlexProtGenesis.runSimulationMPI(self)
+
+    def runSimulationParallel(self, itr):
+        self._iter = itr
+        FlexProtGenesis.runSimulationParallel(self)
+
+    def createGenesisInputStep(self, itr):
         """
         Create GENESIS input files
         :return None:
         """
+        self._iter = itr
         for indexFit in range(self.getNumberOfSimulation()):
             inp_file = self.getGenesisInputFile(indexFit)
             args = self.getDefaultArgs(indexFit)
@@ -310,7 +332,8 @@ class FlexProtMDSPACE(FlexProtGenesis):
                 args["nm_mass"] =  5.0
             createGenesisInput(inp_file, **args)
 
-    def createOutputStep(self):
+    def createOutputStep(self, itr):
+        self._iter = itr
         FlexProtGenesis.createOutputStep(self)
 
         runCommand("cp %s.pdb %s"%(self.getPCAPrefix(), self.getPath("atoms.pdb")))

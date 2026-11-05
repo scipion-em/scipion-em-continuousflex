@@ -117,8 +117,7 @@ class FlexNmaVolPlotter(FlexPlotter):
         return ax
 
     def plotArray3D(self, title, xlabel, ylabel, zlabel):
-        import mpl_toolkits.mplot3d.axes3d as p3
-        ax = p3.Axes3D(self.figure)
+        ax = self.figure.add_subplot(projection='3d')  # Axes3D(fig) no longer attaches to the figure (matplotlib >= 3.4)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -182,8 +181,7 @@ class FlexNmaVolPlotter(FlexPlotter):
         return ax
 
     def plotArray3D_xyz(self, title, xlabel, ylabel, zlabel):
-        import mpl_toolkits.mplot3d.axes3d as p3
-        ax = p3.Axes3D(self.figure)
+        ax = self.figure.add_subplot(projection='3d')  # Axes3D(fig) no longer attaches to the figure (matplotlib >= 3.4)
         ax.set_title(title)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)

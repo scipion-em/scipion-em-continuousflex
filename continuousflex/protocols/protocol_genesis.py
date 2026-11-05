@@ -965,7 +965,8 @@ class FlexProtGenesis(EMProtocol):
                 raise RuntimeError("Multiple restart not implemented")
             rstfile = self.getInputPDBprefix(index) + ".rst"
             if not os.path.exists(rstfile):
-                runCommand("cp %s.rst %s" % (self.restartProt.get().getOutputPrefix(), rstfile))
+                # the prefix of this index (checked above to be unique); MDSPACE keeps its last iteration there
+                runCommand("cp %s.rst %s" % (self.restartProt.get().getOutputPrefixAll(index)[0], rstfile))
             return rstfile
         else:
             return None

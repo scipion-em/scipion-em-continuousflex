@@ -698,7 +698,8 @@ class FlexProtGenesis(EMProtocol):
         with open(self._getExtraPath("mpi_command"), "w") as f:
             f.write(cmd)
 
-        runCommand(cmd)
+        # the launcher inherits this environment: atdyn needs GENESIS_HOME/bin and the conda libraries
+        runCommand(cmd, env=self.getGenesisEnv())
 
     # --------------------------- Create output step --------------------------------------------
 
@@ -964,7 +965,8 @@ class FlexProtGenesis(EMProtocol):
                 raise RuntimeError("Multiple restart not implemented")
             rstfile = self.getInputPDBprefix(index) + ".rst"
             if not os.path.exists(rstfile):
-                runCommand("cp %s.rst %s" % (self.restartProt.get().getOutputPrefix(), rstfile))
+                # the prefix of this index (checked above to be unique); MDSPACE keeps its last iteration there
+                runCommand("cp %s.rst %s" % (self.restartProt.get().getOutputPrefixAll(index)[0], rstfile))
             return rstfile
         else:
             return None

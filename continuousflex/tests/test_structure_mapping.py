@@ -21,7 +21,8 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # ***************************************************************************/
 from pyworkflow.tests import BaseTest, setupTestProject, DataSet
-from pwem.protocols import ProtImportVolumes
+from pwem.protocols import ProtImportPdb
+from xmipp3.protocols import XmippProtConvertPdb
 from continuousflex.protocols import FlexProtStructureMapping
 
 
@@ -29,15 +30,20 @@ class TestStructureMapping(BaseTest):
   @classmethod
   def setUpClass(cls):
     setupTestProject(cls)
-    cls.dsRelion = DataSet.getDataSet('relion_tutorial')
-    cls.protImport1 = cls.newProtocol(ProtImportVolumes,
-                                      filesPath=cls.dsRelion.getFile('volumes/reference_rotated_masked.vol'),
-                                      samplingRate=1.0)
-    cls.launchProtocol(cls.protImport1)
-    cls.protImport2 = cls.newProtocol(ProtImportVolumes,
-                                      filesPath=cls.dsRelion.getFile('volumes/reference_masked.vol'),
-                                      samplingRate=1.0)
-    cls.launchProtocol(cls.protImport2)
+    # open (4ake) and closed (1ake) adenylate kinase as clean volumes of the same size:
+    # noisy subtomograms give thousands of pseudoatoms and the NMA then fails to converge
+    cls.ds = DataSet.getDataSet('nma_V2.0')
+    cls.protImport1 = cls.pdbToVolume('4ake_pdb')
+    cls.protImport2 = cls.pdbToVolume('1ake_pdb')
+
+  @classmethod
+  def pdbToVolume(cls, key):
+    protPdb = cls.newProtocol(ProtImportPdb, inputPdbData=1, pdbFile=cls.ds.getFile(key))
+    cls.launchProtocol(protPdb)
+    protVol = cls.newProtocol(XmippProtConvertPdb, sampling=2.2, setSize=True, size_x=64)
+    protVol.pdbObj.set(protPdb.outputPdb)
+    cls.launchProtocol(protVol)
+    return protVol
 
   def testStructureMapping(self):
     """

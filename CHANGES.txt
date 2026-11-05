@@ -1,1 +1,13 @@
+3.4.4
+- Euler angle conversion through scipy; tilts below ~6 degrees were zeroed before.
+- TomoFlow: optical flow passed to the GPU warp as float32 (refinement results were garbage).
+- Dimred on deformed PDBs uses the ATOM-only structure the modes were computed on.
+- GENESIS: MPI mode gets its environment and fails loudly; restart uses each simulation's own
+  .rst; MDSPACE "Continue" keeps its iteration; protein-DNA topologies keep the DNA.
+- Classify subtomograms reads .mrc and stacks; viewers fixed for matplotlib >= 3.4;
+  resumed denoise/missing-wedge runs no longer mix raw and filtered volumes.
+- VMD_HOME optional (vmd on PATH is used); deepHEMNMA env gets the Xmipp bindings (pyxmipp3).
+- Structure mapping test runs on the plugin's own dataset.
+- Needs the FRM module in Xmipp 6 for subtomogram alignment (see PR notes).
+
 This is the first version of the continuousflex plugin that combines HEMNMA and StructMap protocols.

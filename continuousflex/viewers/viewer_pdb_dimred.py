@@ -34,7 +34,7 @@ from pwem.emlib.image import ImageHandler
 from joblib import load
 from continuousflex.viewers.tk_dimred import PCAWindowDimred, ANIMATION_INV, ANIMATION_AVG
 from continuousflex.protocols.data import Point, Data, PathData
-from pwem.viewers import VmdView
+from continuousflex.viewers.vmd_view import VmdView
 from pyworkflow.utils.path import cleanPath, makePath, makeTmpPath
 from continuousflex.protocols.utilities.genesis_utilities import numpyArr2dcd, dcd2numpyArr
 from continuousflex.protocols.utilities.pdb_handler import ContinuousFlexPDBHandler

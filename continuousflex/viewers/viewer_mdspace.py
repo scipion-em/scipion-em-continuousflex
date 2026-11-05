@@ -30,7 +30,7 @@ from continuousflex.viewers.viewer_genesis import FlexGenesisViewer
 from continuousflex.protocols.utilities.genesis_utilities import *
 
 from .plotter import FlexPlotter
-from pwem.viewers import VmdView, ChimeraView
+from pwem.viewers import ChimeraView
 from pyworkflow.utils import getListFromRangeString
 import numpy as np
 import os

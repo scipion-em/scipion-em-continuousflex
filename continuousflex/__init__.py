@@ -71,6 +71,16 @@ class Plugin(pwem.Plugin):
         return environ
 
     @classmethod
+    def getVmdEnviron(cls):
+        """ Like pwem's Vmd.getEnviron, but VMD_HOME is optional: it is used only
+        when VMD_HOME/bin/vmd exists, otherwise the vmd found on PATH is used. """
+        environ = pwutils.Environ(os.environ)
+        vmdBin = os.path.join(cls.getVar(VMD_HOME) or '', 'bin')  # None when the plugin is imported outside Scipion
+        if os.path.isfile(os.path.join(vmdBin, 'vmd')):
+            environ.set('PATH', vmdBin, position=pwutils.Environ.BEGIN)
+        return environ
+
+    @classmethod
     def getContinuousFlexCmd(cls, args):
         cmd = cls.getVar(MODEL_CONTINUOUSFLEX_ACTIVATION_VAR)
         if not cmd:

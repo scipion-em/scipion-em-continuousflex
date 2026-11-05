@@ -31,7 +31,7 @@ from pyworkflow.utils.path import cleanPath, makePath
 from pyworkflow.viewer import (ProtocolViewer, DESKTOP_TKINTER, WEB_DJANGO)
 from pyworkflow.protocol.params import StringParam, LabelParam
 from pwem.objects import SetOfParticles
-from pwem.viewers import VmdView
+from continuousflex.viewers.vmd_view import VmdView
 from pyworkflow.gui.browser import FileBrowserWindow
 from continuousflex.protocols.protocol_nma_dimred import FlexProtDimredNMA
 from continuousflex.protocols.data import Point, Data

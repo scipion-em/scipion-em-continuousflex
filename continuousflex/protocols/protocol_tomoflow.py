@@ -350,7 +350,7 @@ class FlexProtHeteroFlow(ProtAnalysis3D):
 
         l = np.shape(x)
         # print(l)
-        flow = np.zeros([3, l[0], l[1], l[2]])
+        flow = np.zeros([3, l[0], l[1], l[2]], dtype=np.float32)  # farneback3d's GPU warp reads float32
         flow[0, :, :, :] = x
         flow[1, :, :, :] = y
         flow[2, :, :, :] = z
